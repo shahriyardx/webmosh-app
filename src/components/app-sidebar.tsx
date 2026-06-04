@@ -25,6 +25,8 @@ import {
   ShoppingCartIcon,
 } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
+import { trpc } from "@/lib/trpc/client"
+import { Badge } from "@/components/ui/badge"
 
 const links = [
   { title: "Overview", href: "/dashboard", icon: LayoutDashboardIcon },
@@ -42,11 +44,19 @@ export function AppSidebar({
   onSignOut?: () => void
 }) {
   const pathname = usePathname()
+  const { data: session } = authClient.useSession()
+  const activeOrgId = session?.session?.activeOrganizationId
+
   const { data: orgList } = useQuery({
     queryKey: ["organizations"],
     queryFn: () => authClient.organization.list(),
   })
   const hasOrgs = (orgList?.data?.length ?? 0) > 0
+
+  const { data: pendingDocCount } = trpc.companies.getPendingDocCount.useQuery(
+    { orgId: activeOrgId ?? "" },
+    { enabled: !!activeOrgId },
+  )
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -82,6 +92,13 @@ export function AppSidebar({
                   <Link href={link.href}>
                     <link.icon />
                     <span>{link.title}</span>
+                    {link.title === "Documents" &&
+                      pendingDocCount !== undefined &&
+                      pendingDocCount > 0 && (
+                        <Badge className="ml-auto size-5 rounded-full p-0 text-[10px]">
+                          {pendingDocCount}
+                        </Badge>
+                      )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

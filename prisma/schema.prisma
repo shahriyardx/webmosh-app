@@ -121,16 +121,22 @@ model Director {
   @@map("director")
 }
 
+enum DocumentStatus {
+  submitted
+  approved
+  rejected
+}
+
 model Document {
-  id             String       @id @default(cuid())
+  id             String          @id @default(cuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   value          String
-  status         String       @default("submitted")
+  status         DocumentStatus  @default(submitted)
   rejectReason   String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@index([organizationId])
   @@map("document")

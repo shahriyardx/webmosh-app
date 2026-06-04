@@ -3,6 +3,7 @@ import { protectedProcedure, router } from "../server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
+import { DocumentStatus } from "@/generated/prisma/enums"
 
 const directorInput = z.object({
   firstName: z.string().min(1),
@@ -171,19 +172,27 @@ export const companiesRouter = router({
           {
             name: "Passport",
             value: passportUrl,
-            status: "submitted",
+            status: DocumentStatus.submitted,
             organizationId: org.id,
           },
           {
             name: "Bank Statement",
             value: bankStatementUrl,
-            status: "submitted",
+            status: DocumentStatus.submitted,
             organizationId: org.id,
           },
         ],
       })
 
       return org
+    }),
+
+  getPendingDocCount: protectedProcedure
+    .input(z.object({ orgId: z.string() }))
+    .query(async ({ input }) => {
+      return prisma.document.count({
+        where: { organizationId: input.orgId, status: DocumentStatus.submitted },
+      })
     }),
 
   getDocuments: protectedProcedure
