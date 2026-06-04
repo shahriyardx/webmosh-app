@@ -133,7 +133,7 @@ model Document {
   organizationId String
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
-  value          String
+  value          String?
   status         DocumentStatus  @default(submitted)
   rejectReason   String?
   createdAt      DateTime        @default(now())

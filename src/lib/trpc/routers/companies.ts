@@ -187,6 +187,25 @@ export const companiesRouter = router({
       return org
     }),
 
+  submitDocument: protectedProcedure
+    .input(z.object({ documentId: z.string(), fileUrl: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const orgId = ctx.session?.session?.activeOrganizationId
+      if (!orgId) throw new Error("No active organization")
+
+      // Verify document belongs to user's org
+      const doc = await prisma.document.findFirst({
+        where: { id: input.documentId, organizationId: orgId },
+      })
+      if (!doc) throw new Error("Document not found")
+
+      return prisma.document.update({
+        where: { id: input.documentId },
+        data: { value: input.fileUrl, status: DocumentStatus.submitted },
+        select: { id: true, name: true, value: true, status: true, createdAt: true, rejectReason: true },
+      })
+    }),
+
   getPendingDocCount: protectedProcedure
     .query(async ({ ctx }) => {
       const orgId = ctx.session?.session?.activeOrganizationId
