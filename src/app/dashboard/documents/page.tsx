@@ -188,7 +188,6 @@ function DocumentCard({
       <Button
         variant="outline"
         size="sm"
-        className="gap-1.5 text-xs"
         disabled={uploading}
         onClick={() => fileInputRef.current?.click()}
       >
@@ -251,7 +250,6 @@ function DocumentCard({
               {doc.value && (
                 <Button
                   variant="outline"
-                  className="h-7 gap-1.5 text-xs"
                   asChild
                 >
                   <a href={doc.value} target="_blank" rel="noopener noreferrer">
