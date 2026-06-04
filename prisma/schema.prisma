@@ -122,6 +122,7 @@ model Director {
 }
 
 enum DocumentStatus {
+  requested
   submitted
   approved
   rejected

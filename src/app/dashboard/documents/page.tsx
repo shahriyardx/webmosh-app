@@ -15,6 +15,11 @@ import {
 } from "lucide-react"
 
 const statusConfig = {
+  requested: {
+    label: "Requested",
+    icon: ClockIcon,
+    variant: "secondary" as const,
+  },
   submitted: {
     label: "Submitted",
     icon: ClockIcon,
