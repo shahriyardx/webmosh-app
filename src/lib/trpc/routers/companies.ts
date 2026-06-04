@@ -186,6 +186,15 @@ export const companiesRouter = router({
       return org
     }),
 
+  getDocuments: protectedProcedure
+    .input(z.object({ orgId: z.string() }))
+    .query(async ({ input }) => {
+      return prisma.document.findMany({
+        where: { organizationId: input.orgId },
+        orderBy: { createdAt: "asc" },
+      })
+    }),
+
   getOverview: protectedProcedure
     .input(z.object({ orgId: z.string() }))
     .query(async ({ input }) => {
