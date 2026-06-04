@@ -251,7 +251,6 @@ function DocumentCard({
               {doc.value && (
                 <Button
                   variant="outline"
-                  size="sm"
                   className="h-7 gap-1.5 text-xs"
                   asChild
                 >
