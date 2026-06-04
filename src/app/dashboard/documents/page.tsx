@@ -122,14 +122,14 @@ export default function DocumentsPage() {
                   </p>
                 )}
               </CardContent>
-              <CardFooter className="flex items-center gap-4 border-t border-border pt-4">
+              <CardFooter className="flex items-center justify-between border-t border-border pt-4">
                 <div className="text-xs text-muted-foreground">
                   Uploaded{" "}
                   {new Date(doc.createdAt).toLocaleDateString()}
                 </div>
                 {doc.value && (
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     className="h-7 gap-1.5 text-xs"
                     asChild
