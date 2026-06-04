@@ -212,7 +212,10 @@ export const companiesRouter = router({
       if (!orgId) return 0
 
       return prisma.document.count({
-        where: { organizationId: orgId, status: DocumentStatus.requested },
+        where: {
+          organizationId: orgId,
+          status: { in: [DocumentStatus.requested, DocumentStatus.rejected] },
+        },
       })
     }),
 
