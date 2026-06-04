@@ -40,12 +40,7 @@ export default function OverviewPage() {
   return (
     <div className="space-y-8">
       <div>
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold text-foreground uppercase">{org.name}</h1>
-          <Badge variant={org.status === "rejected" ? "destructive" : org.status === "processing" ? "default" : "secondary"}>
-            {org.status}
-          </Badge>
-        </div>
+        <h1 className="text-2xl font-semibold text-foreground uppercase">{org.name}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {org.country === "uk" ? "United Kingdom" : "United States"} Company
         </p>
@@ -66,6 +61,24 @@ export default function OverviewPage() {
               <p className="text-sm font-medium">
                 {org.country === "uk" ? "United Kingdom" : "United States"}
               </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">Status</p>
+              <Badge
+                variant={
+                  org.status === "rejected"
+                    ? "destructive"
+                    : org.status === "processing"
+                      ? "default"
+                      : "secondary"
+                }
+                className="mt-0.5"
+              >
+                {org.status}
+              </Badge>
             </div>
           </div>
           <div className="flex items-center gap-3">
