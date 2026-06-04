@@ -1,5 +1,5 @@
-import { createEnv } from "@t3-oss/env-nextjs";
-import { z } from "zod";
+import { createEnv } from "@t3-oss/env-nextjs"
+import { z } from "zod"
 
 export const env = createEnv({
   server: {
@@ -13,6 +13,11 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
+    R2_ENDPOINT: z.string(),
+    R2_ACCESS_KEY: z.string(),
+    R2_SECRET_KEY: z.string(),
+    R2_BUCKET: z.string(),
+    R2_PUBLIC_URL: z.string(),
   },
   client: {},
   runtimeEnv: {
@@ -21,7 +26,12 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
+    R2_ENDPOINT: process.env.R2_ENDPOINT,
+    R2_ACCESS_KEY: process.env.R2_ACCESS_KEY,
+    R2_SECRET_KEY: process.env.R2_SECRET_KEY,
+    R2_BUCKET: process.env.R2_BUCKET,
+    R2_PUBLIC_URL: process.env.R2_PUBLIC_URL,
   },
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   emptyStringAsUndefined: false,
-});
+})

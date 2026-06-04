@@ -1,6 +1,45 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma";
+import { admin } from "better-auth/plugins/admin";
+import { createAccessControl } from "better-auth/plugins/access";
+import { organization } from "better-auth/plugins";
+
+const ac = createAccessControl({
+  user: [
+    "create",
+    "list",
+    "set-role",
+    "ban",
+    "impersonate",
+    "delete",
+    "set-password",
+    "get",
+    "update",
+  ],
+  session: ["list", "revoke", "delete"],
+});
+
+const roles = {
+  user: ac.newRole({
+    user: ["get", "update"],
+    session: [],
+  }),
+  admin: ac.newRole({
+    user: [
+      "create",
+      "list",
+      "set-role",
+      "ban",
+      "impersonate",
+      "delete",
+      "set-password",
+      "get",
+      "update",
+    ],
+    session: ["list", "revoke", "delete"],
+  }),
+};
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
@@ -11,4 +50,25 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
     },
   },
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          const count = await prisma.user.count();
+          if (count === 0) {
+            return { data: { ...user, role: "admin" } };
+          }
+        },
+      },
+    },
+  },
+  plugins: [
+    admin({
+      defaultRole: "user",
+      adminRoles: ["admin"],
+      ac,
+      roles,
+    }),
+    organization(),
+  ],
 });
