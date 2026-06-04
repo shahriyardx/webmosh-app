@@ -188,10 +188,12 @@ export const companiesRouter = router({
     }),
 
   getPendingDocCount: protectedProcedure
-    .input(z.object({ orgId: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx }) => {
+      const orgId = ctx.session?.session?.activeOrganizationId
+      if (!orgId) return 0
+
       return prisma.document.count({
-        where: { organizationId: input.orgId, status: DocumentStatus.submitted },
+        where: { organizationId: orgId, status: DocumentStatus.submitted },
       })
     }),
 

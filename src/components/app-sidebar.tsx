@@ -44,8 +44,6 @@ export function AppSidebar({
   onSignOut?: () => void
 }) {
   const pathname = usePathname()
-  const { data: session } = authClient.useSession()
-  const activeOrgId = session?.session?.activeOrganizationId
 
   const { data: orgList } = useQuery({
     queryKey: ["organizations"],
@@ -53,10 +51,8 @@ export function AppSidebar({
   })
   const hasOrgs = (orgList?.data?.length ?? 0) > 0
 
-  const { data: pendingDocCount } = trpc.companies.getPendingDocCount.useQuery(
-    { orgId: activeOrgId ?? "" },
-    { enabled: !!activeOrgId },
-  )
+  const { data: pendingDocCount } =
+    trpc.companies.getPendingDocCount.useQuery()
 
   return (
     <Sidebar collapsible="icon" {...props}>
