@@ -219,6 +219,7 @@ export const companiesRouter = router({
               value: true,
               status: true,
               rejectReason: true,
+              createdAt: true,
             },
           },
           members: {
