@@ -86,12 +86,13 @@ model Verification {
 }
 
 model Organization {
-  id          String       @id @default(cuid())
+  id          String        @id @default(cuid())
   name        String
   slug        String
   logo        String?
   createdAt   DateTime
   metadata    String?
+  status      CompanyStatus @default(pending)
   members     Member[]
   invitations Invitation[]
   country     String?      @map("country")
@@ -125,6 +126,12 @@ enum DocumentStatus {
   requested
   submitted
   approved
+  rejected
+}
+
+enum CompanyStatus {
+  pending
+  processing
   rejected
 }
 

@@ -2,6 +2,7 @@
 
 import { authClient } from "@/lib/auth-client"
 import { trpc } from "@/lib/trpc/client"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Building2Icon,
@@ -39,7 +40,12 @@ export default function OverviewPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground uppercase">{org.name}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold text-foreground uppercase">{org.name}</h1>
+          <Badge variant={org.status === "rejected" ? "destructive" : org.status === "processing" ? "default" : "secondary"}>
+            {org.status}
+          </Badge>
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">
           {org.country === "uk" ? "United Kingdom" : "United States"} Company
         </p>

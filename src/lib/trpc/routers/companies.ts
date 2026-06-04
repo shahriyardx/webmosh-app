@@ -233,7 +233,13 @@ export const companiesRouter = router({
     .query(async ({ input }) => {
       return prisma.organization.findUnique({
         where: { id: input.orgId },
-        include: {
+        select: {
+          name: true,
+          country: true,
+          sicCode: true,
+          sicDescription: true,
+          status: true,
+          createdAt: true,
           directors: {
             select: {
               id: true,
