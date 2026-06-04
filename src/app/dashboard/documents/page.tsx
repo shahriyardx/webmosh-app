@@ -2,7 +2,7 @@
 
 import { authClient } from "@/lib/auth-client"
 import { trpc } from "@/lib/trpc/client"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -104,43 +104,42 @@ export default function DocumentsPage() {
                 <StatusBadge status={doc.status} />
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-4">
-                  <div className="text-xs text-muted-foreground">
-                    Uploaded{" "}
-                    {new Date(doc.createdAt).toLocaleDateString()}
-                  </div>
-                  {doc.value && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 gap-1.5 text-xs"
-                      asChild
-                    >
-                      <a
-                        href={doc.value}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <ExternalLinkIcon className="size-3" />
-                        View file
-                      </a>
-                    </Button>
-                  )}
-                </div>
-
                 {doc.rejectReason && (
-                  <p className="mt-3 flex items-center gap-1.5 text-xs text-red-500">
+                  <p className="flex items-center gap-1.5 text-xs text-red-500">
                     <AlertCircleIcon className="size-3" />
                     {doc.rejectReason}
                   </p>
                 )}
 
                 {doc.status === "submitted" && (
-                  <p className="mt-3 text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Document pending review by admin.
                   </p>
                 )}
               </CardContent>
+              <CardFooter className="flex items-center gap-4 border-t border-border pt-4">
+                <div className="text-xs text-muted-foreground">
+                  Uploaded{" "}
+                  {new Date(doc.createdAt).toLocaleDateString()}
+                </div>
+                {doc.value && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1.5 text-xs"
+                    asChild
+                  >
+                    <a
+                      href={doc.value}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLinkIcon className="size-3" />
+                      View file
+                    </a>
+                  </Button>
+                )}
+              </CardFooter>
             </Card>
           ))}
         </div>
