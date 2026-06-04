@@ -153,20 +153,19 @@ function DocumentCard({
   onUploadFile,
 }: {
   doc: {
-    id: string
-    name: string
-    value: string | null
-    status: string
-    rejectReason: string | null
-    requestReason: string | null
-    createdAt: Date
+    id: string;
+    name: string;
+    value: string | null;
+    status: string;
+    rejectReason: string | null;
+    requestReason: string | null;
+    createdAt: Date;
   };
   uploading: boolean;
   onUploadFile: (file: File) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const needsAction =
-    doc.status === "requested" || doc.status === "rejected";
+  const needsAction = doc.status === "requested" || doc.status === "rejected";
 
   const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -187,7 +186,6 @@ function DocumentCard({
       />
       <Button
         variant="outline"
-        size="sm"
         disabled={uploading}
         onClick={() => fileInputRef.current?.click()}
       >
@@ -204,7 +202,7 @@ function DocumentCard({
         )}
       </Button>
     </>
-  )
+  );
 
   return (
     <Card>
@@ -248,10 +246,7 @@ function DocumentCard({
             </div>
             <div className="flex items-center gap-2">
               {doc.value && (
-                <Button
-                  variant="outline"
-                  asChild
-                >
+                <Button variant="outline" asChild>
                   <a href={doc.value} target="_blank" rel="noopener noreferrer">
                     <ExternalLinkIcon className="size-3" />
                     View file
