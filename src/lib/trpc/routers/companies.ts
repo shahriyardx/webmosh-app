@@ -249,6 +249,7 @@ export const companiesRouter = router({
               value: true,
               status: true,
               rejectReason: true,
+              requestReason: true,
               createdAt: true,
             },
           },

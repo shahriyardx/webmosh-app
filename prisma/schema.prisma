@@ -135,6 +135,7 @@ model Document {
   name           String
   value          String?
   status         DocumentStatus  @default(submitted)
+  requestReason  String?
   rejectReason   String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt

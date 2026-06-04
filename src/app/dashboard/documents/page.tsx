@@ -152,6 +152,7 @@ function DocumentCard({
     value: string | null
     status: string
     rejectReason: string | null
+    requestReason: string | null
     createdAt: string
   }
   uploading: boolean
@@ -196,7 +197,8 @@ function DocumentCard({
 
         {isRequested && (
           <p className="text-xs text-muted-foreground">
-            This document has been requested. Please upload it below.
+            {doc.requestReason ??
+              "This document has been requested. Please upload it below."}
           </p>
         )}
       </CardContent>
