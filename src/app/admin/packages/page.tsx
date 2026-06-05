@@ -1,9 +1,11 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { trpc } from "@/lib/trpc/client"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import {
   Table,
   TableBody,
@@ -20,16 +22,18 @@ import {
 } from "lucide-react"
 
 export default function AdminPackagesPage() {
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string
+    title: string
+  } | null>(null)
   const utils = trpc.useUtils()
   const { data: packages, isLoading } = trpc.packages.list.useQuery()
   const deletePkg = trpc.packages.delete.useMutation({
-    onSuccess: () => utils.packages.list.invalidate(),
+    onSuccess: () => {
+      utils.packages.list.invalidate()
+      setDeleteTarget(null)
+    },
   })
-
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Delete this package?")) return
-    deletePkg.mutate({ id })
-  }
 
   if (isLoading) {
     return (
@@ -89,7 +93,7 @@ export default function AdminPackagesPage() {
                           <PencilIcon className="size-4" />
                         </Link>
                       </Button>
-                      <Button variant="outline" size="icon" className="size-8 text-red-500" onClick={() => handleDelete(pkg.id)}>
+                      <Button variant="outline" size="icon" className="size-8 text-red-500" onClick={() => setDeleteTarget({ id: pkg.id, title: pkg.title })}>
                         <Trash2Icon className="size-4" />
                       </Button>
                     </div>
@@ -100,6 +104,19 @@ export default function AdminPackagesPage() {
           </Table>
         </div>
       )}
+
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete Package"
+        description={
+          deleteTarget
+            ? `Are you sure you want to delete "${deleteTarget.title}"? This action cannot be undone.`
+            : ""
+        }
+        onConfirm={() => deleteTarget && deletePkg.mutate({ id: deleteTarget.id })}
+        loading={deletePkg.isPending}
+      />
     </div>
   )
 }
