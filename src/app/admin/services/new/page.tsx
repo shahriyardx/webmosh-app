@@ -3,18 +3,18 @@
 import { useRouter } from "next/navigation"
 import { trpc } from "@/lib/trpc/client"
 import { Button } from "@/components/ui/button"
-import { PackageForm } from "@/components/package-form"
+import { ServiceForm } from "@/components/service-form"
 import { ArrowLeftIcon } from "lucide-react"
 import Link from "next/link"
 
-export default function NewPackagePage() {
+export default function NewServicePage() {
   const router = useRouter()
   const utils = trpc.useUtils()
 
-  const createPkg = trpc.packages.create.useMutation({
+  const createSvc = trpc.services.create.useMutation({
     onSuccess: () => {
-      utils.packages.list.invalidate()
-      router.push("/admin/packages")
+      utils.services.list.invalidate()
+      router.push("/admin/services")
     },
   })
 
@@ -22,21 +22,21 @@ export default function NewPackagePage() {
     <div className="space-y-8">
       <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" asChild className="size-8">
-          <Link href="/admin/packages">
+          <Link href="/admin/services">
             <ArrowLeftIcon className="size-4" />
           </Link>
         </Button>
         <div>
           <h1 className="text-2xl font-semibold text-foreground">
-            New Package
+            New Service
           </h1>
         </div>
       </div>
 
-      <PackageForm
-        submitLabel="Create Package"
-        loading={createPkg.isPending}
-        onSubmit={(data) => createPkg.mutate(data)}
+      <ServiceForm
+        submitLabel="Create Service"
+        loading={createSvc.isPending}
+        onSubmit={(data) => createSvc.mutate(data)}
         onCancel={() => router.back()}
       />
     </div>

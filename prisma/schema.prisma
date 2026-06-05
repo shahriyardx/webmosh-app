@@ -183,13 +183,27 @@ model Invitation {
 }
 
 model Package {
-  id        String   @id @default(cuid())
-  title     String
-  country   String
-  features  String[]
-  price     Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  country     String
+  features    String[]
+  price       Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@map("package")
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  features    String[]
+  price       Float
+  country     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("service")
 }

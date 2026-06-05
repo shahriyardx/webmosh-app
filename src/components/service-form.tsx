@@ -24,11 +24,11 @@ import { PlusIcon, XIcon } from "lucide-react"
 const schema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
-  country: z.enum(["us", "uk"]),
   features: z
     .array(z.object({ value: z.string().min(1, "Feature cannot be empty") }))
     .min(1, "At least one feature required"),
   price: z.string().min(1, "Price is required"),
+  country: z.enum(["us", "uk"]),
 })
 
 type Schema = z.infer<typeof schema>
@@ -36,22 +36,22 @@ type Schema = z.infer<typeof schema>
 const defaultValues: Schema = {
   title: "",
   description: "",
-  country: "us",
   features: [{ value: "" }],
   price: "",
+  country: "us",
 }
 
 function parseForm(data: Schema) {
   return {
     title: data.title,
     description: data.description,
-    country: data.country,
     features: data.features.map((f) => f.value),
     price: parseFloat(data.price),
+    country: data.country,
   }
 }
 
-export function PackageForm({
+export function ServiceForm({
   defaultValues: initial = defaultValues,
   onSubmit,
   loading,
@@ -86,7 +86,7 @@ export function PackageForm({
           <Field>
             <FieldLabel>Title</FieldLabel>
             <FieldContent>
-              <Input placeholder="e.g. Starter LLC" {...field} />
+              <Input placeholder="e.g. Registered Agent" {...field} />
               <FieldError errors={[fieldState.error]} />
             </FieldContent>
           </Field>
@@ -121,7 +121,7 @@ export function PackageForm({
             <FieldLabel>Description</FieldLabel>
             <FieldContent>
               <Textarea
-                placeholder="Describe the package…"
+                placeholder="Describe the service…"
                 className="min-h-24"
                 {...field}
               />
@@ -190,7 +190,7 @@ export function PackageForm({
                 type="number"
                 min={0}
                 step="0.01"
-                placeholder="e.g. 99.00"
+                placeholder="e.g. 49.00"
                 {...field}
               />
               <FieldError errors={[fieldState.error]} />

@@ -4,9 +4,10 @@ import { prisma } from "@/lib/prisma"
 
 const packageSchema = z.object({
   title: z.string().min(1, "Title is required"),
+  description: z.string().min(1, "Description is required"),
   country: z.enum(["us", "uk"]),
   features: z.array(z.string().min(1)).min(1, "At least one feature required"),
-  price: z.number().int().min(0, "Price must be non-negative"),
+  price: z.number().min(0, "Price must be non-negative"),
 })
 
 export const packagesRouter = router({

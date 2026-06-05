@@ -16,19 +16,19 @@ import {
   PlusIcon,
   PencilIcon,
   Trash2Icon,
-  Package,
+  ConciergeBellIcon,
 } from "lucide-react"
 
-export default function AdminPackagesPage() {
+export default function AdminServicesPage() {
   const utils = trpc.useUtils()
-  const { data: packages, isLoading } = trpc.packages.list.useQuery()
-  const deletePkg = trpc.packages.delete.useMutation({
-    onSuccess: () => utils.packages.list.invalidate(),
+  const { data: services, isLoading } = trpc.services.list.useQuery()
+  const deleteSvc = trpc.services.delete.useMutation({
+    onSuccess: () => utils.services.list.invalidate(),
   })
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Delete this package?")) return
-    deletePkg.mutate({ id })
+    if (!window.confirm("Delete this service?")) return
+    deleteSvc.mutate({ id })
   }
 
   if (isLoading) {
@@ -43,29 +43,29 @@ export default function AdminPackagesPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Packages</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Services</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage formation packages and pricing.
+            Manage additional services and pricing.
           </p>
         </div>
         <Button asChild>
-          <Link href="/admin/packages/new">
+          <Link href="/admin/services/new">
             <PlusIcon className="mr-1.5 size-4" />
-            New Package
+            New Service
           </Link>
         </Button>
       </div>
 
-      {packages?.length === 0 ? (
+      {services?.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16">
-            <Package className="size-10 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">No packages yet.</p>
+            <ConciergeBellIcon className="size-10 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">No services yet.</p>
           </CardContent>
         </Card>
       ) : (
         <div className="rounded-lg border border-border">
-        <Table>
+          <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead>Title</TableHead>
@@ -75,21 +75,19 @@ export default function AdminPackagesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {packages?.map((pkg) => (
-                <TableRow key={pkg.id}>
-                  <TableCell className="font-medium">{pkg.title}</TableCell>
-                  <TableCell>
-                    {pkg.country === "uk" ? "UK" : "US"}
-                  </TableCell>
-                  <TableCell>${pkg.price}</TableCell>
+              {services?.map((svc) => (
+                <TableRow key={svc.id}>
+                  <TableCell className="font-medium">{svc.title}</TableCell>
+                  <TableCell>{svc.country === "uk" ? "UK" : "US"}</TableCell>
+                  <TableCell>${svc.price}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Button variant="outline" size="icon" className="size-8" asChild>
-                        <Link href={`/admin/packages/${pkg.id}/edit`}>
+                        <Link href={`/admin/services/${svc.id}/edit`}>
                           <PencilIcon className="size-4" />
                         </Link>
                       </Button>
-                      <Button variant="outline" size="icon" className="size-8 text-red-500" onClick={() => handleDelete(pkg.id)}>
+                      <Button variant="outline" size="icon" className="size-8 text-red-500" onClick={() => handleDelete(svc.id)}>
                         <Trash2Icon className="size-4" />
                       </Button>
                     </div>

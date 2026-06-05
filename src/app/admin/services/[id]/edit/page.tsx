@@ -4,11 +4,11 @@ import { use } from "react"
 import { useRouter } from "next/navigation"
 import { trpc } from "@/lib/trpc/client"
 import { Button } from "@/components/ui/button"
-import { PackageForm } from "@/components/package-form"
+import { ServiceForm } from "@/components/service-form"
 import { ArrowLeftIcon } from "lucide-react"
 import Link from "next/link"
 
-export default function EditPackagePage({
+export default function EditServicePage({
   params,
 }: {
   params: Promise<{ id: string }>
@@ -17,12 +17,12 @@ export default function EditPackagePage({
   const router = useRouter()
   const utils = trpc.useUtils()
 
-  const { data: pkg, isLoading } = trpc.packages.getById.useQuery({ id })
+  const { data: svc, isLoading } = trpc.services.getById.useQuery({ id })
 
-  const updatePkg = trpc.packages.update.useMutation({
+  const updateSvc = trpc.services.update.useMutation({
     onSuccess: () => {
-      utils.packages.list.invalidate()
-      router.push("/admin/packages")
+      utils.services.list.invalidate()
+      router.push("/admin/services")
     },
   })
 
@@ -34,10 +34,10 @@ export default function EditPackagePage({
     )
   }
 
-  if (!pkg) {
+  if (!svc) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <p className="text-sm text-muted-foreground">Package not found.</p>
+        <p className="text-sm text-muted-foreground">Service not found.</p>
       </div>
     )
   }
@@ -46,29 +46,29 @@ export default function EditPackagePage({
     <div className="space-y-8">
       <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" asChild className="size-8">
-          <Link href="/admin/packages">
+          <Link href="/admin/services">
             <ArrowLeftIcon className="size-4" />
           </Link>
         </Button>
         <div>
           <h1 className="text-2xl font-semibold text-foreground">
-            Edit Package
+            Edit Service
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{pkg.title}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{svc.title}</p>
         </div>
       </div>
 
-      <PackageForm
+      <ServiceForm
         defaultValues={{
-          title: pkg.title,
-          description: pkg.description,
-          country: pkg.country as "us" | "uk",
-          features: pkg.features.map((f) => ({ value: f })),
-          price: String(pkg.price),
+          title: svc.title,
+          description: svc.description,
+          features: svc.features.map((f) => ({ value: f })),
+          price: String(svc.price),
+          country: svc.country as "us" | "uk",
         }}
-        loading={updatePkg.isPending}
-        onSubmit={(data) => updatePkg.mutate({ id, ...data })}
-        onCancel={() => router.push("/admin/packages")}
+        loading={updateSvc.isPending}
+        onSubmit={(data) => updateSvc.mutate({ id, ...data })}
+        onCancel={() => router.push("/admin/services")}
       />
     </div>
   )
