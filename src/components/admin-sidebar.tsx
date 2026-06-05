@@ -21,6 +21,7 @@ import {
   UsersIcon,
   Building2Icon,
   FileTextIcon,
+  PackageIcon,
 } from "lucide-react"
 
 const links = [
@@ -35,6 +36,11 @@ const links = [
     title: "Documents",
     href: "/admin/documents",
     icon: FileTextIcon,
+  },
+  {
+    title: "Packages",
+    href: "/admin/packages",
+    icon: PackageIcon,
   },
 ]
 
