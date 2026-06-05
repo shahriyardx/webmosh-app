@@ -1,19 +1,11 @@
 "use client"
 
-import { use, useMemo } from "react"
+import { use } from "react"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
 import { trpc } from "@/lib/trpc/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {
-  PackageFormFields,
-  PackageFormActions,
-  packageFormSchema,
-  packageFormDefaults,
-  type PackageForm,
-} from "@/components/package-form"
+import { PackageForm } from "@/components/package-form"
 import { ArrowLeftIcon } from "lucide-react"
 import Link from "next/link"
 
@@ -34,32 +26,6 @@ export default function EditPackagePage({
       router.push("/admin/packages")
     },
   })
-
-  const form = useForm<PackageForm>({
-    resolver: zodResolver(packageFormSchema),
-    defaultValues: useMemo(
-      () =>
-        pkg
-          ? {
-              title: pkg.title,
-              country: pkg.country as "us" | "uk",
-              features: pkg.features.join(", "),
-              price: String(pkg.price),
-            }
-          : packageFormDefaults,
-      [pkg],
-    ),
-  })
-
-  const onSubmit = (data: PackageForm) => {
-    updatePkg.mutate({
-      id,
-      title: data.title,
-      country: data.country,
-      features: data.features.split(",").map((f) => f.trim()).filter(Boolean),
-      price: parseInt(data.price, 10),
-    })
-  }
 
   if (isLoading) {
     return (
@@ -98,13 +64,17 @@ export default function EditPackagePage({
           <CardTitle className="text-base">Package Details</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-            <PackageFormFields form={form} />
-            <PackageFormActions
-              loading={updatePkg.isPending}
-              onCancel={() => router.push("/admin/packages")}
-            />
-          </form>
+          <PackageForm
+            defaultValues={{
+              title: pkg.title,
+              country: pkg.country as "us" | "uk",
+              features: pkg.features.join(", "),
+              price: String(pkg.price),
+            }}
+            loading={updatePkg.isPending}
+            onSubmit={(data) => updatePkg.mutate({ id, ...data })}
+            onCancel={() => router.push("/admin/packages")}
+          />
         </CardContent>
       </Card>
     </div>

@@ -1,6 +1,7 @@
 "use client"
 
-import { Controller, UseFormReturn } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -18,29 +19,54 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 
-export const packageFormSchema = z.object({
+const schema = z.object({
   title: z.string().min(1, "Title is required"),
   country: z.enum(["us", "uk"]),
   features: z.string().min(1, "At least one feature required"),
   price: z.string().min(1, "Price is required"),
 })
 
-export type PackageForm = z.infer<typeof packageFormSchema>
+type Schema = z.infer<typeof schema>
 
-export const packageFormDefaults: PackageForm = {
+const defaultValues: Schema = {
   title: "",
   country: "us",
   features: "",
   price: "",
 }
 
-export function PackageFormFields({
-  form,
+function parseForm(data: Schema) {
+  return {
+    title: data.title,
+    country: data.country,
+    features: data.features.split(",").map((f) => f.trim()).filter(Boolean),
+    price: parseInt(data.price, 10),
+  }
+}
+
+export function PackageForm({
+  defaultValues: initial = defaultValues,
+  onSubmit,
+  loading,
+  submitLabel = "Save",
+  onCancel,
 }: {
-  form: UseFormReturn<PackageForm>
+  defaultValues?: Schema
+  onSubmit: (data: ReturnType<typeof parseForm>) => void
+  loading: boolean
+  submitLabel?: string
+  onCancel?: () => void
 }) {
+  const form = useForm<Schema>({
+    resolver: zodResolver(schema),
+    defaultValues: initial,
+  })
+
   return (
-    <>
+    <form
+      onSubmit={form.handleSubmit((data) => onSubmit(parseForm(data)))}
+      className="space-y-5"
+    >
       <Controller
         control={form.control}
         name="title"
@@ -109,29 +135,16 @@ export function PackageFormFields({
           </Field>
         )}
       />
-    </>
-  )
-}
-
-export function PackageFormActions({
-  loading,
-  onCancel,
-  submitLabel = "Save",
-}: {
-  loading: boolean
-  onCancel?: () => void
-  submitLabel?: string
-}) {
-  return (
-    <div className="flex items-center justify-end gap-2 pt-2">
-      {onCancel && (
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+      <div className="flex items-center justify-end gap-2 pt-2">
+        {onCancel && (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
+        <Button type="submit" disabled={loading}>
+          {loading ? `${submitLabel}…` : submitLabel}
         </Button>
-      )}
-      <Button type="submit" disabled={loading}>
-        {loading ? `${submitLabel}…` : submitLabel}
-      </Button>
-    </div>
+      </div>
+    </form>
   )
 }
