@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { authClient } from "@/lib/auth-client"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { authClient } from "@/lib/auth-client";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -11,40 +11,40 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { ArrowRight, Building2, FileCheck, Sparkles, Zap } from "lucide-react"
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ArrowRight, Building2, FileCheck, Sparkles, Zap } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter()
-  const { data: session, isPending } = authClient.useSession()
-  const [signingIn, setSigningIn] = useState(false)
+  const router = useRouter();
+  const { data: session, isPending } = authClient.useSession();
+  const [signingIn, setSigningIn] = useState(false);
 
   useEffect(() => {
     if (!isPending && session) {
-      const role = session.user?.role
+      const role = session.user?.role;
       if (role === "admin") {
-        router.push("/admin")
+        router.push("/admin");
       } else {
-        router.push("/dashboard")
+        router.push("/dashboard");
       }
     }
-  }, [session, isPending, router])
+  }, [session, isPending, router]);
 
   const handleGoogleSignIn = async () => {
-    setSigningIn(true)
-    await authClient.signIn.social({ provider: "google" })
-  }
+    setSigningIn(true);
+    await authClient.signIn.social({ provider: "google" });
+  };
 
   if (isPending) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">
         <div className="size-5 animate-pulse rounded-full bg-amber-500/50" />
       </div>
-    )
+    );
   }
 
-  if (session) return null
+  if (session) return null;
 
   return (
     <div className="flex min-h-dvh flex-col bg-background lg:flex-row">
@@ -96,7 +96,7 @@ export default function LoginPage() {
           ].map((item, i) => (
             <div
               key={item.title}
-              className="group animate-fade-in-up space-y-1.5 rounded-xl border border-border bg-card/20 px-5 py-4 transition-colors hover:border-amber-500/20 hover:bg-amber-500/[0.03]"
+              className="group animate-fade-in-up space-y-1.5 rounded-xl border border-border bg-card/20 px-5 py-4 transition-colors hover:border-amber-500/20 hover:bg-amber-500/3"
               style={{ animationDelay: `${200 + i * 100}ms` }}
             >
               <item.icon className="size-4 text-amber-500/70" />
@@ -145,6 +145,7 @@ export default function LoginPage() {
                 className="flex w-full items-center justify-center gap-3"
               >
                 <svg className="size-5 shrink-0" viewBox="0 0 24 24">
+                  <title>IDK</title>
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
@@ -199,5 +200,5 @@ export default function LoginPage() {
         }
       `}</style>
     </div>
-  )
+  );
 }

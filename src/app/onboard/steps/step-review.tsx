@@ -1,12 +1,25 @@
 "use client"
 
 import type { FormValues } from "../page"
+import { trpc } from "@/lib/trpc/client"
 
 interface StepReviewProps {
   data: FormValues
 }
 
 export function StepReview({ data }: StepReviewProps) {
+  const { data: allPackages } = trpc.packages.list.useQuery()
+  const { data: allServices } = trpc.services.list.useQuery()
+
+  const selectedPackage = (allPackages ?? []).find((p) => p.id === data.packageId)
+  const selectedServices = (allServices ?? []).filter((s) =>
+    data.serviceIds?.includes(s.id),
+  )
+
+  const packagePrice = selectedPackage?.price ?? 0
+  const servicesTotal = selectedServices.reduce((sum, s) => sum + s.price, 0)
+  const grandTotal = packagePrice + servicesTotal
+
   const sections = [
     {
       title: "Country",
@@ -64,6 +77,65 @@ export function StepReview({ data }: StepReviewProps) {
             </span>
           </div>
         ))}
+      </div>
+
+      {/* Package summary */}
+      <div className="rounded-xl border border-border">
+        <div className="border-b border-border px-5 py-3">
+          <h3 className="text-sm font-semibold">Formation Package</h3>
+        </div>
+        {selectedPackage ? (
+          <div className="flex items-center justify-between px-5 py-3.5">
+            <div>
+              <span className="text-sm font-medium">{selectedPackage.title}</span>
+              {selectedPackage.description && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {selectedPackage.description}
+                </p>
+              )}
+            </div>
+            <span className="text-sm font-semibold">
+              ${selectedPackage.price}
+            </span>
+          </div>
+        ) : (
+          <div className="px-5 py-3.5 text-sm text-muted-foreground">None selected</div>
+        )}
+      </div>
+
+      {/* Services summary */}
+      <div className="rounded-xl border border-border">
+        <div className="border-b border-border px-5 py-3">
+          <h3 className="text-sm font-semibold">Additional Services</h3>
+        </div>
+        {selectedServices.length > 0 ? (
+          selectedServices.map((svc) => (
+            <div
+              key={svc.id}
+              className="flex items-center justify-between px-5 py-3.5 border-b border-border last:border-b-0"
+            >
+              <div>
+                <span className="text-sm font-medium">{svc.title}</span>
+                {svc.description && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {svc.description}
+                  </p>
+                )}
+              </div>
+              <span className="text-sm font-semibold">${svc.price}</span>
+            </div>
+          ))
+        ) : (
+          <div className="px-5 py-3.5 text-sm text-muted-foreground">
+            No additional services selected
+          </div>
+        )}
+      </div>
+
+      {/* Total */}
+      <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-5 py-4">
+        <span className="text-base font-semibold">Total</span>
+        <span className="text-xl font-bold">${grandTotal}</span>
       </div>
 
       <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-5 py-4">

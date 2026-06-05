@@ -19,6 +19,8 @@ const createCompanySchema = z.object({
   companyName: z.string().min(1),
   sicCode: z.string().min(1),
   sicDescription: z.string().optional(),
+  packageId: z.string().min(1),
+  serviceIds: z.array(z.string()),
   passportUrl: z.string().min(1),
   bankStatementUrl: z.string().min(1),
   director: directorInput,
@@ -129,6 +131,8 @@ export const companiesRouter = router({
         companyName,
         sicCode,
         sicDescription,
+        packageId,
+        serviceIds,
         passportUrl,
         bankStatementUrl,
         director,
@@ -150,6 +154,8 @@ export const companiesRouter = router({
           country,
           sicCode,
           sicDescription: sicDescription ?? null,
+          packageId,
+          serviceIds,
         },
       })
 

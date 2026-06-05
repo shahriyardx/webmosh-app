@@ -98,6 +98,8 @@ model Organization {
   country     String?      @map("country")
   sicCode     String?      @map("sic_code")
   sicDescription String?   @map("sic_description")
+  packageId   String?
+  serviceIds  String[]
   directors   Director[]
   documents   Document[]
 

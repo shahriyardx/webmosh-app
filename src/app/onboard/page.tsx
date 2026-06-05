@@ -8,6 +8,8 @@ import { authClient } from "@/lib/auth-client"
 import { StepCountry } from "./steps/step-country"
 import { StepName } from "./steps/step-name"
 import { StepSic } from "./steps/step-sic"
+import { StepPackage } from "./steps/step-package"
+import { StepServices } from "./steps/step-services"
 import { StepDocuments } from "./steps/step-documents"
 import { StepDirector } from "./steps/step-director"
 import { StepReview } from "./steps/step-review"
@@ -29,11 +31,13 @@ const directorSchema = z.object({
   address: z.string().min(1, "Residential address is required"),
 })
 
-type FormValues = {
+export type FormValues = {
   country: "us" | "uk"
   companyName: string
   sicCode: string
   sicDescription?: string
+  packageId: string
+  serviceIds: string[]
   passportUrl: string
   bankStatementUrl: string
   director: z.infer<typeof directorSchema>
@@ -45,13 +49,34 @@ const steps = [
   { id: "sic", label: "SIC Code" },
   { id: "documents", label: "Documents" },
   { id: "director", label: "Director" },
+  { id: "package", label: "Package" },
+  { id: "services", label: "Services" },
   { id: "review", label: "Review" },
 ] as const
+
+type StepId = (typeof steps)[number]["id"]
+
+const firstStep: StepId = steps[0].id
+const lastStep: StepId = steps[steps.length - 1].id
+
+function stepIndex(id: StepId): number {
+  return steps.findIndex((s) => s.id === id)
+}
+
+function nextStep(id: StepId): StepId | null {
+  const idx = stepIndex(id)
+  return idx < steps.length - 1 ? steps[idx + 1].id : null
+}
+
+function prevStep(id: StepId): StepId | null {
+  const idx = stepIndex(id)
+  return idx > 0 ? steps[idx - 1].id : null
+}
 
 export default function OnboardPage() {
   const router = useRouter()
   const { data: session, isPending: authPending } = authClient.useSession()
-  const [currentStep, setCurrentStep] = useState(0)
+  const [currentStep, setCurrentStep] = useState<StepId>(firstStep)
   const [formData, setFormData] = useState<Partial<FormValues>>({})
   const [isUploading, setIsUploading] = useState(false)
   const [documentsReady, setDocumentsReady] = useState(false)
@@ -65,7 +90,7 @@ export default function OnboardPage() {
 
   const handleNext = useCallback((stepData: Partial<FormValues>) => {
     setFormData((prev) => ({ ...prev, ...stepData }))
-    setCurrentStep((s) => Math.min(s + 1, steps.length - 1))
+    setCurrentStep((prev) => nextStep(prev) ?? prev)
   }, [])
 
   const triggerNext = useCallback(() => {
@@ -74,7 +99,7 @@ export default function OnboardPage() {
   }, [])
 
   const handleBack = useCallback(() => {
-    setCurrentStep((s) => Math.max(s - 1, 0))
+    setCurrentStep((prev) => prevStep(prev) ?? prev)
   }, [])
 
   if (authPending) {
@@ -108,44 +133,47 @@ export default function OnboardPage() {
           <div className="mx-auto w-full max-w-7xl py-8">
             {/* Step indicators */}
             <div className="mb-8 flex items-center gap-2">
-              {steps.map((s, i) => (
-                <div key={s.id} className="flex items-center gap-2">
-                  <div
-                    className={`flex size-8 items-center justify-center rounded-full text-sm font-medium transition-colors ${
-                      i < currentStep
-                        ? "bg-amber-500 text-white"
-                        : i === currentStep
-                          ? "bg-amber-500/10 text-amber-500 border border-amber-500"
-                          : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {i < currentStep ? <CheckIcon className="size-4" /> : i + 1}
+              {steps.map((s, i) => {
+                const currentIdx = stepIndex(currentStep)
+                return (
+                  <div key={s.id} className="flex items-center gap-2">
+                    <div
+                      className={`flex size-8 items-center justify-center rounded-full text-sm font-medium transition-colors ${
+                        i < currentIdx
+                          ? "bg-amber-500 text-white"
+                          : i === currentIdx
+                            ? "bg-amber-500/10 text-amber-500 border border-amber-500"
+                            : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {i < currentIdx ? <CheckIcon className="size-4" /> : i + 1}
+                    </div>
+                    <span
+                      className={`text-sm hidden sm:inline ${
+                        i === currentIdx
+                          ? "font-medium text-foreground"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {s.label}
+                    </span>
+                    {i < steps.length - 1 && (
+                      <div className="mx-2 w-px h-4 bg-border hidden sm:block" />
+                    )}
                   </div>
-                  <span
-                    className={`text-sm hidden sm:inline ${
-                      i === currentStep
-                        ? "font-medium text-foreground"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {s.label}
-                  </span>
-                  {i < steps.length - 1 && (
-                    <div className="mx-2 w-px h-4 bg-border hidden sm:block" />
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             {/* Step content */}
             <div className="w-full">
-              {currentStep === 0 && (
+              {currentStep === "country" && (
                 <StepCountry
                   onNext={handleNext}
                   initialValue={formData.country}
                 />
               )}
-              {currentStep === 1 && (
+              {currentStep === "name" && (
                 <StepName
                   onNext={handleNext}
                   country={formData.country}
@@ -153,7 +181,7 @@ export default function OnboardPage() {
                   onReady={setNameReady}
                 />
               )}
-              {currentStep === 2 && (
+              {currentStep === "sic" && (
                 <StepSic
                   onNext={handleNext}
                   country={formData.country}
@@ -161,7 +189,7 @@ export default function OnboardPage() {
                   initialDescription={formData.sicDescription}
                 />
               )}
-              {currentStep === 3 && (
+              {currentStep === "documents" && (
                 <StepDocuments
                   onNext={handleNext}
                   passportUrl={formData.passportUrl}
@@ -170,13 +198,27 @@ export default function OnboardPage() {
                   onFilesReady={setDocumentsReady}
                 />
               )}
-              {currentStep === 4 && (
+              {currentStep === "director" && (
                 <StepDirector
                   onNext={handleNext}
                   initialValues={formData.director}
                 />
               )}
-              {currentStep === 5 && (
+              {currentStep === "package" && (
+                <StepPackage
+                  onNext={handleNext}
+                  country={formData.country}
+                  initialValue={formData.packageId}
+                />
+              )}
+              {currentStep === "services" && (
+                <StepServices
+                  onNext={handleNext}
+                  country={formData.country}
+                  initialValue={formData.serviceIds}
+                />
+              )}
+              {currentStep === "review" && (
                 <StepReview data={formData as FormValues} />
               )}
             </div>
@@ -189,19 +231,19 @@ export default function OnboardPage() {
             <Button
               variant="outline"
               onClick={handleBack}
-              disabled={currentStep === 0}
+              disabled={currentStep === firstStep}
             >
               <ChevronLeftIcon className="mr-1 size-4" />
               Back
             </Button>
 
-            {currentStep < steps.length - 1 ? (
+            {currentStep !== lastStep ? (
               <Button
                 onClick={triggerNext}
                 disabled={
                   isUploading ||
-                  (currentStep === 1 && !nameReady) ||
-                  (currentStep === 3 && !documentsReady)
+                  (currentStep === "name" && !nameReady) ||
+                  (currentStep === "documents" && !documentsReady)
                 }
               >
                 {isUploading ? (
