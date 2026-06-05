@@ -6,23 +6,15 @@ import { trpc } from "@/lib/trpc/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Field,
-  FieldContent,
-  FieldError,
-  FieldLabel,
-} from "@/components/ui/field"
-import { useForm, Controller } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
+import {
+  PackageFormFields,
+  PackageFormActions,
+  packageFormSchema,
+  packageFormDefaults,
+  type PackageForm,
+} from "@/components/package-form"
 import {
   PlusIcon,
   PencilIcon,
@@ -31,22 +23,6 @@ import {
   DollarSignIcon,
   GlobeIcon,
 } from "lucide-react"
-
-const packageFormSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  country: z.enum(["us", "uk"]),
-  features: z.string().min(1, "Enter at least one feature (comma-separated)"),
-  price: z.string().min(1, "Price is required"),
-})
-
-type PackageForm = z.infer<typeof packageFormSchema>
-
-const defaultValues: PackageForm = {
-  title: "",
-  country: "us",
-  features: "",
-  price: "",
-}
 
 export default function AdminPackagesPage() {
   const utils = trpc.useUtils()
@@ -62,7 +38,7 @@ export default function AdminPackagesPage() {
 
   const editForm = useForm<PackageForm>({
     resolver: zodResolver(packageFormSchema),
-    defaultValues,
+    defaultValues: packageFormDefaults,
   })
 
   const handleUpdate = (data: PackageForm) => {
@@ -74,7 +50,7 @@ export default function AdminPackagesPage() {
       features: data.features.split(",").map((f) => f.trim()).filter(Boolean),
       price: parseInt(data.price, 10),
     })
-    editForm.reset(defaultValues)
+    editForm.reset(packageFormDefaults)
   }
 
   const startEdit = (pkg: NonNullable<typeof packages>[number]) => {
@@ -133,12 +109,13 @@ export default function AdminPackagesPage() {
                   <CardTitle className="text-base">Edit Package</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <PackageFormContent
-                    form={editForm}
-                    onSubmit={handleUpdate}
-                    loading={updatePkg.isPending}
-                    onCancel={() => { setEditingId(null); editForm.reset(defaultValues) }}
-                  />
+                  <form onSubmit={editForm.handleSubmit(handleUpdate)} className="space-y-5">
+                    <PackageFormFields form={editForm} />
+                    <PackageFormActions
+                      loading={updatePkg.isPending}
+                      onCancel={() => { setEditingId(null); editForm.reset(packageFormDefaults) }}
+                    />
+                  </form>
                 </CardContent>
               </Card>
             ) : (
@@ -181,92 +158,5 @@ export default function AdminPackagesPage() {
         </div>
       )}
     </div>
-  )
-}
-
-function PackageFormContent({
-  form,
-  onSubmit,
-  loading,
-  onCancel,
-}: {
-  form: ReturnType<typeof useForm<PackageForm>>
-  onSubmit: (data: PackageForm) => void
-  loading: boolean
-  onCancel?: () => void
-}) {
-  return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-      <Controller
-        control={form.control}
-        name="title"
-        render={({ field, fieldState }) => (
-          <Field>
-            <FieldLabel>Title</FieldLabel>
-            <FieldContent>
-              <Input placeholder="e.g. Starter LLC" {...field} />
-              <FieldError errors={[fieldState.error]} />
-            </FieldContent>
-          </Field>
-        )}
-      />
-      <Controller
-        control={form.control}
-        name="country"
-        render={({ field, fieldState }) => (
-          <Field>
-            <FieldLabel>Country</FieldLabel>
-            <FieldContent>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="us">United States</SelectItem>
-                  <SelectItem value="uk">United Kingdom</SelectItem>
-                </SelectContent>
-              </Select>
-              <FieldError errors={[fieldState.error]} />
-            </FieldContent>
-          </Field>
-        )}
-      />
-      <Controller
-        control={form.control}
-        name="features"
-        render={({ field, fieldState }) => (
-          <Field>
-            <FieldLabel>Features (comma-separated)</FieldLabel>
-            <FieldContent>
-              <Input placeholder="e.g. Free registered agent, Banking support" {...field} />
-              <FieldError errors={[fieldState.error]} />
-            </FieldContent>
-          </Field>
-        )}
-      />
-      <Controller
-        control={form.control}
-        name="price"
-        render={({ field, fieldState }) => (
-          <Field>
-            <FieldLabel>Price (cents)</FieldLabel>
-            <FieldContent>
-              <Input type="number" min={0} placeholder="e.g. 9900 for $99" {...field} />
-              <FieldError errors={[fieldState.error]} />
-            </FieldContent>
-          </Field>
-        )}
-      />
-      <div className="flex items-center justify-end gap-2 pt-2">
-        {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-        )}
-        <Button type="submit" disabled={loading}>
-          {loading ? "Saving…" : "Save"}
-        </Button>
-      </div>
-    </form>
   )
 }
