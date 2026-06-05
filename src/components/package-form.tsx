@@ -116,9 +116,11 @@ export function PackageFormFields({
 export function PackageFormActions({
   loading,
   onCancel,
+  submitLabel = "Save",
 }: {
   loading: boolean
   onCancel?: () => void
+  submitLabel?: string
 }) {
   return (
     <div className="flex items-center justify-end gap-2 pt-2">
@@ -128,7 +130,7 @@ export function PackageFormActions({
         </Button>
       )}
       <Button type="submit" disabled={loading}>
-        {loading ? "Saving…" : "Save"}
+        {loading ? `${submitLabel}…` : submitLabel}
       </Button>
     </div>
   )
