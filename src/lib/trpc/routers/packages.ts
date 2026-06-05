@@ -14,6 +14,12 @@ export const packagesRouter = router({
     prisma.package.findMany({ orderBy: { createdAt: "desc" } }),
   ),
 
+  getById: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .query(({ input }) =>
+      prisma.package.findUnique({ where: { id: input.id } }),
+    ),
+
   create: adminProcedure.input(packageSchema).mutation(({ input }) =>
     prisma.package.create({ data: input }),
   ),
