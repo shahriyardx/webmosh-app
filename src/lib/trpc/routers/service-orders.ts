@@ -1,7 +1,7 @@
 import { z } from "zod"
-import { protectedProcedure, router } from "../server"
+import { adminProcedure, protectedProcedure, router } from "../server"
 import { prisma } from "@/lib/prisma"
-import { PaymentStatus } from "@/generated/prisma/enums"
+import { PaymentStatus, ServiceOrderStatus } from "@/generated/prisma/enums"
 
 async function attachInvoiceAndService(orders: Awaited<ReturnType<typeof prisma.serviceOrder.findMany>>) {
   const invoiceIds = orders.map((o) => o.invoiceId)
@@ -46,6 +46,22 @@ export const serviceOrdersRouter = router({
       if (!order || order.organizationId !== orgId) return null
       const enriched = await attachInvoiceAndService([order])
       return enriched[0]
+    }),
+
+  listAll: adminProcedure.query(async () => {
+    const orders = await prisma.serviceOrder.findMany({
+      orderBy: { createdAt: "desc" },
+    })
+    return attachInvoiceAndService(orders)
+  }),
+
+  updateStatus: adminProcedure
+    .input(z.object({ id: z.string(), status: z.nativeEnum(ServiceOrderStatus) }))
+    .mutation(async ({ input }) => {
+      return prisma.serviceOrder.update({
+        where: { id: input.id },
+        data: { status: input.status },
+      })
     }),
 
   purchase: protectedProcedure

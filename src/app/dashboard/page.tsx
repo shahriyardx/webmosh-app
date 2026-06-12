@@ -2,7 +2,9 @@
 
 import { authClient } from "@/lib/auth-client"
 import { trpc } from "@/lib/trpc/client"
+import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Building2Icon,
@@ -10,6 +12,7 @@ import {
   HashIcon,
   FileTextIcon,
   CalendarIcon,
+  ReceiptIcon,
 } from "lucide-react"
 
 export default function OverviewPage() {
@@ -19,6 +22,12 @@ export default function OverviewPage() {
   const { data: org, isLoading } = trpc.companies.getOverview.useQuery(
     { orgId: activeOrgId ?? "" },
     { enabled: !!activeOrgId },
+  )
+
+  const { data: invoices } = trpc.invoices.list.useQuery()
+
+  const pendingInvoices = (invoices ?? []).filter(
+    (inv) => inv.status === "unpaid" || inv.status === "processing",
   )
 
   if (isLoading) {
@@ -110,6 +119,37 @@ export default function OverviewPage() {
           </div>
         </CardContent>
       </Card>
+
+      {pendingInvoices.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ReceiptIcon className="size-4 text-amber-500" />
+              Pending Invoices
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pendingInvoices.map((inv) => (
+              <div
+                key={inv.id}
+                className="flex items-center justify-between rounded-lg border border-border p-3"
+              >
+                <div>
+                  <p className="text-sm font-medium">${inv.amount}</p>
+                  <p className="text-xs text-muted-foreground capitalize">
+                    {inv.status === "unpaid" ? "Unpaid" : "Processing"}
+                  </p>
+                </div>
+                <Button size="sm" asChild>
+                  <Link href={`/dashboard/invoices/${inv.id}`}>
+                    {inv.status === "unpaid" ? "Pay Now" : "View"}
+                  </Link>
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

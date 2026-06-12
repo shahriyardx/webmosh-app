@@ -1,9 +1,9 @@
 import { z } from "zod"
-import { protectedProcedure, router } from "../server"
+import { adminProcedure, protectedProcedure, router } from "../server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
-import { DocumentStatus, PaymentStatus } from "@/generated/prisma/enums"
+import { CompanyStatus, DocumentStatus, PaymentStatus } from "@/generated/prisma/enums"
 
 const directorInput = z.object({
   firstName: z.string().min(1),
@@ -292,6 +292,94 @@ export const companiesRouter = router({
               role: true,
             },
           },
+        },
+      })
+    }),
+
+  listAll: adminProcedure.query(async () => {
+    return prisma.organization.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        members: {
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
+        directors: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+        documents: {
+          select: { id: true, name: true, status: true },
+        },
+        _count: { select: { invoices: true } },
+      },
+    })
+  }),
+
+  getById: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      return prisma.organization.findUnique({
+        where: { id: input.id },
+        include: {
+          members: {
+            include: {
+              user: {
+                select: { id: true, name: true, email: true, image: true },
+              },
+            },
+          },
+          directors: true,
+          documents: {
+            orderBy: { createdAt: "desc" },
+          },
+          invoices: {
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      })
+    }),
+
+  reviewDocument: adminProcedure
+    .input(
+      z.object({
+        documentId: z.string(),
+        status: z.enum(["approved", "rejected"]),
+        reason: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const data: Record<string, unknown> = { status: input.status }
+      if (input.status === "rejected" && input.reason) {
+        data.rejectReason = input.reason
+      }
+      if (input.status === "approved") {
+        data.rejectReason = null
+      }
+      return prisma.document.update({
+        where: { id: input.documentId },
+        data,
+        select: { id: true, name: true, status: true, rejectReason: true },
+      })
+    }),
+
+  updateStatus: adminProcedure
+    .input(z.object({ id: z.string(), status: z.nativeEnum(CompanyStatus) }))
+    .mutation(async ({ input }) => {
+      return prisma.organization.update({
+        where: { id: input.id },
+        data: { status: input.status },
+      })
+    }),
+
+  requestDocument: adminProcedure
+    .input(z.object({ organizationId: z.string(), name: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      return prisma.document.create({
+        data: {
+          organizationId: input.organizationId,
+          name: input.name,
+          status: DocumentStatus.requested,
         },
       })
     }),

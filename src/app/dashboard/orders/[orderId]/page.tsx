@@ -7,11 +7,17 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ArrowLeftIcon, ShoppingCartIcon, CheckIcon } from "lucide-react"
 
-const statusLabel: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
+const invStatusLabel: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
   unpaid: { label: "Unpaid", variant: "outline" },
   processing: { label: "Processing", variant: "secondary" },
   paid: { label: "Paid", variant: "default" },
   rejected: { label: "Rejected", variant: "destructive" },
+}
+
+const orderStatusLabel: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
+  pending: { label: "Pending", variant: "outline" },
+  processing: { label: "Processing", variant: "secondary" },
+  completed: { label: "Completed", variant: "default" },
 }
 
 export default function OrderDetailPage({
@@ -41,7 +47,8 @@ export default function OrderDetailPage({
 
   const inv = order.invoice
   const svc = order.service
-  const st = inv ? statusLabel[inv.status] ?? statusLabel.unpaid : undefined
+  const st = inv ? invStatusLabel[inv.status] ?? invStatusLabel.unpaid : undefined
+  const os = orderStatusLabel[order.status] ?? orderStatusLabel.pending
 
   return (
     <div className="space-y-6">
@@ -58,8 +65,9 @@ export default function OrderDetailPage({
       </div>
 
       <div className="rounded-xl border border-border">
-        <div className="border-b border-border px-5 py-3.5">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
           <span className="text-sm font-semibold">Service</span>
+          <Badge variant={os.variant}>{os.label}</Badge>
         </div>
         <div className="flex items-center gap-4 px-5 py-4">
           <div className="flex size-12 items-center justify-center rounded-lg bg-amber-500/10">

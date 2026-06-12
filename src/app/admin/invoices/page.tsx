@@ -20,14 +20,12 @@ const tabs = [
   { label: "Unpaid", value: PaymentStatus.unpaid },
   { label: "Processing", value: PaymentStatus.processing },
   { label: "Paid", value: PaymentStatus.paid },
-  { label: "Rejected", value: PaymentStatus.rejected },
 ] as const
 
 const statusBadge: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
   unpaid: { label: "Unpaid", variant: "outline" },
   processing: { label: "Processing", variant: "secondary" },
   paid: { label: "Paid", variant: "default" },
-  rejected: { label: "Rejected", variant: "destructive" },
 }
 
 export default function AdminInvoicesPage() {
@@ -145,11 +143,6 @@ export default function AdminInvoicesPage() {
                         )}
                         {inv.status === PaymentStatus.paid && (
                           <span className="text-xs text-green-600">Completed</span>
-                        )}
-                        {inv.status === PaymentStatus.rejected && (
-                          <div className="text-xs text-red-600 max-w-32 truncate" title={inv.rejectReason ?? ""}>
-                            {inv.rejectReason ?? "Rejected"}
-                          </div>
                         )}
                       </div>
                     </TableCell>

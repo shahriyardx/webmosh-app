@@ -136,6 +136,7 @@ enum DocumentStatus {
 enum CompanyStatus {
   pending
   processing
+  completed
   rejected
 }
 
@@ -144,6 +145,12 @@ enum PaymentStatus {
   processing
   paid
   rejected
+}
+
+enum ServiceOrderStatus {
+  pending
+  processing
+  completed
 }
 
 model Document {
@@ -244,13 +251,14 @@ model Invoice {
 }
 
 model ServiceOrder {
-  id             String   @id @default(cuid())
+  id             String            @id @default(cuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   serviceId      String
   invoiceId      String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  status         ServiceOrderStatus @default(pending)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   @@index([organizationId])
   @@map("service_order")

@@ -18,18 +18,17 @@ import {
 import {
   GalleryVerticalEndIcon,
   ShieldIcon,
-  UsersIcon,
   Building2Icon,
   FileTextIcon,
   PackageIcon,
   ConciergeBellIcon,
   ReceiptIcon,
+  ShoppingCartIcon,
   Settings,
 } from "lucide-react"
 
 const links = [
   { title: "Dashboard", href: "/admin", icon: ShieldIcon },
-  { title: "Users", href: "/admin/users", icon: UsersIcon },
   {
     title: "Formations",
     href: "/admin/formations",
@@ -49,6 +48,11 @@ const links = [
     title: "Services",
     href: "/admin/services",
     icon: ConciergeBellIcon,
+  },
+  {
+    title: "Orders",
+    href: "/admin/orders",
+    icon: ShoppingCartIcon,
   },
   {
     title: "Invoices",
