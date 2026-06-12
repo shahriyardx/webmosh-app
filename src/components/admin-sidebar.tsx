@@ -23,6 +23,7 @@ import {
   FileTextIcon,
   PackageIcon,
   ConciergeBellIcon,
+  ReceiptIcon,
 } from "lucide-react"
 
 const links = [
@@ -47,6 +48,11 @@ const links = [
     title: "Services",
     href: "/admin/services",
     icon: ConciergeBellIcon,
+  },
+  {
+    title: "Invoices",
+    href: "/admin/invoices",
+    icon: ReceiptIcon,
   },
 ]
 

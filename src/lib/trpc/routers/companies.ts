@@ -3,7 +3,7 @@ import { protectedProcedure, router } from "../server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
-import { DocumentStatus } from "@/generated/prisma/enums"
+import { DocumentStatus, PaymentStatus } from "@/generated/prisma/enums"
 
 const directorInput = z.object({
   firstName: z.string().min(1),
@@ -188,6 +188,23 @@ export const companiesRouter = router({
             organizationId: org.id,
           },
         ],
+      })
+
+      // Calculate invoice amount from package + services
+      const formationPkg = await prisma.package.findUnique({ where: { id: packageId } })
+      const selectedSvcs = serviceIds.length > 0
+        ? await prisma.service.findMany({ where: { id: { in: serviceIds } } })
+        : []
+      const pkgPrice = formationPkg?.price ?? 0
+      const svcTotal = selectedSvcs.reduce((sum, s) => sum + s.price, 0)
+      const amount = pkgPrice + svcTotal
+
+      await prisma.invoice.create({
+        data: {
+          organizationId: org.id,
+          amount,
+          status: PaymentStatus.unpaid,
+        },
       })
 
       return org

@@ -102,6 +102,7 @@ model Organization {
   serviceIds  String[]
   directors   Director[]
   documents   Document[]
+  invoices    Invoice[]
 
   @@unique([slug])
   @@map("organization")
@@ -134,6 +135,13 @@ enum DocumentStatus {
 enum CompanyStatus {
   pending
   processing
+  rejected
+}
+
+enum PaymentStatus {
+  unpaid
+  processing
+  paid
   rejected
 }
 
@@ -208,4 +216,20 @@ model Service {
   updatedAt   DateTime @updatedAt
 
   @@map("service")
+}
+
+model Invoice {
+  id              String        @id @default(cuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  amount          Float
+  paymentMethod   String?       @map("payment_method")
+  transactionId   String?       @map("transaction_id")
+  status          PaymentStatus @default(unpaid)
+  rejectReason    String?       @map("reject_reason")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([organizationId])
+  @@map("invoice")
 }

@@ -23,6 +23,7 @@ import {
   FileTextIcon,
   ConciergeBellIcon,
   ShoppingCartIcon,
+  ReceiptIcon,
 } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 import { trpc } from "@/lib/trpc/client"
@@ -33,6 +34,7 @@ const links = [
   { title: "Documents", href: "/dashboard/documents", icon: FileTextIcon },
   { title: "Services", href: "/dashboard/services", icon: ConciergeBellIcon },
   { title: "Orders", href: "/dashboard/orders", icon: ShoppingCartIcon },
+  { title: "Invoices", href: "/dashboard/invoices", icon: ReceiptIcon },
 ]
 
 export function AppSidebar({
