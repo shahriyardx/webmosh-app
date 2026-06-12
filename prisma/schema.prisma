@@ -100,9 +100,10 @@ model Organization {
   sicDescription String?   @map("sic_description")
   packageId   String?
   serviceIds  String[]
-  directors   Director[]
-  documents   Document[]
-  invoices    Invoice[]
+  directors     Director[]
+  documents     Document[]
+  invoices      Invoice[]
+  serviceOrders ServiceOrder[]
 
   @@unique([slug])
   @@map("organization")
@@ -218,18 +219,39 @@ model Service {
   @@map("service")
 }
 
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+
+  @@map("setting")
+}
+
 model Invoice {
-  id              String        @id @default(cuid())
-  organizationId  String
-  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  amount          Float
-  paymentMethod   String?       @map("payment_method")
-  transactionId   String?       @map("transaction_id")
-  status          PaymentStatus @default(unpaid)
-  rejectReason    String?       @map("reject_reason")
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  amount         Float
+  paymentMethod  String?       @map("payment_method")
+  transactionId  String?       @map("transaction_id")
+  status         PaymentStatus @default(unpaid)
+  rejectReason   String?       @map("reject_reason")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@index([organizationId])
   @@map("invoice")
+}
+
+model ServiceOrder {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  serviceId      String
+  invoiceId      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@map("service_order")
 }

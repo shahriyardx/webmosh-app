@@ -4,7 +4,8 @@ import Link from "next/link"
 import { trpc } from "@/lib/trpc/client"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ReceiptIcon, ArrowRightIcon } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { ShoppingCartIcon, ArrowRightIcon } from "lucide-react"
 
 const statusLabel: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
   unpaid: { label: "Unpaid", variant: "outline" },
@@ -13,8 +14,11 @@ const statusLabel: Record<string, { label: string; variant: "outline" | "seconda
   rejected: { label: "Rejected", variant: "destructive" },
 }
 
-export default function InvoicesPage() {
-  const { data: invoices, isLoading } = trpc.invoices.list.useQuery()
+export default function OrdersPage() {
+  const { data: orders, isLoading } = trpc.serviceOrders.list.useQuery()
+  const { data: allServices } = trpc.services.list.useQuery()
+
+  const serviceMap = new Map(allServices?.map((s) => [s.id, s]) ?? [])
 
   if (isLoading) {
     return (
@@ -27,39 +31,44 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Invoices</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Orders</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          View and pay your formation invoices.
+          Your service orders and payment status.
         </p>
       </div>
 
-      {invoices?.length === 0 ? (
+      {orders?.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16">
-            <ReceiptIcon className="size-10 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">No invoices yet.</p>
+            <ShoppingCartIcon className="size-10 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">No orders yet.</p>
+            <Button asChild size="sm">
+              <Link href="/dashboard/services">Browse Services</Link>
+            </Button>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-3">
-          {invoices?.map((inv) => {
+          {orders?.map((order) => {
+            const svc = serviceMap.get(order.serviceId)
+            const inv = order.invoice!
             const st = statusLabel[inv.status] ?? statusLabel.unpaid
             return (
               <Link
-                key={inv.id}
-                href={`/dashboard/invoices/${inv.id}`}
+                key={order.id}
+                href={`/dashboard/orders/${order.id}`}
                 className="flex items-center justify-between rounded-xl border border-border p-4 transition-colors hover:bg-muted/50"
               >
                 <div className="flex items-center gap-4">
                   <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-                    <ReceiptIcon className="size-5 text-muted-foreground" />
+                    <ShoppingCartIcon className="size-5 text-muted-foreground" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">
-                      ${inv.amount}
+                      {svc?.title ?? "Unknown Service"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {((inv as any).item?.title as string) ?? "Formation"} — {new Date(inv.createdAt).toLocaleDateString()}
+                      ${inv.amount} — {new Date(order.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
