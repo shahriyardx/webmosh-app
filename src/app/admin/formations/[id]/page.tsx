@@ -1,6 +1,10 @@
 "use client"
 
-import { use, useState } from "react"
+import { use, useState, useEffect } from "react"
+import { useForm, Controller } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { toast } from "sonner"
 import { CompanyStatus } from "@/generated/prisma/enums"
 import Link from "next/link"
 import { trpc } from "@/lib/trpc/client"
@@ -25,6 +29,7 @@ import {
   DownloadIcon,
   CheckIcon,
   XIcon,
+  SettingsIcon,
 } from "lucide-react"
 import {
   MultiSelect,
@@ -65,25 +70,71 @@ export default function FormationDetailPage({
 
   const { data: org, isLoading } = trpc.companies.getById.useQuery({ id })
   const reviewDoc = trpc.companies.reviewDocument.useMutation({
-    onSuccess: () => utils.companies.getById.invalidate({ id }),
-  })
-  const updateStatus = trpc.companies.updateStatus.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       utils.companies.getById.invalidate({ id })
-      utils.companies.listAll.invalidate()
+      toast.success(data.status === "approved" ? "Document approved" : "Document rejected")
     },
   })
-
   const [rejecting, setRejecting] = useState<{ docId: string; docName: string } | null>(null)
   const [rejectReason, setRejectReason] = useState("")
   const [requestModal, setRequestModal] = useState(false)
   const [requestDocName, setRequestDocName] = useState("")
+
+  const [adminStatus, setAdminStatus] = useState(org?.status ?? ("pending" as string))
+  const [saving, setSaving] = useState(false)
+
+  const adminSchema = z.object({
+    companyId: z.string().optional(),
+    authCode: z.string().optional(),
+  })
+
+  const adminForm = useForm({
+    resolver: zodResolver(adminSchema),
+    defaultValues: { companyId: "", authCode: "" },
+  })
+  const { control: adminControl, handleSubmit: handleAdminSubmit, reset: adminReset } = adminForm
+
+  const updateStatus = trpc.companies.updateStatus.useMutation()
+  const adminUpdate = trpc.companies.updateCompanyDetails.useMutation()
+
+  useEffect(() => {
+    if (org) {
+      setAdminStatus(org.status)
+    }
+  }, [org])
+
+  useEffect(() => {
+    if (org?.companyId != null || org?.authCode != null) {
+      adminReset({ companyId: org.companyId ?? "", authCode: org.authCode ?? "" })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [org?.companyId, org?.authCode])
+
+  const onAdminSave = adminForm.handleSubmit(async (data) => {
+    if (!org || saving) return
+    setSaving(true)
+    const promises: Promise<unknown>[] = []
+    if (adminStatus !== org.status) {
+      promises.push(updateStatus.mutateAsync({ id, status: adminStatus as CompanyStatus }))
+    }
+    if (data.companyId !== org.companyId || data.authCode !== org.authCode) {
+      promises.push(
+        adminUpdate.mutateAsync({ id, companyId: data.companyId ?? "", authCode: data.authCode ?? "" }),
+      )
+    }
+    await Promise.all(promises)
+    utils.companies.getById.invalidate({ id })
+    utils.companies.listAll.invalidate()
+    if (promises.length > 0) toast.success("Settings saved")
+    setSaving(false)
+  })
 
   const requestDoc = trpc.companies.requestDocument.useMutation({
     onSuccess: () => {
       utils.companies.getById.invalidate({ id })
       setRequestModal(false)
       setRequestDocName("")
+      toast.success("Document requested")
     },
   })
 
@@ -122,9 +173,9 @@ export default function FormationDetailPage({
         </div>
       </div>
 
-      {/* Company info */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+      {/* Company info */}
+      <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Building2Icon className="size-4 text-amber-500" />
@@ -132,30 +183,6 @@ export default function FormationDetailPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-start gap-3">
-              <FileTextIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground">Status</p>
-                  <MultiSelect
-                    single
-                    values={[org.status]}
-                    onValuesChange={(vals) => {
-                      const v = vals[0]
-                      if (v) updateStatus.mutate({ id, status: v as CompanyStatus })
-                    }}
-                  >
-                    <MultiSelectTrigger className="h-7 px-2 text-xs">
-                      <MultiSelectValue />
-                    </MultiSelectTrigger>
-                    <MultiSelectContent>
-                      <MultiSelectItem value="pending">Pending</MultiSelectItem>
-                      <MultiSelectItem value="processing">Processing</MultiSelectItem>
-                      <MultiSelectItem value="completed">Completed</MultiSelectItem>
-                      <MultiSelectItem value="rejected">Rejected</MultiSelectItem>
-                    </MultiSelectContent>
-                  </MultiSelect>
-              </div>
-            </div>
             <div className="flex items-start gap-3">
               <GlobeIcon className="size-4 shrink-0 text-muted-foreground" />
               <div>
@@ -188,40 +215,100 @@ export default function FormationDetailPage({
                 </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Owner */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <UserIcon className="size-4 text-amber-500" />
-              Owner
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {owner ? (
-              <>
-                <div className="flex items-start gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-full bg-muted text-sm font-medium">
-                    {owner.name?.charAt(0) ?? "?"}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{owner.name ?? "—"}</p>
-                    <p className="text-xs text-muted-foreground">{owner.email}</p>
-                  </div>
+            {owner && (
+              <div className="flex items-start gap-3">
+                <UserIcon className="size-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Owner</p>
+                  <p className="text-sm font-medium">{owner.name ?? "—"}</p>
+                  <p className="text-xs text-muted-foreground">{owner.email}</p>
                 </div>
-                {org.members.length > 1 && (
-                  <div className="text-xs text-muted-foreground">
-                    {org.members.length - 1} other member{org.members.length - 1 !== 1 ? "s" : ""}
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">No owner found.</p>
+              </div>
             )}
           </CardContent>
         </Card>
+
+      {/* Admin Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <SettingsIcon className="size-4 text-amber-500" />
+            Admin Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onAdminSave} className="space-y-4">
+            <div className="flex items-start gap-3">
+              <FileTextIcon className="mt-1 size-4 shrink-0 text-muted-foreground" />
+              <div className="flex-1">
+                <p className="text-xs text-muted-foreground">Status</p>
+                <MultiSelect
+                  single
+                  values={[adminStatus]}
+                  onValuesChange={(vals) => setAdminStatus(vals[0] ?? "pending")}
+                >
+                  <MultiSelectTrigger className="mt-1 h-8 w-44">
+                    <MultiSelectValue />
+                  </MultiSelectTrigger>
+                  <MultiSelectContent>
+                    <MultiSelectItem value="pending">Pending</MultiSelectItem>
+                    <MultiSelectItem value="processing">Processing</MultiSelectItem>
+                    <MultiSelectItem value="completed">Completed</MultiSelectItem>
+                    <MultiSelectItem value="rejected">Rejected</MultiSelectItem>
+                  </MultiSelectContent>
+                </MultiSelect>
+              </div>
+            </div>
+
+            {org.country === "uk" && (
+              <>
+                <div className="flex items-start gap-3">
+                  <HashIcon className="mt-1 size-4 shrink-0 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">Company ID (Companies House)</p>
+                    <Controller
+                      control={adminControl}
+                      name="companyId"
+                      render={({ field, fieldState }) => (
+                        <div className="space-y-1">
+                          <Input className="mt-1 h-8 text-sm" placeholder="e.g. 12345678" {...field} />
+                          {fieldState.error && (
+                            <p className="text-xs text-red-500">{fieldState.error.message}</p>
+                          )}
+                        </div>
+                      )}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <HashIcon className="mt-1 size-4 shrink-0 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">Auth Code</p>
+                    <Controller
+                      control={adminControl}
+                      name="authCode"
+                      render={({ field, fieldState }) => (
+                        <div className="space-y-1">
+                          <Input className="mt-1 h-8 text-sm" placeholder="Enter auth code" {...field} />
+                          {fieldState.error && (
+                            <p className="text-xs text-red-500">{fieldState.error.message}</p>
+                          )}
+                        </div>
+                      )}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
       </div>
 
       {/* Directors */}
@@ -293,14 +380,16 @@ export default function FormationDetailPage({
                     <div className="flex items-start gap-3">
                       <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
                       <div>
-                        <p className="text-sm font-medium">{doc.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">{doc.name}</p>
+                          <Badge variant={ds.variant}>{ds.label}</Badge>
+                        </div>
                         {doc.rejectReason && (
                           <p className="text-xs text-red-500">{doc.rejectReason}</p>
                         )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant={ds.variant}>{ds.label}</Badge>
                       {doc.value && (
                         <Button variant="outline" size="icon" className="size-8" asChild>
                           <a href={doc.value} target="_blank" rel="noopener noreferrer">
@@ -308,25 +397,29 @@ export default function FormationDetailPage({
                           </a>
                         </Button>
                       )}
-                      {doc.status === "submitted" && (
+                      {doc.status !== "requested" && (
                         <>
-                          <Button
-                            variant="default"
-                            size="icon"
-                            className="size-8"
-                            onClick={() => reviewDoc.mutate({ documentId: doc.id, status: "approved" })}
-                            disabled={reviewDoc.isPending}
-                          >
-                            <CheckIcon className="size-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="size-8 text-red-500"
-                            onClick={() => setRejecting({ docId: doc.id, docName: doc.name })}
-                          >
-                            <XIcon className="size-4" />
-                          </Button>
+                          {doc.status !== "approved" && (
+                            <Button
+                              variant="default"
+                              size="icon"
+                              className="size-8"
+                              onClick={() => reviewDoc.mutate({ documentId: doc.id, status: "approved" })}
+                              disabled={reviewDoc.isPending}
+                            >
+                              <CheckIcon className="size-4" />
+                            </Button>
+                          )}
+                          {doc.status !== "rejected" && (
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="size-8 text-red-500"
+                              onClick={() => setRejecting({ docId: doc.id, docName: doc.name })}
+                            >
+                              <XIcon className="size-4" />
+                            </Button>
+                          )}
                         </>
                       )}
                     </div>

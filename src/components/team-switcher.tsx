@@ -17,7 +17,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
+import { ChevronsUpDownIcon, Building2Icon } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 
 export function TeamSwitcher() {
@@ -63,11 +63,7 @@ export function TeamSwitcher() {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground text-xs font-semibold">
-                {activeOrgData
-                  ? activeOrgData.name.charAt(0).toUpperCase()
-                  : "?"}
-              </div>
+              <Building2Icon className="size-5" />
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium uppercase">
                   {activeOrgData?.name ?? "No organization"}
@@ -83,7 +79,7 @@ export function TeamSwitcher() {
             sideOffset={4}
           >
             <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Organizations
+              Companies
             </DropdownMenuLabel>
             {organizations.map((org) => (
               <DropdownMenuItem
@@ -92,9 +88,6 @@ export function TeamSwitcher() {
                 className="gap-2 p-2"
                 disabled={switching}
               >
-                <div className="flex size-6 items-center justify-center rounded-md border bg-muted text-xs font-medium">
-                  {org.name.charAt(0).toUpperCase()}
-                </div>
                 <span className="flex-1 truncate uppercase">{org.name}</span>
                 {org.id === activeOrgId && (
                   <span className="text-xs text-muted-foreground">Active</span>
@@ -106,9 +99,6 @@ export function TeamSwitcher() {
               className="gap-2 p-2"
               onClick={() => router.push("/onboard")}
             >
-              <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
-                <PlusIcon className="size-4" />
-              </div>
               <div className="font-medium text-muted-foreground">
                 + New Company
               </div>

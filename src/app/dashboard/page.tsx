@@ -97,6 +97,24 @@ export default function OverviewPage() {
               <p className="text-sm font-medium">{org.sicCode ?? "—"}</p>
             </div>
           </div>
+          {org.country === "uk" && org.companyId && (
+            <div className="flex items-center gap-3">
+              <HashIcon className="size-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">Company ID</p>
+                <p className="text-sm font-medium">{org.companyId}</p>
+              </div>
+            </div>
+          )}
+          {org.country === "uk" && org.authCode && (
+            <div className="flex items-center gap-3">
+              <HashIcon className="size-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">Auth Code</p>
+                <p className="text-sm font-mono">{org.authCode}</p>
+              </div>
+            </div>
+          )}
           {org.sicDescription && (
             <div className="flex items-center gap-3">
               <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />

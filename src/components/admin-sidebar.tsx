@@ -19,7 +19,6 @@ import {
   GalleryVerticalEndIcon,
   ShieldIcon,
   Building2Icon,
-  FileTextIcon,
   PackageIcon,
   ConciergeBellIcon,
   ReceiptIcon,
@@ -33,11 +32,6 @@ const links = [
     title: "Formations",
     href: "/admin/formations",
     icon: Building2Icon,
-  },
-  {
-    title: "Documents",
-    href: "/admin/documents",
-    icon: FileTextIcon,
   },
   {
     title: "Packages",

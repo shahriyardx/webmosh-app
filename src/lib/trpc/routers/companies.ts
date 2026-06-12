@@ -262,6 +262,8 @@ export const companiesRouter = router({
           sicCode: true,
           sicDescription: true,
           status: true,
+          companyId: true,
+          authCode: true,
           createdAt: true,
           directors: {
             select: {
@@ -360,6 +362,24 @@ export const companiesRouter = router({
         where: { id: input.documentId },
         data,
         select: { id: true, name: true, status: true, rejectReason: true },
+      })
+    }),
+
+  updateCompanyDetails: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        companyId: z.string().optional(),
+        authCode: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return prisma.organization.update({
+        where: { id: input.id },
+        data: {
+          ...(input.companyId !== undefined && { companyId: input.companyId }),
+          ...(input.authCode !== undefined && { authCode: input.authCode }),
+        },
       })
     }),
 

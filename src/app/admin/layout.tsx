@@ -10,6 +10,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
+import { Toaster } from "@/components/ui/sonner"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -87,6 +88,7 @@ export default function AdminLayout({
         </header>
         <main className="flex flex-1 flex-col p-6">{children}</main>
       </SidebarInset>
+      <Toaster />
     </SidebarProvider>
   )
 }
