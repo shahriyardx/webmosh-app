@@ -15,6 +15,9 @@ const statusLabel: Record<string, { label: string; variant: "outline" | "seconda
 
 export default function InvoicesPage() {
   const { data: invoices, isLoading } = trpc.invoices.list.useQuery()
+  type EnrichedInvoice = NonNullable<typeof invoices>[number] & {
+    item: { type: "service" | "package"; title: string } | null
+  }
 
   if (isLoading) {
     return (
@@ -44,6 +47,7 @@ export default function InvoicesPage() {
         <div className="grid gap-3">
           {invoices?.map((inv) => {
             const st = statusLabel[inv.status] ?? statusLabel.unpaid
+            const item = (inv as EnrichedInvoice).item
             return (
               <Link
                 key={inv.id}
@@ -59,7 +63,7 @@ export default function InvoicesPage() {
                       ${inv.amount}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {((inv as any).item?.title as string) ?? "Formation"} — {new Date(inv.createdAt).toLocaleDateString()}
+                      {item ? item.title : "Formation"} — {new Date(inv.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                 </div>

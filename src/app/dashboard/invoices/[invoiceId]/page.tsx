@@ -25,6 +25,9 @@ export default function InvoiceDetailPage({
   const utils = trpc.useUtils()
 
   const { data: invoice, isLoading } = trpc.invoices.getById.useQuery({ id: invoiceId })
+  type EnrichedInvoice = NonNullable<typeof invoice> & {
+    item: { type: "service" | "package"; title: string } | null
+  }
   const { data: settings } = trpc.settings.getAll.useQuery()
 
   const [selectedMethod, setSelectedMethod] = useState<"stripe" | "bkash" | null>(null)
@@ -78,6 +81,7 @@ export default function InvoiceDetailPage({
 
   const st = statusLabel[invoice.status] ?? statusLabel.unpaid
   const canPay = invoice.status === "unpaid"
+  const invItem = (invoice as EnrichedInvoice).item
   const rate = settings?.usd_to_bdt_rate ? parseFloat(settings.usd_to_bdt_rate) : null
   const bdtAmount = rate ? (invoice.amount * rate).toFixed(2) : null
   const bkashNumber = settings?.bkash_number ?? ""
@@ -111,10 +115,10 @@ export default function InvoiceDetailPage({
             )}
           </div>
 
-          {(invoice as any).item && (
+          {invItem && (
             <div className="border-t border-border pt-4 text-sm text-muted-foreground">
-              {(invoice as any).item.type === "service" ? "Service" : "Package"}:{" "}
-              <span className="font-medium text-foreground">{(invoice as any).item.title}</span>
+              {invItem.type === "service" ? "Service" : "Package"}:{" "}
+              <span className="font-medium text-foreground">{invItem.title}</span>
             </div>
           )}
 

@@ -4,6 +4,10 @@ import { prisma } from "@/lib/prisma"
 import { PaymentStatus } from "@/generated/prisma/enums"
 import Stripe from "stripe"
 
+export type EnrichedInvoice = Awaited<ReturnType<typeof prisma.invoice.findMany>>[number] & {
+  item: { type: "service" | "package"; title: string } | null
+}
+
 async function attachItemInfo(
   invoices: Awaited<ReturnType<typeof prisma.invoice.findMany>>,
 ) {
