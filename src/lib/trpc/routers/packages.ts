@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { adminProcedure, router } from "../server"
+import { adminProcedure, protectedProcedure, router } from "../server"
 import { prisma } from "@/lib/prisma"
 
 const packageSchema = z.object({
@@ -11,7 +11,7 @@ const packageSchema = z.object({
 })
 
 export const packagesRouter = router({
-  list: adminProcedure.query(() =>
+  list: protectedProcedure.query(() =>
     prisma.package.findMany({ orderBy: { createdAt: "desc" } }),
   ),
 
