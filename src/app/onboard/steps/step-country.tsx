@@ -12,7 +12,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 const schema = z.object({
-  country: z.enum(["us", "uk"], { required_error: "Select a country" }),
+  country: z.enum(["us", "uk"], { error: "Select a country" }),
 })
 
 type Schema = z.infer<typeof schema>

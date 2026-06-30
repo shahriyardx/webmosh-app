@@ -32,12 +32,12 @@ export function TeamSwitcher() {
 
   const [switching, setSwitching] = React.useState(false)
 
-  const organizations: {
-    id: string
-    name: string
-    slug: string
-    logo: string | null
-  }[] = orgList?.data ?? []
+  const organizations = (orgList?.data ?? []).map((o) => ({
+    id: o.id,
+    name: o.name,
+    slug: o.slug,
+    logo: o.logo ?? null,
+  }))
   const activeOrgId = session?.session?.activeOrganizationId
   const activeOrgData = organizations.find((o) => o.id === activeOrgId)
 
