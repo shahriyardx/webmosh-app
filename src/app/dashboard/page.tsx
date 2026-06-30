@@ -15,6 +15,7 @@ import {
   CalendarClockIcon,
   ReceiptIcon,
   MailIcon,
+  AlertCircleIcon,
 } from "lucide-react"
 
 function dueMeta(date: Date) {
@@ -58,6 +59,10 @@ export default function OverviewPage() {
     (inv) => inv.status === "unpaid" || inv.status === "processing",
   )
   const unreadMails = (mails ?? []).filter((m) => !m.read)
+
+  const actionDocuments = (org?.documents ?? []).filter(
+    (d) => d.status === "rejected" || d.status === "requested",
+  )
 
   const deadlines = org
     ? (
@@ -183,6 +188,39 @@ export default function OverviewPage() {
           </div>
         </CardContent>
       </Card>
+
+      {actionDocuments.length > 0 && (
+        <Card className="border-red-500/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertCircleIcon className="size-4 text-red-500" />
+              Documents Need Attention
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {actionDocuments.map((doc) => (
+              <div
+                key={doc.id}
+                className="flex items-center justify-between rounded-lg border border-border p-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{doc.name}</p>
+                  <p className="text-xs text-red-600">
+                    {doc.status === "rejected"
+                      ? doc.rejectReason
+                        ? `Rejected: ${doc.rejectReason}`
+                        : "Rejected — please re-upload"
+                      : "Requested — please upload"}
+                  </p>
+                </div>
+                <Button size="sm" asChild>
+                  <Link href="/dashboard/documents">Upload</Link>
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {deadlines.length > 0 && (
         <Card>
