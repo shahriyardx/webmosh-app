@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/auth-client"
 import { trpc } from "@/lib/trpc/client"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card"
 import {
   ConciergeBellIcon,
   Loader2Icon,
@@ -85,47 +92,47 @@ export default function DashboardServicesPage() {
           {filtered.map((svc) => {
             const loading = purchase.isPending && purchase.variables?.serviceId === svc.id
             return (
-              <Card key={svc.id}>
-                <CardContent className="flex flex-col gap-3 p-5">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-amber-500/10">
+              <Card key={svc.id} className="flex flex-col">
+                <CardHeader>
+                  <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-amber-500/10">
                     <ConciergeBellIcon className="size-5 text-amber-500" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">{svc.title}</h3>
-                    {svc.description && (
-                      <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-                        {svc.description}
-                      </p>
-                    )}
-                  </div>
-                  {svc.features.length > 0 && (
+                  <CardTitle>{svc.title}</CardTitle>
+                  {svc.description && (
+                    <CardDescription className="line-clamp-2">
+                      {svc.description}
+                    </CardDescription>
+                  )}
+                </CardHeader>
+                {svc.features.length > 0 && (
+                  <CardContent className="flex-1">
                     <ul className="space-y-1">
                       {svc.features.map((f, i) => (
                         <li key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <CheckIcon className="size-3 text-green-600 shrink-0" />
+                          <CheckIcon className="size-3 shrink-0 text-green-600" />
                           {f}
                         </li>
                       ))}
                     </ul>
-                  )}
-                  <div className="mt-auto flex items-center justify-between pt-3">
-                    <span className="text-lg font-bold text-foreground">${svc.price}</span>
-                    <Button
-                      size="sm"
-                      onClick={() => purchase.mutate({ serviceId: svc.id })}
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2Icon className="mr-1 size-3 animate-spin" />
-                          Processing…
-                        </>
-                      ) : (
-                        "Purchase"
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
+                  </CardContent>
+                )}
+                <CardFooter className="mt-auto justify-between">
+                  <span className="text-lg font-bold text-foreground">${svc.price}</span>
+                  <Button
+                    size="sm"
+                    onClick={() => purchase.mutate({ serviceId: svc.id })}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2Icon className="mr-1 size-3 animate-spin" />
+                        Processing…
+                      </>
+                    ) : (
+                      "Purchase"
+                    )}
+                  </Button>
+                </CardFooter>
               </Card>
             )
           })}

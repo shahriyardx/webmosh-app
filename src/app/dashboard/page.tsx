@@ -12,9 +12,35 @@ import {
   HashIcon,
   FileTextIcon,
   CalendarIcon,
+  CalendarClockIcon,
   ReceiptIcon,
   MailIcon,
 } from "lucide-react"
+
+function dueMeta(date: Date) {
+  const now = new Date()
+  const due = new Date(date)
+  const days = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  let tone: "danger" | "warn" | "ok" = "ok"
+  if (days < 0 || days <= 14) tone = "danger"
+  else if (days <= 30) tone = "warn"
+  let note = `${days} days left`
+  if (days < 0) note = `Overdue by ${Math.abs(days)} days`
+  else if (days === 0) note = "Due today"
+  return { days, tone, note }
+}
+
+const toneStyles: Record<string, string> = {
+  danger: "border-red-500/30 bg-red-500/5",
+  warn: "border-amber-500/30 bg-amber-500/5",
+  ok: "border-border",
+}
+
+const toneText: Record<string, string> = {
+  danger: "text-red-600",
+  warn: "text-amber-600",
+  ok: "text-muted-foreground",
+}
 
 export default function OverviewPage() {
   const { data: session } = authClient.useSession()
@@ -32,6 +58,23 @@ export default function OverviewPage() {
     (inv) => inv.status === "unpaid" || inv.status === "processing",
   )
   const unreadMails = (mails ?? []).filter((m) => !m.read)
+
+  const deadlines = org
+    ? (
+        org.country === "uk"
+          ? [
+              { label: "Confirmation Statement Due", date: org.confirmationStatementDue },
+              { label: "Accounts & Tax Filing Due", date: org.accountsFilingDue },
+            ]
+          : [
+              { label: "State Filing Due", date: org.stateFilingDue },
+              { label: "Federal Filing Due", date: org.federalFilingDue },
+              { label: "State Tax Due", date: org.stateTaxDue },
+            ]
+      )
+        .filter((d): d is { label: string; date: Date } => d.date != null)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    : []
 
   if (isLoading) {
     return (
@@ -140,6 +183,36 @@ export default function OverviewPage() {
           </div>
         </CardContent>
       </Card>
+
+      {deadlines.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CalendarClockIcon className="size-4 text-amber-500" />
+              Filing Deadlines
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {deadlines.map((d) => {
+              const meta = dueMeta(d.date)
+              return (
+                <div
+                  key={d.label}
+                  className={`flex items-center justify-between rounded-lg border p-3 ${toneStyles[meta.tone]}`}
+                >
+                  <div>
+                    <p className="text-sm font-medium">{d.label}</p>
+                    <p className={`text-xs ${toneText[meta.tone]}`}>{meta.note}</p>
+                  </div>
+                  <p className="text-sm font-medium">
+                    {new Date(d.date).toLocaleDateString()}
+                  </p>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {pendingInvoices.length > 0 && (
         <Card>

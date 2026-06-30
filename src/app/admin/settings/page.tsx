@@ -16,9 +16,6 @@ import {
 
 const schema = z.object({
   usdToBdtRate: z.string(),
-  bkashNumber: z.string(),
-  stripePublishableKey: z.string(),
-  stripeSecretKey: z.string(),
 })
 
 type Schema = z.infer<typeof schema>
@@ -32,16 +29,13 @@ export default function AdminSettingsPage() {
 
   const { control, handleSubmit, reset } = useForm<Schema>({
     resolver: zodResolver(schema),
-    defaultValues: { usdToBdtRate: "", bkashNumber: "", stripePublishableKey: "", stripeSecretKey: "" },
+    defaultValues: { usdToBdtRate: "" },
   })
 
   useEffect(() => {
     if (settings) {
       reset({
         usdToBdtRate: settings.usd_to_bdt_rate ?? "",
-        bkashNumber: settings.bkash_number ?? "",
-        stripePublishableKey: settings.stripe_publishable_key ?? "",
-        stripeSecretKey: settings.stripe_secret_key ?? "",
       })
     }
   }, [settings, reset])
@@ -83,62 +77,6 @@ export default function AdminSettingsPage() {
                     min={0}
                     step="0.01"
                     placeholder="e.g. 120"
-                    {...field}
-                  />
-                  <FieldError errors={[fieldState.error]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="bkashNumber"
-            render={({ field, fieldState }) => (
-              <Field>
-                <FieldLabel>bKash Number</FieldLabel>
-                <FieldContent>
-                  <Input
-                    placeholder="e.g. 01XXXXXXXXX"
-                    {...field}
-                  />
-                  <FieldError errors={[fieldState.error]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-
-          <div className="border-t border-border pt-5">
-            <span className="text-sm font-semibold">Stripe</span>
-          </div>
-
-          <Controller
-            control={control}
-            name="stripePublishableKey"
-            render={({ field, fieldState }) => (
-              <Field>
-                <FieldLabel>Publishable Key</FieldLabel>
-                <FieldContent>
-                  <Input
-                    placeholder="pk_live_..."
-                    {...field}
-                  />
-                  <FieldError errors={[fieldState.error]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="stripeSecretKey"
-            render={({ field, fieldState }) => (
-              <Field>
-                <FieldLabel>Secret Key</FieldLabel>
-                <FieldContent>
-                  <Input
-                    type="password"
-                    placeholder="sk_live_..."
                     {...field}
                   />
                   <FieldError errors={[fieldState.error]} />

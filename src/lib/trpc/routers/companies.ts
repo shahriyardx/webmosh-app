@@ -264,6 +264,11 @@ export const companiesRouter = router({
           status: true,
           companyId: true,
           authCode: true,
+          confirmationStatementDue: true,
+          accountsFilingDue: true,
+          stateFilingDue: true,
+          federalFilingDue: true,
+          stateTaxDue: true,
           createdAt: true,
           directors: {
             select: {
@@ -297,6 +302,63 @@ export const companiesRouter = router({
         },
       })
     }),
+
+  getStats: adminProcedure.query(async () => {
+    const [
+      totalFormations,
+      pendingFormations,
+      processingFormations,
+      completedFormations,
+      docsToReview,
+      processingInvoices,
+      unpaidInvoices,
+      pendingOrders,
+      totalUsers,
+      paidInvoices,
+      recentFormations,
+    ] = await Promise.all([
+      prisma.organization.count(),
+      prisma.organization.count({ where: { status: CompanyStatus.pending } }),
+      prisma.organization.count({ where: { status: CompanyStatus.processing } }),
+      prisma.organization.count({ where: { status: CompanyStatus.completed } }),
+      prisma.document.count({ where: { status: DocumentStatus.submitted } }),
+      prisma.invoice.count({ where: { status: PaymentStatus.processing } }),
+      prisma.invoice.count({ where: { status: PaymentStatus.unpaid } }),
+      prisma.serviceOrder.count({ where: { status: "pending" } }),
+      prisma.user.count(),
+      prisma.invoice.findMany({
+        where: { status: PaymentStatus.paid },
+        select: { amount: true },
+      }),
+      prisma.organization.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          name: true,
+          country: true,
+          status: true,
+          createdAt: true,
+        },
+      }),
+    ])
+
+    const revenue = paidInvoices.reduce((sum, i) => sum + i.amount, 0)
+
+    return {
+      totalFormations,
+      pendingFormations,
+      processingFormations,
+      completedFormations,
+      docsToReview,
+      processingInvoices,
+      unpaidInvoices,
+      pendingOrders,
+      totalUsers,
+      revenue,
+      recentFormations,
+    }
+  }),
 
   listAll: adminProcedure.query(async () => {
     return prisma.organization.findMany({
@@ -371,14 +433,36 @@ export const companiesRouter = router({
         id: z.string(),
         companyId: z.string().optional(),
         authCode: z.string().optional(),
+        confirmationStatementDue: z.string().nullable().optional(),
+        accountsFilingDue: z.string().nullable().optional(),
+        stateFilingDue: z.string().nullable().optional(),
+        federalFilingDue: z.string().nullable().optional(),
+        stateTaxDue: z.string().nullable().optional(),
       }),
     )
     .mutation(async ({ input }) => {
+      const toDate = (v: string | null | undefined) =>
+        v === undefined ? undefined : v ? new Date(v) : null
       return prisma.organization.update({
         where: { id: input.id },
         data: {
           ...(input.companyId !== undefined && { companyId: input.companyId }),
           ...(input.authCode !== undefined && { authCode: input.authCode }),
+          ...(input.confirmationStatementDue !== undefined && {
+            confirmationStatementDue: toDate(input.confirmationStatementDue),
+          }),
+          ...(input.accountsFilingDue !== undefined && {
+            accountsFilingDue: toDate(input.accountsFilingDue),
+          }),
+          ...(input.stateFilingDue !== undefined && {
+            stateFilingDue: toDate(input.stateFilingDue),
+          }),
+          ...(input.federalFilingDue !== undefined && {
+            federalFilingDue: toDate(input.federalFilingDue),
+          }),
+          ...(input.stateTaxDue !== undefined && {
+            stateTaxDue: toDate(input.stateTaxDue),
+          }),
         },
       })
     }),

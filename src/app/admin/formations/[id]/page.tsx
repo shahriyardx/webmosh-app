@@ -52,6 +52,40 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
+function toDateInput(d: Date | string | null | undefined): string {
+  if (!d) return ""
+  const date = new Date(d)
+  if (isNaN(date.getTime())) return ""
+  return date.toISOString().slice(0, 10)
+}
+
+function DateField({
+  control,
+  name,
+  label,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  control: any
+  name: string
+  label: string
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <CalendarIcon className="mt-1 size-4 shrink-0 text-muted-foreground" />
+      <div className="flex-1">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <Controller
+          control={control}
+          name={name}
+          render={({ field }) => (
+            <Input type="date" className="mt-1 h-8 text-sm" {...field} />
+          )}
+        />
+      </div>
+    </div>
+  )
+}
+
 const statusBadge: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
   pending: { label: "Pending", variant: "outline" },
   processing: { label: "Processing", variant: "secondary" },
@@ -99,13 +133,26 @@ export default function FormationDetailPage({
   const adminSchema = z.object({
     companyId: z.string().optional(),
     authCode: z.string().optional(),
+    confirmationStatementDue: z.string().optional(),
+    accountsFilingDue: z.string().optional(),
+    stateFilingDue: z.string().optional(),
+    federalFilingDue: z.string().optional(),
+    stateTaxDue: z.string().optional(),
   })
 
   const adminForm = useForm({
     resolver: zodResolver(adminSchema),
-    defaultValues: { companyId: "", authCode: "" },
+    defaultValues: {
+      companyId: "",
+      authCode: "",
+      confirmationStatementDue: "",
+      accountsFilingDue: "",
+      stateFilingDue: "",
+      federalFilingDue: "",
+      stateTaxDue: "",
+    },
   })
-  const { control: adminControl, handleSubmit: handleAdminSubmit, reset: adminReset } = adminForm
+  const { control: adminControl, reset: adminReset } = adminForm
 
   const updateStatus = trpc.companies.updateStatus.useMutation()
   const adminUpdate = trpc.companies.updateCompanyDetails.useMutation()
@@ -117,11 +164,19 @@ export default function FormationDetailPage({
   }, [org])
 
   useEffect(() => {
-    if (org?.companyId != null || org?.authCode != null) {
-      adminReset({ companyId: org.companyId ?? "", authCode: org.authCode ?? "" })
+    if (org) {
+      adminReset({
+        companyId: org.companyId ?? "",
+        authCode: org.authCode ?? "",
+        confirmationStatementDue: toDateInput(org.confirmationStatementDue),
+        accountsFilingDue: toDateInput(org.accountsFilingDue),
+        stateFilingDue: toDateInput(org.stateFilingDue),
+        federalFilingDue: toDateInput(org.federalFilingDue),
+        stateTaxDue: toDateInput(org.stateTaxDue),
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [org?.companyId, org?.authCode])
+  }, [org?.id])
 
   const onAdminSave = adminForm.handleSubmit(async (data) => {
     if (!org || saving) return
@@ -130,15 +185,22 @@ export default function FormationDetailPage({
     if (adminStatus !== org.status) {
       promises.push(updateStatus.mutateAsync({ id, status: adminStatus as CompanyStatus }))
     }
-    if (data.companyId !== org.companyId || data.authCode !== org.authCode) {
-      promises.push(
-        adminUpdate.mutateAsync({ id, companyId: data.companyId ?? "", authCode: data.authCode ?? "" }),
-      )
-    }
+    promises.push(
+      adminUpdate.mutateAsync({
+        id,
+        companyId: data.companyId ?? "",
+        authCode: data.authCode ?? "",
+        confirmationStatementDue: data.confirmationStatementDue || null,
+        accountsFilingDue: data.accountsFilingDue || null,
+        stateFilingDue: data.stateFilingDue || null,
+        federalFilingDue: data.federalFilingDue || null,
+        stateTaxDue: data.stateTaxDue || null,
+      }),
+    )
     await Promise.all(promises)
     utils.companies.getById.invalidate({ id })
     utils.companies.listAll.invalidate()
-    if (promises.length > 0) toast.success("Settings saved")
+    toast.success("Settings saved")
     setSaving(false)
   })
 
@@ -394,6 +456,16 @@ export default function FormationDetailPage({
                     />
                   </div>
                 </div>
+                <DateField control={adminControl} name="confirmationStatementDue" label="Confirmation Statement Due" />
+                <DateField control={adminControl} name="accountsFilingDue" label="Accounts & Tax Filing Due" />
+              </>
+            )}
+
+            {org.country === "us" && (
+              <>
+                <DateField control={adminControl} name="stateFilingDue" label="State Filing Due" />
+                <DateField control={adminControl} name="federalFilingDue" label="Federal Filing Due" />
+                <DateField control={adminControl} name="stateTaxDue" label="State Tax Due" />
               </>
             )}
 
@@ -468,60 +540,73 @@ export default function FormationDetailPage({
           {org.documents.length === 0 ? (
             <p className="text-sm text-muted-foreground">No documents.</p>
           ) : (
-            <div className="divide-y divide-border">
-              {org.documents.map((doc) => {
-                const ds = docStatusBadge[doc.status] ?? docStatusBadge.requested
-                return (
-                  <div key={doc.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                    <div className="flex items-start gap-3">
-                      <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium">{doc.name}</p>
+            <div className="rounded-lg border border-border">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {org.documents.map((doc) => {
+                    const ds = docStatusBadge[doc.status] ?? docStatusBadge.requested
+                    return (
+                      <TableRow key={doc.id}>
+                        <TableCell>
+                          <p className="font-medium">{doc.name}</p>
+                          {doc.rejectReason && (
+                            <p className="mt-0.5 text-xs text-red-500">{doc.rejectReason}</p>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           <Badge variant={ds.variant}>{ds.label}</Badge>
-                        </div>
-                        {doc.rejectReason && (
-                          <p className="text-xs text-red-500">{doc.rejectReason}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {doc.value && (
-                        <Button variant="outline" size="icon" className="size-8" asChild>
-                          <a href={doc.value} target="_blank" rel="noopener noreferrer">
-                            <DownloadIcon className="size-4" />
-                          </a>
-                        </Button>
-                      )}
-                      {doc.status !== "requested" && (
-                        <>
-                          {doc.status !== "approved" && (
-                            <Button
-                              variant="default"
-                              size="icon"
-                              className="size-8"
-                              onClick={() => reviewDoc.mutate({ documentId: doc.id, status: "approved" })}
-                              disabled={reviewDoc.isPending}
-                            >
-                              <CheckIcon className="size-4" />
-                            </Button>
-                          )}
-                          {doc.status !== "rejected" && (
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="size-8 text-red-500"
-                              onClick={() => setRejecting({ docId: doc.id, docName: doc.name })}
-                            >
-                              <XIcon className="size-4" />
-                            </Button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {doc.value && (
+                              <Button variant="outline" size="icon" className="size-8" asChild>
+                                <a href={doc.value} target="_blank" rel="noopener noreferrer">
+                                  <DownloadIcon className="size-4" />
+                                </a>
+                              </Button>
+                            )}
+                            {doc.status !== "requested" && (
+                              <>
+                                {doc.status !== "approved" && (
+                                  <Button
+                                    variant="default"
+                                    size="icon"
+                                    className="size-8"
+                                    onClick={() => reviewDoc.mutate({ documentId: doc.id, status: "approved" })}
+                                    disabled={reviewDoc.isPending}
+                                  >
+                                    <CheckIcon className="size-4" />
+                                  </Button>
+                                )}
+                                {doc.status !== "rejected" && (
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="size-8 text-red-500"
+                                    onClick={() => setRejecting({ docId: doc.id, docName: doc.name })}
+                                  >
+                                    <XIcon className="size-4" />
+                                  </Button>
+                                )}
+                              </>
+                            )}
+                            {doc.status === "requested" && !doc.value && (
+                              <span className="text-xs text-muted-foreground">Awaiting upload</span>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>
