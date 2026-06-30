@@ -106,6 +106,7 @@ model Organization {
   documents      Document[]
   invoices       Invoice[]
   serviceOrders  ServiceOrder[]
+  mails          Mail[]
 
   @@unique([slug])
   @@map("organization")
@@ -241,6 +242,7 @@ model Invoice {
   organizationId String
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   amount         Float
+  description    String?
   paymentMethod  String?       @map("payment_method")
   transactionId  String?       @map("transaction_id")
   status         PaymentStatus @default(unpaid)
@@ -250,6 +252,22 @@ model Invoice {
 
   @@index([organizationId])
   @@map("invoice")
+}
+
+model Mail {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  from           String
+  subject        String
+  body           String
+  attachments    String[]
+  read           Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@map("mail")
 }
 
 model ServiceOrder {

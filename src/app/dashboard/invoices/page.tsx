@@ -63,7 +63,7 @@ export default function InvoicesPage() {
                       ${inv.amount}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {item ? item.title : "Formation"} — {new Date(inv.createdAt).toLocaleDateString()}
+                      {inv.description || (item ? item.title : "Formation")} — {new Date(inv.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                 </div>

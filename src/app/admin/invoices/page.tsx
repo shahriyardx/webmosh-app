@@ -107,7 +107,12 @@ export default function AdminInvoicesPage() {
                     <TableCell className="font-medium">
                       {inv.organization?.name ?? "—"}
                     </TableCell>
-                    <TableCell>${inv.amount}</TableCell>
+                    <TableCell>
+                      <p>${inv.amount}</p>
+                      {inv.description && (
+                        <p className="mt-0.5 max-w-xs text-xs text-muted-foreground">{inv.description}</p>
+                      )}
+                    </TableCell>
                     <TableCell className="capitalize">
                       {inv.paymentMethod ?? "—"}
                     </TableCell>

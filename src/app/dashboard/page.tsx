@@ -13,6 +13,7 @@ import {
   FileTextIcon,
   CalendarIcon,
   ReceiptIcon,
+  MailIcon,
 } from "lucide-react"
 
 export default function OverviewPage() {
@@ -25,10 +26,12 @@ export default function OverviewPage() {
   )
 
   const { data: invoices } = trpc.invoices.list.useQuery()
+  const { data: mails } = trpc.mails.list.useQuery()
 
   const pendingInvoices = (invoices ?? []).filter(
     (inv) => inv.status === "unpaid" || inv.status === "processing",
   )
+  const unreadMails = (mails ?? []).filter((m) => !m.read)
 
   if (isLoading) {
     return (
@@ -162,6 +165,34 @@ export default function OverviewPage() {
                   <Link href={`/dashboard/invoices/${inv.id}`}>
                     {inv.status === "unpaid" ? "Pay Now" : "View"}
                   </Link>
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {unreadMails.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <MailIcon className="size-4 text-amber-500" />
+              Unread Mail
+              <Badge className="ml-1">{unreadMails.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {unreadMails.map((m) => (
+              <div
+                key={m.id}
+                className="flex items-center justify-between rounded-lg border border-border p-3"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{m.subject}</p>
+                  <p className="text-xs text-muted-foreground">From: {m.from}</p>
+                </div>
+                <Button size="sm" variant="outline" asChild>
+                  <Link href="/dashboard/mail">View</Link>
                 </Button>
               </div>
             ))}

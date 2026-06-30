@@ -106,7 +106,7 @@ export const invoicesRouter = router({
     .input(
       z.object({
         invoiceId: z.string(),
-        paymentMethod: z.enum(["bkash"]),
+        paymentMethod: z.enum(["bkash", "BanglaQR"]),
         transactionId: z.string().min(1, "Transaction ID is required"),
       }),
     )
@@ -278,6 +278,25 @@ export const invoicesRouter = router({
           rejectReason: input.reason,
           paymentMethod: null,
           transactionId: null,
+        },
+      })
+    }),
+
+  create: adminProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        amount: z.number().positive(),
+        description: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return prisma.invoice.create({
+        data: {
+          organizationId: input.organizationId,
+          amount: input.amount,
+          description: input.description || null,
+          status: PaymentStatus.unpaid,
         },
       })
     }),

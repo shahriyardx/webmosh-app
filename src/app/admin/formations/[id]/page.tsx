@@ -1,16 +1,18 @@
 "use client"
 
-import { use, useState, useEffect } from "react"
+import { use, useState, useEffect, useRef } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
-import { CompanyStatus } from "@/generated/prisma/enums"
+import { CompanyStatus, PaymentStatus } from "@/generated/prisma/enums"
 import Link from "next/link"
 import { trpc } from "@/lib/trpc/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Card,
   CardContent,
@@ -30,6 +32,9 @@ import {
   CheckIcon,
   XIcon,
   SettingsIcon,
+  MailIcon,
+  PaperclipIcon,
+  Trash2Icon,
 } from "lucide-react"
 import {
   MultiSelect,
@@ -38,6 +43,14 @@ import {
   MultiSelectContent,
   MultiSelectItem,
 } from "@/components/ui/multi-select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
 const statusBadge: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
   pending: { label: "Pending", variant: "outline" },
@@ -137,6 +150,89 @@ export default function FormationDetailPage({
       toast.success("Document requested")
     },
   })
+
+  const { data: mails } = trpc.mails.listByOrg.useQuery({ organizationId: id })
+  const [mailModal, setMailModal] = useState(false)
+  const [mailFrom, setMailFrom] = useState("")
+  const [mailSubject, setMailSubject] = useState("")
+  const [mailBody, setMailBody] = useState("")
+  const [mailFiles, setMailFiles] = useState<File[]>([])
+  const [mailUploading, setMailUploading] = useState(false)
+  const mailFileRef = useRef<HTMLInputElement>(null)
+
+  const createMail = trpc.mails.create.useMutation({
+    onSuccess: () => {
+      utils.mails.listByOrg.invalidate({ organizationId: id })
+      setMailModal(false)
+      setMailFrom("")
+      setMailSubject("")
+      setMailBody("")
+      setMailFiles([])
+      toast.success("Mail added")
+    },
+  })
+
+  const deleteMail = trpc.mails.delete.useMutation({
+    onSuccess: () => {
+      utils.mails.listByOrg.invalidate({ organizationId: id })
+      toast.success("Mail deleted")
+    },
+  })
+
+  const [invRejecting, setInvRejecting] = useState<{ id: string } | null>(null)
+  const [invRejectReason, setInvRejectReason] = useState("")
+  const [invoiceModal, setInvoiceModal] = useState(false)
+  const [invoiceAmount, setInvoiceAmount] = useState("")
+  const [invoiceDescription, setInvoiceDescription] = useState("")
+  const createInvoice = trpc.invoices.create.useMutation({
+    onSuccess: () => {
+      utils.companies.getById.invalidate({ id })
+      setInvoiceModal(false)
+      setInvoiceAmount("")
+      setInvoiceDescription("")
+      toast.success("Invoice created")
+    },
+  })
+  const approveInvoice = trpc.invoices.approve.useMutation({
+    onSuccess: () => {
+      utils.companies.getById.invalidate({ id })
+      toast.success("Invoice approved")
+    },
+  })
+  const rejectInvoice = trpc.invoices.reject.useMutation({
+    onSuccess: () => {
+      utils.companies.getById.invalidate({ id })
+      setInvRejecting(null)
+      setInvRejectReason("")
+      toast.success("Invoice rejected")
+    },
+  })
+
+  const handleAddMail = async () => {
+    setMailUploading(true)
+    try {
+      let attachments: string[] = []
+      if (mailFiles.length > 0) {
+        const fd = new FormData()
+        mailFiles.forEach((f) => fd.append("mail", f))
+        const res = await fetch("/api/upload", { method: "POST", body: fd })
+        if (!res.ok) throw new Error("Upload failed")
+        const data: { files: { name: string; url: string }[] } = await res.json()
+        attachments = data.files.map((f) => f.url)
+      }
+      await createMail.mutateAsync({
+        organizationId: id,
+        from: mailFrom,
+        subject: mailSubject,
+        body: mailBody,
+        attachments,
+      })
+    } catch {
+      toast.error("Failed to add mail")
+    } finally {
+      setMailUploading(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -434,39 +530,314 @@ export default function FormationDetailPage({
       {/* Invoices */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ReceiptIcon className="size-4 text-amber-500" />
-            Invoices
+          <CardTitle className="flex items-center justify-between text-base">
+            <div className="flex items-center gap-2">
+              <ReceiptIcon className="size-4 text-amber-500" />
+              Invoices
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setInvoiceModal(true)}>
+              + Add Invoice
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
           {org.invoices.length === 0 ? (
             <p className="text-sm text-muted-foreground">No invoices.</p>
           ) : (
-            <div className="divide-y divide-border">
-              {org.invoices.map((inv) => {
-                const is = invStatusLabel[inv.status] ?? invStatusLabel.unpaid
-                return (
-                  <div key={inv.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                    <div>
-                      <p className="text-sm font-medium">${inv.amount}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{inv.id}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={is.variant}>{is.label}</Badge>
-                      {inv.transactionId && (
-                        <span className="text-xs text-muted-foreground font-mono">
-                          {inv.transactionId}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
+            <div className="rounded-lg border border-border">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Method</TableHead>
+                    <TableHead>Transaction</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-40 text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {org.invoices.map((inv) => {
+                    const is = invStatusLabel[inv.status] ?? invStatusLabel.unpaid
+                    return (
+                      <TableRow key={inv.id}>
+                        <TableCell>
+                          <p className="font-medium">${inv.amount}</p>
+                          {inv.description && (
+                            <p className="mt-0.5 max-w-xs text-xs text-muted-foreground">{inv.description}</p>
+                          )}
+                        </TableCell>
+                        <TableCell className="capitalize">{inv.paymentMethod ?? "—"}</TableCell>
+                        <TableCell className="font-mono text-xs">{inv.transactionId ?? "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant={is.variant}>{is.label}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {inv.status === PaymentStatus.processing ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => approveInvoice.mutate({ id: inv.id })}
+                                disabled={approveInvoice.isPending}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setInvRejecting({ id: inv.id })}
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Mails */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between text-base">
+            <div className="flex items-center gap-2">
+              <MailIcon className="size-4 text-amber-500" />
+              Mail
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setMailModal(true)}>
+              + Add Mail
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!mails || mails.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No mail.</p>
+          ) : (
+            <div className="rounded-lg border border-border">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>From</TableHead>
+                    <TableHead>Attachments</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="w-16 text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {mails.map((m) => (
+                    <TableRow key={m.id}>
+                      <TableCell>
+                        <p className="font-medium">{m.subject}</p>
+                        <p className="mt-0.5 max-w-md whitespace-pre-wrap text-xs text-muted-foreground">{m.body}</p>
+                      </TableCell>
+                      <TableCell>{m.from}</TableCell>
+                      <TableCell>
+                        {m.attachments.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {m.attachments.map((url, i) => (
+                              <a
+                                key={url}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                              >
+                                <PaperclipIcon className="size-3" />
+                                {i + 1}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {new Date(m.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="size-8 text-red-500"
+                          onClick={() => deleteMail.mutate({ id: m.id })}
+                          disabled={deleteMail.isPending}
+                        >
+                          <Trash2Icon className="size-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add mail modal */}
+      {mailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-xl bg-popover p-6 ring-1 ring-foreground/10">
+            <h3 className="font-semibold text-foreground">Add Mail</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Record an incoming mail for this company.
+            </p>
+            <div className="mt-4 space-y-4">
+              <div className="space-y-2">
+                <Label>From</Label>
+                <Input
+                  placeholder="e.g. HM Revenue & Customs"
+                  value={mailFrom}
+                  onChange={(e) => setMailFrom(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Subject</Label>
+                <Input
+                  placeholder="e.g. Confirmation Statement Due"
+                  value={mailSubject}
+                  onChange={(e) => setMailSubject(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Body</Label>
+                <Textarea
+                  rows={5}
+                  placeholder="Mail content…"
+                  value={mailBody}
+                  onChange={(e) => setMailBody(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Attachments</Label>
+                <input
+                  ref={mailFileRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    setMailFiles(Array.from(e.target.files ?? []))
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => mailFileRef.current?.click()}
+                >
+                  <PaperclipIcon className="size-3" />
+                  {mailFiles.length > 0 ? `${mailFiles.length} file(s) selected` : "Attach files"}
+                </Button>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setMailModal(false)
+                  setMailFrom("")
+                  setMailSubject("")
+                  setMailBody("")
+                  setMailFiles([])
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddMail}
+                disabled={!mailFrom || !mailSubject || !mailBody || mailUploading || createMail.isPending}
+              >
+                {mailUploading || createMail.isPending ? "Adding…" : "Add Mail"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add invoice modal */}
+      {invoiceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-xl bg-popover p-6 ring-1 ring-foreground/10">
+            <h3 className="font-semibold text-foreground">Add Invoice</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Create an unpaid invoice for this company.
+            </p>
+            <div className="mt-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Amount (USD)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g. 99"
+                  value={invoiceAmount}
+                  onChange={(e) => setInvoiceAmount(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  rows={2}
+                  placeholder="e.g. Annual confirmation statement filing"
+                  value={invoiceDescription}
+                  onChange={(e) => setInvoiceDescription(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setInvoiceModal(false); setInvoiceAmount(""); setInvoiceDescription("") }}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => createInvoice.mutate({ organizationId: id, amount: parseFloat(invoiceAmount), description: invoiceDescription })}
+                disabled={!invoiceAmount || parseFloat(invoiceAmount) <= 0 || createInvoice.isPending}
+              >
+                {createInvoice.isPending ? "Creating…" : "Create Invoice"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject invoice modal */}
+      {invRejecting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-xl bg-popover p-6 ring-1 ring-foreground/10">
+            <h3 className="font-semibold text-foreground">Reject Invoice</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Provide a reason for rejection.
+            </p>
+            <Textarea
+              className="mt-4"
+              rows={3}
+              placeholder="e.g. Invalid transaction ID"
+              value={invRejectReason}
+              onChange={(e) => setInvRejectReason(e.target.value)}
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setInvRejecting(null); setInvRejectReason("") }}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => rejectInvoice.mutate({ id: invRejecting.id, reason: invRejectReason })}
+                disabled={!invRejectReason || rejectInvoice.isPending}
+              >
+                {rejectInvoice.isPending ? "Rejecting…" : "Reject"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Request document modal */}
       {requestModal && (

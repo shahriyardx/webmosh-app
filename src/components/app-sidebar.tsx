@@ -24,6 +24,7 @@ import {
   ConciergeBellIcon,
   ShoppingCartIcon,
   ReceiptIcon,
+  MailIcon,
 } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 import { trpc } from "@/lib/trpc/client"
@@ -35,6 +36,7 @@ const links = [
   { title: "Services", href: "/dashboard/services", icon: ConciergeBellIcon },
   { title: "Orders", href: "/dashboard/orders", icon: ShoppingCartIcon },
   { title: "Invoices", href: "/dashboard/invoices", icon: ReceiptIcon },
+  { title: "Mail", href: "/dashboard/mail", icon: MailIcon },
 ]
 
 export function AppSidebar({
@@ -55,6 +57,8 @@ export function AppSidebar({
 
   const { data: pendingDocCount } =
     trpc.companies.getPendingDocCount.useQuery()
+
+  const { data: unreadMailCount } = trpc.mails.unreadCount.useQuery()
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -95,6 +99,13 @@ export function AppSidebar({
                       pendingDocCount > 0 && (
                         <Badge className="ml-auto size-5 rounded-full p-0 text-[10px]">
                           {pendingDocCount}
+                        </Badge>
+                      )}
+                    {link.title === "Mail" &&
+                      unreadMailCount !== undefined &&
+                      unreadMailCount > 0 && (
+                        <Badge className="ml-auto size-5 rounded-full p-0 text-[10px]">
+                          {unreadMailCount}
                         </Badge>
                       )}
                   </Link>
