@@ -65,7 +65,7 @@ export default function AdminDashboardPage() {
       icon: UsersIcon,
       value: stats.totalUsers,
       sub: "Registered users",
-      href: "/admin/formations",
+      href: "/admin/users",
     },
     {
       title: "Completed",

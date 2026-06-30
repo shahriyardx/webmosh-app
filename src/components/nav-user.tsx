@@ -8,7 +8,6 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -20,7 +19,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, SparklesIcon, BadgeCheckIcon, CreditCardIcon, BellIcon, LogOutIcon } from "lucide-react"
+import { ChevronsUpDownIcon, LogOutIcon } from "lucide-react"
 
 export function NavUser({
   user,
@@ -78,35 +77,8 @@ export function NavUser({
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <SparklesIcon
-                />
-                Upgrade to Pro
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <BadgeCheckIcon
-                />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCardIcon
-                />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <BellIcon
-                />
-                Notifications
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onLogout}>
-              <LogOutIcon
-              />
+              <LogOutIcon />
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
