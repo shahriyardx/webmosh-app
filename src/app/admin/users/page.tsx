@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { authClient } from "@/lib/auth-client"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -20,11 +21,26 @@ import {
   MultiSelectContent,
   MultiSelectItem,
 } from "@/components/ui/multi-select"
-import { UsersIcon } from "lucide-react"
+import { UsersIcon, LogInIcon } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export default function AdminUsersPage() {
+  const router = useRouter()
   const { data: session } = authClient.useSession()
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [impersonatingId, setImpersonatingId] = useState<string | null>(null)
+
+  const handleImpersonate = async (userId: string) => {
+    setImpersonatingId(userId)
+    try {
+      const res = await authClient.admin.impersonateUser({ userId })
+      if (res.error) throw new Error(res.error.message)
+      router.push("/dashboard")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to impersonate")
+      setImpersonatingId(null)
+    }
+  }
 
   const {
     data: users,
@@ -86,6 +102,7 @@ export default function AdminUsersPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead className="w-44 text-right">Role</TableHead>
+                <TableHead className="w-32 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -134,6 +151,19 @@ export default function AdminUsersPage() {
                           </MultiSelect>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {!isSelf && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleImpersonate(u.id)}
+                          disabled={impersonatingId === u.id}
+                        >
+                          <LogInIcon className="size-3.5" />
+                          {impersonatingId === u.id ? "…" : "Impersonate"}
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 )

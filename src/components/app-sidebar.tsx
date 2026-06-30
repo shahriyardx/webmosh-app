@@ -1,6 +1,6 @@
 "use client"
 
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { NavUser } from "@/components/nav-user"
@@ -25,10 +25,12 @@ import {
   ShoppingCartIcon,
   ReceiptIcon,
   MailIcon,
+  UserXIcon,
 } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 import { trpc } from "@/lib/trpc/client"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 
 const links = [
   { title: "Overview", href: "/dashboard", icon: LayoutDashboardIcon },
@@ -48,6 +50,16 @@ export function AppSidebar({
   onSignOut?: () => void
 }) {
   const pathname = usePathname()
+  const router = useRouter()
+
+  const { data: session } = authClient.useSession()
+  const isImpersonating = !!session?.session?.impersonatedBy
+
+  const handleStopImpersonating = async () => {
+    await authClient.admin.stopImpersonating()
+    router.push("/admin/users")
+    router.refresh()
+  }
 
   const { data: orgList } = useQuery({
     queryKey: ["organizations"],
@@ -116,6 +128,19 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
+        {isImpersonating && (
+          <Button
+            variant="destructive"
+            size="sm"
+            className="w-full justify-start"
+            onClick={handleStopImpersonating}
+          >
+            <UserXIcon className="size-4" />
+            <span className="group-data-[collapsible=icon]:hidden">
+              Stop impersonating
+            </span>
+          </Button>
+        )}
         <NavUser user={user} onLogout={onSignOut} />
       </SidebarFooter>
       <SidebarRail />
