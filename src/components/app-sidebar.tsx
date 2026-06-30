@@ -1,6 +1,6 @@
 "use client"
 
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { NavUser } from "@/components/nav-user"
@@ -50,15 +50,13 @@ export function AppSidebar({
   onSignOut?: () => void
 }) {
   const pathname = usePathname()
-  const router = useRouter()
 
   const { data: session } = authClient.useSession()
   const isImpersonating = !!session?.session?.impersonatedBy
 
   const handleStopImpersonating = async () => {
     await authClient.admin.stopImpersonating()
-    router.push("/admin/users")
-    router.refresh()
+    window.location.href = "/admin"
   }
 
   const { data: orgList } = useQuery({
