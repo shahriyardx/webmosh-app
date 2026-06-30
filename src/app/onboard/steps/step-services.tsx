@@ -3,6 +3,14 @@
 import { useState } from "react"
 import { trpc } from "@/lib/trpc/client"
 import { CheckIcon } from "lucide-react"
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card"
 
 interface StepServicesProps {
   country: "us" | "uk" | undefined
@@ -70,34 +78,55 @@ export function StepServices({ country, onNext, initialValue }: StepServicesProp
           {filtered.map((svc) => {
             const isSelected = selectedIds.includes(svc.id)
             return (
-              <button
+              <Card
                 key={svc.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => toggleService(svc.id)}
-                className={`relative rounded-xl border p-4 text-left transition-all ${
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    toggleService(svc.id)
+                  }
+                }}
+                className={`relative flex cursor-pointer flex-col transition-all ${
                   isSelected
-                    ? "border-amber-500 bg-amber-500/5 ring-1 ring-amber-500"
-                    : "border-border bg-background hover:border-amber-500/50"
+                    ? "ring-2 ring-amber-500"
+                    : "hover:ring-foreground/20"
                 }`}
               >
                 {isSelected && (
-                  <div className="absolute right-2.5 top-2.5 flex size-5 items-center justify-center rounded-full bg-amber-500 text-white">
+                  <div className="absolute right-3 top-3 flex size-5 items-center justify-center rounded-full bg-amber-500 text-white">
                     <CheckIcon className="size-3" />
                   </div>
                 )}
 
-                <h3 className="font-medium text-foreground">{svc.title}</h3>
+                <CardHeader>
+                  <CardTitle>{svc.title}</CardTitle>
+                  {svc.description && (
+                    <CardDescription className="line-clamp-2">
+                      {svc.description}
+                    </CardDescription>
+                  )}
+                </CardHeader>
 
-                {svc.description && (
-                  <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-                    {svc.description}
-                  </p>
+                {svc.features.length > 0 && (
+                  <CardContent className="flex-1">
+                    <ul className="space-y-1">
+                      {svc.features.map((f, i) => (
+                        <li key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <CheckIcon className="size-3 shrink-0 text-green-600" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
                 )}
 
-                <div className="mt-2 text-sm font-semibold text-foreground">
-                  ${svc.price}
-                </div>
-              </button>
+                <CardFooter className="mt-auto">
+                  <span className="text-sm font-semibold text-foreground">${svc.price}</span>
+                </CardFooter>
+              </Card>
             )
           })}
         </div>
