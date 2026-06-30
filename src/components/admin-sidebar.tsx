@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
@@ -16,7 +17,6 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import {
-  GalleryVerticalEndIcon,
   ShieldIcon,
   Building2Icon,
   PackageIcon,
@@ -82,8 +82,8 @@ export function AdminSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <div className="flex items-center gap-2 px-2 py-1">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <GalleryVerticalEndIcon />
+              <div className="flex aspect-square size-8 items-center justify-center">
+                <Image src="/logo.png" alt="Webmosh" width={32} height={32} className="size-full object-contain" />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">Webmosh</span>
