@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react"
 import { z } from "zod"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/auth-client"
 import { StepCountry } from "./steps/step-country"
@@ -18,7 +19,6 @@ import {
   ChevronRightIcon,
   CheckIcon,
   Loader2Icon,
-  Building2Icon,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 
@@ -120,9 +120,7 @@ export default function OnboardPage() {
       {/* Header */}
       <header className="flex h-14 items-center border-b border-border px-6">
         <div className="mx-auto flex w-full max-w-7xl items-center gap-2">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-amber-500 text-white">
-            <Building2Icon className="size-4" />
-          </div>
+          <Image src="/logo.png" alt="Webmosh" width={32} height={32} className="size-8 object-contain" />
           <span className="text-sm font-semibold tracking-wide">WEBMOSH</span>
         </div>
       </header>
