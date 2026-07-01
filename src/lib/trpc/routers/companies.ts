@@ -221,6 +221,41 @@ export const companiesRouter = router({
       return org
     }),
 
+  importCompany: protectedProcedure
+    .input(
+      z.object({
+        companyId: z.string().min(1),
+        authCode: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const profile = await getCompaniesHouseProfile(input.companyId.trim())
+      if (!profile || !profile.name) {
+        throw new Error("Company not found on Companies House. Check the Company ID.")
+      }
+
+      const slug = slugify(profile.name) || slugify(input.companyId)
+      const hdrs = await headers()
+
+      const org = await auth.api.createOrganization({
+        body: { name: profile.name, slug },
+        headers: hdrs,
+      })
+
+      await prisma.organization.update({
+        where: { id: org.id },
+        data: {
+          country: "uk",
+          companyId: input.companyId.trim(),
+          authCode: input.authCode.trim(),
+          sicCode: profile.sicCodes[0] ?? null,
+          status: CompanyStatus.completed,
+        },
+      })
+
+      return org
+    }),
+
   submitDocument: protectedProcedure
     .input(z.object({ documentId: z.string(), fileUrl: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {

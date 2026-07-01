@@ -4,7 +4,11 @@ import { useState, useCallback } from "react"
 import { z } from "zod"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent } from "@/components/ui/card"
 import { authClient } from "@/lib/auth-client"
 import { StepCountry } from "./steps/step-country"
 import { StepName } from "./steps/step-name"
@@ -19,6 +23,9 @@ import {
   ChevronRightIcon,
   CheckIcon,
   Loader2Icon,
+  Building2Icon,
+  PlusIcon,
+  ArrowLeftIcon,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 
@@ -76,16 +83,28 @@ function prevStep(id: StepId): StepId | null {
 export default function OnboardPage() {
   const router = useRouter()
   const { data: session, isPending: authPending } = authClient.useSession()
+  const [mode, setMode] = useState<"choice" | "create" | "import">("choice")
   const [currentStep, setCurrentStep] = useState<StepId>(firstStep)
   const [formData, setFormData] = useState<Partial<FormValues>>({})
   const [isUploading, setIsUploading] = useState(false)
   const [documentsReady, setDocumentsReady] = useState(false)
   const [nameReady, setNameReady] = useState(false)
 
+  const [importCompanyId, setImportCompanyId] = useState("")
+  const [importAuthCode, setImportAuthCode] = useState("")
+
   const createCompany = trpc.companies.createCompany.useMutation({
     onSuccess: () => {
       router.push("/dashboard")
     },
+  })
+
+  const importCompany = trpc.companies.importCompany.useMutation({
+    onSuccess: () => {
+      router.refresh()
+      router.push("/dashboard")
+    },
+    onError: (e) => toast.error(e.message),
   })
 
   const handleNext = useCallback((stepData: Partial<FormValues>) => {
@@ -127,6 +146,110 @@ export default function OnboardPage() {
 
       {/* Content */}
       <main className="flex flex-1 flex-col">
+        {mode === "choice" && (
+          <div className="mx-auto w-full max-w-3xl px-6 py-12">
+            <h1 className="text-2xl font-semibold text-foreground">Get started</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              How would you like to begin?
+            </p>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <Card
+                role="button"
+                tabIndex={0}
+                onClick={() => setMode("create")}
+                className="cursor-pointer transition-all hover:ring-2 hover:ring-amber-500"
+              >
+                <CardContent className="flex flex-col gap-3 py-8">
+                  <div className="flex size-11 items-center justify-center rounded-lg bg-amber-500/10">
+                    <PlusIcon className="size-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Create a company</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Form a new UK or US company from scratch.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card
+                role="button"
+                tabIndex={0}
+                onClick={() => setMode("import")}
+                className="cursor-pointer transition-all hover:ring-2 hover:ring-amber-500"
+              >
+                <CardContent className="flex flex-col gap-3 py-8">
+                  <div className="flex size-11 items-center justify-center rounded-lg bg-amber-500/10">
+                    <Building2Icon className="size-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">I already have a company</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Import an existing UK company with its Company ID & Auth Code.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {mode === "import" && (
+          <div className="mx-auto w-full max-w-md px-6 py-12">
+            <button
+              type="button"
+              onClick={() => setMode("choice")}
+              className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeftIcon className="size-4" />
+              Back
+            </button>
+            <h1 className="text-2xl font-semibold text-foreground">Import your company</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Enter your UK Company ID and Authentication Code. We&apos;ll pull your
+              details from Companies House.
+            </p>
+            <div className="mt-6 space-y-4">
+              <div className="space-y-2">
+                <Label>Company ID (Companies House)</Label>
+                <Input
+                  placeholder="e.g. 12345678"
+                  value={importCompanyId}
+                  onChange={(e) => setImportCompanyId(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Authentication Code</Label>
+                <Input
+                  placeholder="Enter auth code"
+                  value={importAuthCode}
+                  onChange={(e) => setImportAuthCode(e.target.value)}
+                />
+              </div>
+              <Button
+                className="w-full"
+                onClick={() =>
+                  importCompany.mutate({
+                    companyId: importCompanyId.trim(),
+                    authCode: importAuthCode.trim(),
+                  })
+                }
+                disabled={!importCompanyId || !importAuthCode || importCompany.isPending}
+              >
+                {importCompany.isPending ? (
+                  <>
+                    <Loader2Icon className="mr-1 size-4 animate-spin" />
+                    Importing…
+                  </>
+                ) : (
+                  "Import Company"
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {mode === "create" && (
+        <>
         <div className="w-full flex-1 px-6">
           <div className="mx-auto w-full max-w-7xl py-8">
             {/* Step indicators */}
@@ -274,6 +397,8 @@ export default function OnboardPage() {
             )}
           </div>
         </div>
+        </>
+        )}
       </main>
     </div>
   )
