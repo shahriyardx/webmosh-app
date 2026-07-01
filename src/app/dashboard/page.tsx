@@ -7,6 +7,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CompaniesHouseCard, OfficersCard, FilingHistoryCard } from "@/components/companies-house-card"
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
 import {
   Building2Icon,
   GlobeIcon,
@@ -17,6 +20,7 @@ import {
   ReceiptIcon,
   MailIcon,
   AlertCircleIcon,
+  Trash2Icon,
 } from "lucide-react"
 
 function dueMeta(date: Date) {
@@ -53,8 +57,24 @@ export default function OverviewPage() {
     { enabled: !!activeOrgId },
   )
 
+  const router = useRouter()
+  const utils = trpc.useUtils()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+
   const { data: invoices } = trpc.invoices.list.useQuery()
   const { data: mails } = trpc.mails.list.useQuery()
+
+  const deleteCompany = trpc.companies.deleteCompany.useMutation({
+    onSuccess: (res) => {
+      utils.companies.myCompanies.invalidate()
+      if (res.nextActiveOrgId) {
+        router.push("/dashboard")
+        router.refresh()
+      } else {
+        router.push("/onboard")
+      }
+    },
+  })
 
   const pendingInvoices = (invoices ?? []).filter(
     (inv) => inv.status === "unpaid" || inv.status === "processing",
@@ -314,6 +334,33 @@ export default function OverviewPage() {
           </CardContent>
         </Card>
       )}
+
+      <div className="flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/5 p-4">
+        <div>
+          <p className="text-sm font-medium text-foreground">Delete this company</p>
+          <p className="text-xs text-muted-foreground">
+            Permanently hides it from your account. This cannot be undone.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="text-red-500"
+          onClick={() => setDeleteOpen(true)}
+          disabled={!activeOrgId}
+        >
+          <Trash2Icon className="size-4" />
+          Delete
+        </Button>
+      </div>
+
+      <DeleteConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete company"
+        description={`Delete "${org.name}"? You will lose access to it and this cannot be undone.`}
+        onConfirm={() => activeOrgId && deleteCompany.mutate({ id: activeOrgId })}
+        loading={deleteCompany.isPending}
+      />
     </div>
   )
 }

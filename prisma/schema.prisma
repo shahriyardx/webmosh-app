@@ -103,6 +103,7 @@ model Organization {
   serviceIds     String[]
   companyId String?   @map("company_id")
   authCode       String?   @map("auth_code")
+  deletedAt      DateTime? @map("deleted_at")
   confirmationStatementDue DateTime? @map("confirmation_statement_due")
   accountsFilingDue        DateTime? @map("accounts_filing_due")
   stateFilingDue           DateTime? @map("state_filing_due")

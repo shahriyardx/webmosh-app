@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Building2Icon, ArrowRightIcon } from "lucide-react"
+import { Building2Icon, ArrowRightIcon, Trash2Icon } from "lucide-react"
 
 const statusBadge: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
   pending: { label: "Pending", variant: "outline" },
@@ -34,11 +34,19 @@ export default function AdminFormationsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Formations</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          All company formations.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Formations</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            All company formations.
+          </p>
+        </div>
+        <Button variant="outline" asChild>
+          <Link href="/admin/formations/trash">
+            <Trash2Icon className="size-4" />
+            Trash
+          </Link>
+        </Button>
       </div>
 
       {companies?.length === 0 ? (

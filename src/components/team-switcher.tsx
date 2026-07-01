@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { useQuery } from "@tanstack/react-query"
+import { trpc } from "@/lib/trpc/client"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,19 +25,11 @@ export function TeamSwitcher() {
   const router = useRouter()
   const { data: session } = authClient.useSession()
 
-  const { data: orgList } = useQuery({
-    queryKey: ["organizations"],
-    queryFn: () => authClient.organization.list(),
-  })
+  const { data: myCompanies } = trpc.companies.myCompanies.useQuery()
 
   const [switching, setSwitching] = React.useState(false)
 
-  const organizations = (orgList?.data ?? []).map((o) => ({
-    id: o.id,
-    name: o.name,
-    slug: o.slug,
-    logo: o.logo ?? null,
-  }))
+  const organizations = myCompanies ?? []
   const activeOrgId = session?.session?.activeOrganizationId
   const activeOrgData = organizations.find((o) => o.id === activeOrgId)
 

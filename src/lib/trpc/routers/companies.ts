@@ -314,8 +314,8 @@ export const companiesRouter = router({
   getOverview: protectedProcedure
     .input(z.object({ orgId: z.string() }))
     .query(async ({ input }) => {
-      return prisma.organization.findUnique({
-        where: { id: input.orgId },
+      return prisma.organization.findFirst({
+        where: { id: input.orgId, deletedAt: null },
         select: {
           name: true,
           country: true,
@@ -366,8 +366,8 @@ export const companiesRouter = router({
   companiesHouse: protectedProcedure
     .input(z.object({ orgId: z.string() }))
     .query(async ({ input, ctx }) => {
-      const org = await prisma.organization.findUnique({
-        where: { id: input.orgId },
+      const org = await prisma.organization.findFirst({
+        where: { id: input.orgId, deletedAt: null },
         select: { companyId: true, authCode: true, country: true, status: true, name: true },
       })
       if (!org || org.country !== "uk" || !org.companyId) return null
@@ -406,10 +406,10 @@ export const companiesRouter = router({
       paidInvoices,
       recentFormations,
     ] = await Promise.all([
-      prisma.organization.count(),
-      prisma.organization.count({ where: { status: CompanyStatus.pending } }),
-      prisma.organization.count({ where: { status: CompanyStatus.processing } }),
-      prisma.organization.count({ where: { status: CompanyStatus.completed } }),
+      prisma.organization.count({ where: { deletedAt: null } }),
+      prisma.organization.count({ where: { deletedAt: null, status: CompanyStatus.pending } }),
+      prisma.organization.count({ where: { deletedAt: null, status: CompanyStatus.processing } }),
+      prisma.organization.count({ where: { deletedAt: null, status: CompanyStatus.completed } }),
       prisma.document.count({ where: { status: DocumentStatus.submitted } }),
       prisma.invoice.count({ where: { status: PaymentStatus.processing } }),
       prisma.invoice.count({ where: { status: PaymentStatus.unpaid } }),
@@ -420,6 +420,7 @@ export const companiesRouter = router({
         select: { amount: true },
       }),
       prisma.organization.findMany({
+        where: { deletedAt: null },
         orderBy: { createdAt: "desc" },
         take: 5,
         select: {
@@ -451,6 +452,7 @@ export const companiesRouter = router({
 
   listAll: adminProcedure.query(async () => {
     return prisma.organization.findMany({
+      where: { deletedAt: null },
       orderBy: { createdAt: "desc" },
       include: {
         members: {
@@ -590,5 +592,97 @@ export const companiesRouter = router({
       })
       await emailUserDocumentRequested(input.organizationId, input.name).catch(() => {})
       return doc
+    }),
+
+  // User's own non-deleted companies (for the org switcher)
+  myCompanies: protectedProcedure.query(async ({ ctx }) => {
+    const members = await prisma.member.findMany({
+      where: { userId: ctx.user.id, organization: { deletedAt: null } },
+      select: {
+        organization: { select: { id: true, name: true, slug: true, logo: true } },
+      },
+    })
+    return members.map((m) => m.organization)
+  }),
+
+  // User soft-deletes their own company; reassigns active org
+  deleteCompany: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const member = await prisma.member.findFirst({
+        where: { organizationId: input.id, userId: ctx.user.id },
+        select: { id: true },
+      })
+      if (!member) throw new Error("Forbidden")
+
+      await prisma.organization.update({
+        where: { id: input.id },
+        data: { deletedAt: new Date() },
+      })
+
+      // Pick another available company for this user
+      const next = await prisma.member.findFirst({
+        where: {
+          userId: ctx.user.id,
+          organizationId: { not: input.id },
+          organization: { deletedAt: null },
+        },
+        select: { organizationId: true },
+        orderBy: { createdAt: "desc" },
+      })
+
+      const hdrs = await headers()
+      await auth.api.setActiveOrganization({
+        body: { organizationId: next?.organizationId ?? null },
+        headers: hdrs,
+      })
+
+      return { nextActiveOrgId: next?.organizationId ?? null }
+    }),
+
+  // Admin soft-deletes a formation
+  deleteFormation: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      return prisma.organization.update({
+        where: { id: input.id },
+        data: { deletedAt: new Date() },
+      })
+    }),
+
+  // Admin: list soft-deleted formations (trash)
+  listDeleted: adminProcedure.query(async () => {
+    return prisma.organization.findMany({
+      where: { deletedAt: { not: null } },
+      orderBy: { deletedAt: "desc" },
+      include: {
+        members: {
+          include: { user: { select: { id: true, name: true, email: true } } },
+        },
+        _count: { select: { invoices: true, documents: true } },
+      },
+    })
+  }),
+
+  // Admin: restore a soft-deleted formation
+  restoreFormation: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      return prisma.organization.update({
+        where: { id: input.id },
+        data: { deletedAt: null },
+      })
+    }),
+
+  // Admin: permanently delete a formation and everything linked to it
+  purgeFormation: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      // Tickets link with SetNull, so remove them explicitly (messages cascade)
+      await prisma.ticket.deleteMany({ where: { organizationId: input.id } })
+      // Directors, documents, invoices, serviceOrders, mails, members, invitations
+      // all cascade on organization delete
+      await prisma.organization.delete({ where: { id: input.id } })
+      return { ok: true }
     }),
 })

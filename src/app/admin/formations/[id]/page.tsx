@@ -1,6 +1,7 @@
 "use client"
 
 import { use, useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -52,6 +53,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { CompaniesHouseCard, OfficersCard, FilingHistoryCard } from "@/components/companies-house-card"
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 
 function toDateInput(d: Date | string | null | undefined): string {
   if (!d) return ""
@@ -114,7 +116,17 @@ export default function FormationDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = use(params)
+  const router = useRouter()
   const utils = trpc.useUtils()
+
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const deleteFormation = trpc.companies.deleteFormation.useMutation({
+    onSuccess: () => {
+      utils.companies.listAll.invalidate()
+      toast.success("Formation deleted")
+      router.push("/admin/formations")
+    },
+  })
 
   const { data: org, isLoading } = trpc.companies.getById.useQuery({ id })
   const reviewDoc = trpc.companies.reviewDocument.useMutation({
@@ -324,13 +336,26 @@ export default function FormationDetailPage({
             <ArrowLeftIcon className="size-4" />
           </Link>
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-semibold text-foreground">{org.name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {org.country === "uk" ? "United Kingdom" : "United States"} Company
           </p>
         </div>
+        <Button variant="outline" className="text-red-500" onClick={() => setDeleteOpen(true)}>
+          <Trash2Icon className="size-4" />
+          Delete
+        </Button>
       </div>
+
+      <DeleteConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete formation"
+        description={`Delete "${org.name}"? It will be hidden and the owner can no longer manage it. You can permanently remove it later from the trash.`}
+        onConfirm={() => deleteFormation.mutate({ id })}
+        loading={deleteFormation.isPending}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
       {/* Company info */}

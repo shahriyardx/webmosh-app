@@ -2,7 +2,6 @@
 
 import { usePathname } from "next/navigation"
 import Link from "next/link"
-import { useQuery } from "@tanstack/react-query"
 import { NavUser } from "@/components/nav-user"
 import { TeamSwitcher } from "@/components/team-switcher"
 import {
@@ -61,11 +60,8 @@ export function AppSidebar({
     window.location.href = "/admin"
   }
 
-  const { data: orgList } = useQuery({
-    queryKey: ["organizations"],
-    queryFn: () => authClient.organization.list(),
-  })
-  const hasOrgs = (orgList?.data?.length ?? 0) > 0
+  const { data: myCompanies } = trpc.companies.myCompanies.useQuery()
+  const hasOrgs = (myCompanies?.length ?? 0) > 0
 
   const { data: pendingDocCount } =
     trpc.companies.getPendingDocCount.useQuery()
