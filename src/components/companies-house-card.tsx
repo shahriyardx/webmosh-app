@@ -166,41 +166,54 @@ export function CompaniesHouseCard({ orgId }: { orgId: string }) {
           </div>
         )}
 
-        {/* Filing history */}
-        {data.filings.length > 0 && (
-          <div className="border-t border-border pt-4">
-            <p className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <FileTextIcon className="size-3.5" />
-              Filing History
-            </p>
-            <div className="divide-y divide-border">
-              {data.filings.map((f, i) => (
-                <div key={i} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {humanize(f.category)}
-                      {f.type ? ` (${f.type})` : ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {f.date ? new Date(f.date).toLocaleDateString() : ""}
-                    </p>
-                  </div>
-                  {f.hasDocument && f.transactionId && (
-                    <a
-                      href={`${CH_DOC_BASE}/company/${data.companyNumber}/filing-history/${f.transactionId}/document?format=pdf&download=1`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      <DownloadIcon className="size-3" />
-                      PDF
-                    </a>
-                  )}
-                </div>
-              ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+export function FilingHistoryCard({ orgId }: { orgId: string }) {
+  const { data, isLoading } = trpc.companies.companiesHouse.useQuery(
+    { orgId },
+    { enabled: !!orgId },
+  )
+
+  if (isLoading || !data || data.filings.length === 0) return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <FileTextIcon className="size-4 text-amber-500" />
+          Filing History
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="divide-y divide-border">
+          {data.filings.map((f, i) => (
+            <div key={i} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">
+                  {humanize(f.category)}
+                  {f.type ? ` (${f.type})` : ""}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {f.date ? new Date(f.date).toLocaleDateString() : ""}
+                </p>
+              </div>
+              {f.hasDocument && f.transactionId && (
+                <a
+                  href={`${CH_DOC_BASE}/company/${data.companyNumber}/filing-history/${f.transactionId}/document?format=pdf&download=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <DownloadIcon className="size-3" />
+                  PDF
+                </a>
+              )}
             </div>
-          </div>
-        )}
+          ))}
+        </div>
       </CardContent>
     </Card>
   )

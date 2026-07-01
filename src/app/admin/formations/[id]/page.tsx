@@ -51,7 +51,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { CompaniesHouseCard } from "@/components/companies-house-card"
+import { CompaniesHouseCard, FilingHistoryCard } from "@/components/companies-house-card"
 
 function toDateInput(d: Date | string | null | undefined): string {
   if (!d) return ""
@@ -483,6 +483,7 @@ export default function FormationDetailPage({
 
       {/* Companies House (UK) */}
       <CompaniesHouseCard orgId={id} />
+      <FilingHistoryCard orgId={id} />
 
       {/* Directors */}
       {org.directors.length > 0 && (
