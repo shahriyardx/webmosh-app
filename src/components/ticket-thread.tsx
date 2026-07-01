@@ -45,6 +45,7 @@ export function TicketThread({
     utils.tickets.list.invalidate()
     utils.tickets.listAll.invalidate()
     utils.tickets.openCount.invalidate()
+    utils.tickets.pendingCount.invalidate()
     utils.tickets.adminOpenCount.invalidate()
   }
 

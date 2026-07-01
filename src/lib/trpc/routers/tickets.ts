@@ -138,6 +138,12 @@ export const ticketsRouter = router({
     })
   }),
 
+  pendingCount: protectedProcedure.query(async ({ ctx }) => {
+    return prisma.ticket.count({
+      where: { userId: ctx.user.id, status: TicketStatus.pending },
+    })
+  }),
+
   adminOpenCount: adminProcedure.query(async () => {
     return prisma.ticket.count({ where: { status: TicketStatus.open } })
   }),

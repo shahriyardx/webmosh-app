@@ -72,6 +72,8 @@ export function AppSidebar({
 
   const { data: unreadMailCount } = trpc.mails.unreadCount.useQuery()
 
+  const { data: pendingTicketCount } = trpc.tickets.pendingCount.useQuery()
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -118,6 +120,13 @@ export function AppSidebar({
                       unreadMailCount > 0 && (
                         <Badge className="ml-auto size-5 rounded-full p-0 text-[10px]">
                           {unreadMailCount}
+                        </Badge>
+                      )}
+                    {link.title === "Support" &&
+                      pendingTicketCount !== undefined &&
+                      pendingTicketCount > 0 && (
+                        <Badge className="ml-auto size-5 rounded-full p-0 text-[10px]">
+                          {pendingTicketCount}
                         </Badge>
                       )}
                   </Link>
