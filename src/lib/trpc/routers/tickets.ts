@@ -48,8 +48,12 @@ export const ticketsRouter = router({
     }),
 
   list: protectedProcedure.query(async ({ ctx }) => {
+    const orgId = ctx.session?.session?.activeOrganizationId
     return prisma.ticket.findMany({
-      where: { userId: ctx.user.id },
+      where: {
+        userId: ctx.user.id,
+        ...(orgId ? { organizationId: orgId } : {}),
+      },
       orderBy: { updatedAt: "desc" },
       include: { organization: { select: { name: true } } },
     })
@@ -199,8 +203,13 @@ export const ticketsRouter = router({
   }),
 
   pendingCount: protectedProcedure.query(async ({ ctx }) => {
+    const orgId = ctx.session?.session?.activeOrganizationId
     return prisma.ticket.count({
-      where: { userId: ctx.user.id, status: TicketStatus.pending },
+      where: {
+        userId: ctx.user.id,
+        status: TicketStatus.pending,
+        ...(orgId ? { organizationId: orgId } : {}),
+      },
     })
   }),
 
