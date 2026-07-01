@@ -13,7 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { ReceiptIcon, DownloadIcon } from "lucide-react"
+import { ReceiptIcon, DownloadIcon, Trash2Icon } from "lucide-react"
+import { toast } from "sonner"
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 
 const tabs = [
   { label: "All", value: undefined },
@@ -43,6 +45,14 @@ export default function AdminInvoicesPage() {
       utils.invoices.listAll.invalidate()
       setRejecting(null)
       setRejectReason("")
+    },
+  })
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string } | null>(null)
+  const del = trpc.invoices.delete.useMutation({
+    onSuccess: () => {
+      utils.invoices.listAll.invalidate()
+      setDeleteTarget(null)
+      toast.success("Invoice deleted")
     },
   })
 
@@ -159,6 +169,15 @@ export default function AdminInvoicesPage() {
                             <DownloadIcon className="size-4" />
                           </a>
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="size-8 text-red-500"
+                          title="Delete invoice"
+                          onClick={() => setDeleteTarget({ id: inv.id })}
+                        >
+                          <Trash2Icon className="size-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -168,6 +187,15 @@ export default function AdminInvoicesPage() {
           </Table>
         </div>
       )}
+
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Delete invoice"
+        description="Delete this invoice? It will be hidden and excluded from revenue. This cannot be undone."
+        onConfirm={() => deleteTarget && del.mutate({ id: deleteTarget.id })}
+        loading={del.isPending}
+      />
 
       {/* Reject modal */}
       {rejecting && (

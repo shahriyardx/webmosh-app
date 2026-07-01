@@ -72,7 +72,7 @@ export const invoicesRouter = router({
     const orgId = ctx.session?.session?.activeOrganizationId
     if (!orgId) return []
     const invoices = await prisma.invoice.findMany({
-      where: { organizationId: orgId },
+      where: { organizationId: orgId, deletedAt: null },
       orderBy: { createdAt: "desc" },
     })
     return attachItemInfo(invoices)
@@ -85,7 +85,7 @@ export const invoicesRouter = router({
       const invoice = await prisma.invoice.findUnique({
         where: { id: input.id },
       })
-      if (!invoice) return null
+      if (!invoice || invoice.deletedAt) return null
 
       // User can only view their own org's invoices unless admin
       const isAdmin = ctx.session?.user?.role === "admin"
@@ -98,7 +98,10 @@ export const invoicesRouter = router({
   listAll: adminProcedure
     .input(z.object({ status: z.nativeEnum(PaymentStatus).optional() }))
     .query(async ({ input }) => {
-      const where = input.status ? { status: input.status } : {}
+      const where = {
+        deletedAt: null,
+        ...(input.status ? { status: input.status } : {}),
+      }
       return prisma.invoice.findMany({
         where,
         orderBy: { createdAt: "desc" },
@@ -335,5 +338,14 @@ export const invoicesRouter = router({
       })
       await emailUserNewInvoice(input.organizationId, invoice).catch(() => {})
       return invoice
+    }),
+
+  delete: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      return prisma.invoice.update({
+        where: { id: input.id },
+        data: { deletedAt: new Date() },
+      })
     }),
 })

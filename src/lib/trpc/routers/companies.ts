@@ -411,12 +411,12 @@ export const companiesRouter = router({
       prisma.organization.count({ where: { deletedAt: null, status: CompanyStatus.processing } }),
       prisma.organization.count({ where: { deletedAt: null, status: CompanyStatus.completed } }),
       prisma.document.count({ where: { status: DocumentStatus.submitted } }),
-      prisma.invoice.count({ where: { status: PaymentStatus.processing } }),
-      prisma.invoice.count({ where: { status: PaymentStatus.unpaid } }),
+      prisma.invoice.count({ where: { status: PaymentStatus.processing, deletedAt: null } }),
+      prisma.invoice.count({ where: { status: PaymentStatus.unpaid, deletedAt: null } }),
       prisma.serviceOrder.count({ where: { status: "pending" } }),
       prisma.user.count(),
       prisma.invoice.findMany({
-        where: { status: PaymentStatus.paid },
+        where: { status: PaymentStatus.paid, deletedAt: null },
         select: { amount: true },
       }),
       prisma.organization.findMany({
@@ -489,6 +489,7 @@ export const companiesRouter = router({
             orderBy: { createdAt: "desc" },
           },
           invoices: {
+            where: { deletedAt: null },
             orderBy: { createdAt: "desc" },
           },
         },

@@ -282,6 +282,14 @@ export default function FormationDetailPage({
       toast.success("Invoice rejected")
     },
   })
+  const [invDeleteTarget, setInvDeleteTarget] = useState<{ id: string } | null>(null)
+  const deleteInvoice = trpc.invoices.delete.useMutation({
+    onSuccess: () => {
+      utils.companies.getById.invalidate({ id })
+      setInvDeleteTarget(null)
+      toast.success("Invoice deleted")
+    },
+  })
 
   const handleAddMail = async () => {
     setMailUploading(true)
@@ -347,6 +355,15 @@ export default function FormationDetailPage({
           Delete
         </Button>
       </div>
+
+      <DeleteConfirmDialog
+        open={!!invDeleteTarget}
+        onOpenChange={(o) => !o && setInvDeleteTarget(null)}
+        title="Delete invoice"
+        description="Delete this invoice? It will be hidden and excluded from revenue. This cannot be undone."
+        onConfirm={() => invDeleteTarget && deleteInvoice.mutate({ id: invDeleteTarget.id })}
+        loading={deleteInvoice.isPending}
+      />
 
       <DeleteConfirmDialog
         open={deleteOpen}
@@ -718,6 +735,15 @@ export default function FormationDetailPage({
                               >
                                 <DownloadIcon className="size-4" />
                               </a>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="size-8 text-red-500"
+                              title="Delete invoice"
+                              onClick={() => setInvDeleteTarget({ id: inv.id })}
+                            >
+                              <Trash2Icon className="size-4" />
                             </Button>
                           </div>
                         </TableCell>
