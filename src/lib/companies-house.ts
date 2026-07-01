@@ -26,6 +26,14 @@ export interface CompaniesHouseProfile {
     appointedOn: string | null
     resignedOn: string | null
   }[]
+  filings: {
+    transactionId: string | null
+    date: string | null
+    type: string | null
+    category: string | null
+    description: string | null
+    hasDocument: boolean
+  }[]
 }
 
 function formatAddress(a: Record<string, string> | undefined): string | null {
@@ -72,6 +80,29 @@ export async function getCompaniesHouseProfile(
     // officers optional
   }
 
+  let filings: CompaniesHouseProfile["filings"] = []
+  try {
+    const fRes = await fetch(
+      `${BASE}/company/${encodeURIComponent(number)}/filing-history?items_per_page=25`,
+      { headers: { Authorization: auth }, next: { revalidate: 3600 } },
+    )
+    if (fRes.ok) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fd: any = await fRes.json()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      filings = (fd.items ?? []).map((f: any) => ({
+        transactionId: f.transaction_id ?? null,
+        date: f.date ?? null,
+        type: f.type ?? null,
+        category: f.category ?? null,
+        description: f.description ?? null,
+        hasDocument: !!f.links?.document_metadata,
+      }))
+    }
+  } catch {
+    // filings optional
+  }
+
   return {
     companyNumber: d.company_number ?? number,
     name: d.company_name ?? null,
@@ -87,5 +118,6 @@ export async function getCompaniesHouseProfile(
     confirmationNextDue: d.confirmation_statement?.next_due ?? null,
     confirmationOverdue: !!d.confirmation_statement?.overdue,
     officers,
+    filings,
   }
 }

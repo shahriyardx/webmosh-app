@@ -10,12 +10,28 @@ import {
   MapPinIcon,
   FileTextIcon,
   UsersIcon,
+  DownloadIcon,
+  BuildingIcon,
 } from "lucide-react"
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   active: "default",
   dissolved: "destructive",
   liquidation: "destructive",
+}
+
+const internalStatusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  pending: "outline",
+  processing: "secondary",
+  completed: "default",
+  rejected: "destructive",
+}
+
+const CH_DOC_BASE = "https://find-and-update.company-information.service.gov.uk"
+
+function humanize(s: string | null) {
+  if (!s) return ""
+  return s.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 function fmtDate(d: string | null) {
@@ -50,6 +66,25 @@ export function CompaniesHouseCard({ orgId }: { orgId: string }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex items-start gap-3">
+            <BuildingIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">Company Name</p>
+              <p className="text-sm font-medium">{data.name ?? data.localName}</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <LandmarkIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">Application Status</p>
+              <Badge
+                variant={internalStatusVariant[data.internalStatus] ?? "secondary"}
+                className="mt-0.5 capitalize"
+              >
+                {data.internalStatus}
+              </Badge>
+            </div>
+          </div>
           <div className="flex items-start gap-3">
             <FileTextIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <div>
@@ -127,6 +162,42 @@ export function CompaniesHouseCard({ orgId }: { orgId: string }) {
                     </span>
                   </div>
                 ))}
+            </div>
+          </div>
+        )}
+
+        {/* Filing history */}
+        {data.filings.length > 0 && (
+          <div className="border-t border-border pt-4">
+            <p className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <FileTextIcon className="size-3.5" />
+              Filing History
+            </p>
+            <div className="divide-y divide-border">
+              {data.filings.map((f, i) => (
+                <div key={i} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {humanize(f.category)}
+                      {f.type ? ` (${f.type})` : ""}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {f.date ? new Date(f.date).toLocaleDateString() : ""}
+                    </p>
+                  </div>
+                  {f.hasDocument && f.transactionId && (
+                    <a
+                      href={`${CH_DOC_BASE}/company/${data.companyNumber}/filing-history/${f.transactionId}/document?format=pdf&download=1`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      <DownloadIcon className="size-3" />
+                      PDF
+                    </a>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}
