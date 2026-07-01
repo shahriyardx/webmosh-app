@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeftIcon } from "lucide-react"
+import { ArrowLeftIcon, DownloadIcon } from "lucide-react"
 import Link from "next/link"
 
 const QR_CONTENT =
@@ -74,10 +74,16 @@ export default function InvoiceDetailPage({
             <ArrowLeftIcon className="size-4" />
           </Link>
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-semibold text-foreground">Invoice</h1>
           <p className="text-xs text-muted-foreground font-mono">{invoice.id}</p>
         </div>
+        <Button variant="outline" asChild>
+          <a href={`/dashboard/invoices/${invoiceId}/pdf`} target="_blank" rel="noopener noreferrer">
+            <DownloadIcon className="size-4" />
+            Download
+          </a>
+        </Button>
       </div>
 
       <div className="rounded-xl border border-border">
