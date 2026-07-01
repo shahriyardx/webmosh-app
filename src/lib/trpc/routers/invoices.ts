@@ -3,6 +3,12 @@ import { adminProcedure, protectedProcedure, router } from "../server"
 import { prisma } from "@/lib/prisma"
 import { PaymentStatus } from "@/generated/prisma/enums"
 import Stripe from "stripe"
+import {
+  emailUserNewInvoice,
+  emailUserPayment,
+  emailAdminPaymentSubmitted,
+  emailAdminInvoicePaid,
+} from "@/lib/notify"
 
 export type EnrichedInvoice = Awaited<ReturnType<typeof prisma.invoice.findMany>>[number] & {
   item: { type: "service" | "package"; title: string } | null
@@ -122,7 +128,7 @@ export const invoicesRouter = router({
         throw new Error("Invoice is not in unpaid status")
       }
 
-      return prisma.invoice.update({
+      const updated = await prisma.invoice.update({
         where: { id: input.invoiceId },
         data: {
           paymentMethod: input.paymentMethod,
@@ -130,6 +136,19 @@ export const invoicesRouter = router({
           status: PaymentStatus.processing,
         },
       })
+
+      const org = await prisma.organization.findUnique({
+        where: { id: invoice.organizationId },
+        select: { name: true },
+      })
+      await emailAdminPaymentSubmitted(
+        org?.name ?? "a company",
+        invoice.amount,
+        input.paymentMethod,
+        input.transactionId,
+      ).catch(() => {})
+
+      return updated
     }),
 
   createCheckoutSession: protectedProcedure
@@ -241,7 +260,7 @@ export const invoicesRouter = router({
         throw new Error("Invoice not found")
       }
 
-      return prisma.invoice.update({
+      const updated = await prisma.invoice.update({
         where: { id: invoiceId },
         data: {
           paymentMethod: "stripe",
@@ -249,18 +268,29 @@ export const invoicesRouter = router({
           status: PaymentStatus.paid,
         },
       })
+
+      const org = await prisma.organization.findUnique({
+        where: { id: updated.organizationId },
+        select: { name: true },
+      })
+      await emailAdminInvoicePaid(org?.name ?? "a company", updated.amount).catch(() => {})
+      await emailUserPayment(updated.organizationId, true, updated.amount).catch(() => {})
+
+      return updated
     }),
 
   approve: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
-      return prisma.invoice.update({
+      const updated = await prisma.invoice.update({
         where: { id: input.id },
         data: {
           status: PaymentStatus.paid,
           rejectReason: null,
         },
       })
+      await emailUserPayment(updated.organizationId, true, updated.amount).catch(() => {})
+      return updated
     }),
 
   reject: adminProcedure
@@ -271,7 +301,7 @@ export const invoicesRouter = router({
       }),
     )
     .mutation(async ({ input }) => {
-      return prisma.invoice.update({
+      const updated = await prisma.invoice.update({
         where: { id: input.id },
         data: {
           status: PaymentStatus.unpaid,
@@ -280,6 +310,10 @@ export const invoicesRouter = router({
           transactionId: null,
         },
       })
+      await emailUserPayment(updated.organizationId, false, updated.amount, input.reason).catch(
+        () => {},
+      )
+      return updated
     }),
 
   create: adminProcedure
@@ -291,7 +325,7 @@ export const invoicesRouter = router({
       }),
     )
     .mutation(async ({ input }) => {
-      return prisma.invoice.create({
+      const invoice = await prisma.invoice.create({
         data: {
           organizationId: input.organizationId,
           amount: input.amount,
@@ -299,5 +333,7 @@ export const invoicesRouter = router({
           status: PaymentStatus.unpaid,
         },
       })
+      await emailUserNewInvoice(input.organizationId, invoice).catch(() => {})
+      return invoice
     }),
 })

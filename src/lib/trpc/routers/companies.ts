@@ -4,6 +4,14 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { CompanyStatus, DocumentStatus, PaymentStatus } from "@/generated/prisma/enums"
+import {
+  emailAdminNewFormation,
+  emailAdminDocumentResubmitted,
+  emailUserDocumentRequested,
+  emailUserDocumentReviewed,
+  emailUserStatusUpdate,
+  emailUserCompanyCompleted,
+} from "@/lib/notify"
 
 const directorInput = z.object({
   firstName: z.string().min(1),
@@ -207,6 +215,8 @@ export const companiesRouter = router({
         },
       })
 
+      await emailAdminNewFormation(org.id, companyName, country).catch(() => {})
+
       return org
     }),
 
@@ -222,11 +232,19 @@ export const companiesRouter = router({
       })
       if (!doc) throw new Error("Document not found")
 
-      return prisma.document.update({
+      const updated = await prisma.document.update({
         where: { id: input.documentId },
         data: { value: input.fileUrl, status: DocumentStatus.submitted },
         select: { id: true, name: true, value: true, status: true, createdAt: true, rejectReason: true },
       })
+
+      const org = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { name: true },
+      })
+      await emailAdminDocumentResubmitted(orgId, updated.name, org?.name ?? "a company").catch(() => {})
+
+      return updated
     }),
 
   getPendingDocCount: protectedProcedure
@@ -420,11 +438,18 @@ export const companiesRouter = router({
       if (input.status === "approved") {
         data.rejectReason = null
       }
-      return prisma.document.update({
+      const updated = await prisma.document.update({
         where: { id: input.documentId },
         data,
-        select: { id: true, name: true, status: true, rejectReason: true },
+        select: { id: true, name: true, status: true, rejectReason: true, organizationId: true },
       })
+      await emailUserDocumentReviewed(
+        updated.organizationId,
+        updated.name,
+        input.status === "approved",
+        input.reason,
+      ).catch(() => {})
+      return updated
     }),
 
   updateCompanyDetails: adminProcedure
@@ -470,21 +495,29 @@ export const companiesRouter = router({
   updateStatus: adminProcedure
     .input(z.object({ id: z.string(), status: z.nativeEnum(CompanyStatus) }))
     .mutation(async ({ input }) => {
-      return prisma.organization.update({
+      const updated = await prisma.organization.update({
         where: { id: input.id },
         data: { status: input.status },
       })
+      if (input.status === CompanyStatus.completed) {
+        await emailUserCompanyCompleted(input.id).catch(() => {})
+      } else {
+        await emailUserStatusUpdate(input.id, input.status).catch(() => {})
+      }
+      return updated
     }),
 
   requestDocument: adminProcedure
     .input(z.object({ organizationId: z.string(), name: z.string().min(1) }))
     .mutation(async ({ input }) => {
-      return prisma.document.create({
+      const doc = await prisma.document.create({
         data: {
           organizationId: input.organizationId,
           name: input.name,
           status: DocumentStatus.requested,
         },
       })
+      await emailUserDocumentRequested(input.organizationId, input.name).catch(() => {})
+      return doc
     }),
 })

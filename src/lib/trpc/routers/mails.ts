@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { adminProcedure, protectedProcedure, router } from "../server"
 import { prisma } from "@/lib/prisma"
+import { emailUserNewMail } from "@/lib/notify"
 
 export const mailsRouter = router({
   create: adminProcedure
@@ -14,7 +15,7 @@ export const mailsRouter = router({
       }),
     )
     .mutation(async ({ input }) => {
-      return prisma.mail.create({
+      const mail = await prisma.mail.create({
         data: {
           organizationId: input.organizationId,
           from: input.from,
@@ -23,6 +24,8 @@ export const mailsRouter = router({
           attachments: input.attachments,
         },
       })
+      await emailUserNewMail(input.organizationId, input.subject).catch(() => {})
+      return mail
     }),
 
   listByOrg: adminProcedure

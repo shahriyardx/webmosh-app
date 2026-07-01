@@ -58,6 +58,11 @@ export const auth = betterAuth({
             return { data: { ...user, role: "admin" } };
           }
         },
+        after: async (user) => {
+          const { emailUserWelcome, emailAdminNewUser } = await import("./notify");
+          await emailUserWelcome(user.email, user.name).catch(() => {});
+          await emailAdminNewUser(user.name, user.email).catch(() => {});
+        },
       },
     },
   },

@@ -2,6 +2,13 @@ import { z } from "zod"
 import { adminProcedure, protectedProcedure, router } from "../server"
 import { prisma } from "@/lib/prisma"
 import { TicketStatus } from "@/generated/prisma/enums"
+import {
+  emailAdminNewTicket,
+  emailAdminTicketReply,
+  emailAdminTicketClosed,
+  emailUserTicketReply,
+  emailUserTicketStatus,
+} from "@/lib/notify"
 
 export const ticketsRouter = router({
   create: protectedProcedure
@@ -13,7 +20,7 @@ export const ticketsRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      return prisma.ticket.create({
+      const ticket = await prisma.ticket.create({
         data: {
           userId: ctx.user.id,
           subject: input.subject,
@@ -28,6 +35,13 @@ export const ticketsRouter = router({
           },
         },
       })
+      await emailAdminNewTicket(
+        ctx.user.name ?? null,
+        ctx.user.email,
+        ticket.id,
+        input.subject,
+      ).catch(() => {})
+      return ticket
     }),
 
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -64,6 +78,7 @@ export const ticketsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const ticket = await prisma.ticket.findUnique({
         where: { id: input.ticketId },
+        include: { user: { select: { name: true, email: true } } },
       })
       if (!ticket) throw new Error("Ticket not found")
       const isAdmin = ctx.user.role === "admin"
@@ -85,28 +100,58 @@ export const ticketsRouter = router({
       })
 
       // Admin reply → pending (awaiting user); user reply → open
-      return prisma.ticket.update({
+      const updated = await prisma.ticket.update({
         where: { id: input.ticketId },
         data: {
           status: isAdmin ? TicketStatus.pending : TicketStatus.open,
           updatedAt: new Date(),
         },
       })
+
+      if (isAdmin) {
+        await emailUserTicketReply(
+          ticket.user.email,
+          ticket.user.name,
+          ticket.id,
+          ticket.subject,
+        ).catch(() => {})
+      } else {
+        await emailAdminTicketReply(ticket.user.name, ticket.id, ticket.subject).catch(() => {})
+      }
+
+      return updated
     }),
 
   close: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const ticket = await prisma.ticket.findUnique({ where: { id: input.id } })
+      const ticket = await prisma.ticket.findUnique({
+        where: { id: input.id },
+        include: { user: { select: { name: true, email: true } } },
+      })
       if (!ticket) throw new Error("Ticket not found")
       const isAdmin = ctx.user.role === "admin"
       if (ticket.userId !== ctx.user.id && !isAdmin) {
         throw new Error("Forbidden")
       }
-      return prisma.ticket.update({
+      const updated = await prisma.ticket.update({
         where: { id: input.id },
         data: { status: TicketStatus.closed },
       })
+
+      if (isAdmin) {
+        await emailUserTicketStatus(
+          ticket.user.email,
+          ticket.user.name,
+          ticket.id,
+          ticket.subject,
+          TicketStatus.closed,
+        ).catch(() => {})
+      } else {
+        await emailAdminTicketClosed(ticket.user.name, ticket.id, ticket.subject).catch(() => {})
+      }
+
+      return updated
     }),
 
   // Admin
@@ -126,10 +171,19 @@ export const ticketsRouter = router({
   updateStatus: adminProcedure
     .input(z.object({ id: z.string(), status: z.nativeEnum(TicketStatus) }))
     .mutation(async ({ input }) => {
-      return prisma.ticket.update({
+      const updated = await prisma.ticket.update({
         where: { id: input.id },
         data: { status: input.status },
+        include: { user: { select: { name: true, email: true } } },
       })
+      await emailUserTicketStatus(
+        updated.user.email,
+        updated.user.name,
+        updated.id,
+        updated.subject,
+        input.status,
+      ).catch(() => {})
+      return updated
     }),
 
   openCount: protectedProcedure.query(async ({ ctx }) => {
