@@ -65,22 +65,19 @@ export default function OverviewPage() {
     (d) => d.status === "rejected" || d.status === "requested",
   )
 
-  const deadlines = org
-    ? (
-        org.country === "uk"
-          ? [
-              { label: "Confirmation Statement Due", date: org.confirmationStatementDue },
-              { label: "Accounts & Tax Filing Due", date: org.accountsFilingDue },
-            ]
-          : [
-              { label: "State Filing Due", date: org.stateFilingDue },
-              { label: "Federal Filing Due", date: org.federalFilingDue },
-              { label: "State Tax Due", date: org.stateTaxDue },
-            ]
-      )
-        .filter((d): d is { label: string; date: Date } => d.date != null)
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    : []
+  // UK filing deadlines come live from Companies House (shown in that card).
+  // Only US companies use manually-set deadline dates.
+  const hasCompaniesHouse = org?.country === "uk" && !!org?.companyId
+  const deadlines =
+    org && org.country === "us"
+      ? [
+          { label: "State Filing Due", date: org.stateFilingDue },
+          { label: "Federal Filing Due", date: org.federalFilingDue },
+          { label: "State Tax Due", date: org.stateTaxDue },
+        ]
+          .filter((d): d is { label: string; date: Date } => d.date != null)
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      : []
 
   if (isLoading) {
     return (
@@ -107,6 +104,7 @@ export default function OverviewPage() {
         </p>
       </div>
 
+      {!hasCompaniesHouse && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -189,6 +187,7 @@ export default function OverviewPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {activeOrgId && <CompaniesHouseCard orgId={activeOrgId} />}
 

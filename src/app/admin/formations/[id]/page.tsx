@@ -457,8 +457,9 @@ export default function FormationDetailPage({
                     />
                   </div>
                 </div>
-                <DateField control={adminControl} name="confirmationStatementDue" label="Confirmation Statement Due" />
-                <DateField control={adminControl} name="accountsFilingDue" label="Accounts & Tax Filing Due" />
+                <p className="text-xs text-muted-foreground">
+                  Filing deadlines are pulled automatically from Companies House.
+                </p>
               </>
             )}
 

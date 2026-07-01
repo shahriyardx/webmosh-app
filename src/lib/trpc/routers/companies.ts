@@ -362,7 +362,7 @@ export const companiesRouter = router({
     .query(async ({ input, ctx }) => {
       const org = await prisma.organization.findUnique({
         where: { id: input.orgId },
-        select: { companyId: true, country: true },
+        select: { companyId: true, authCode: true, country: true },
       })
       if (!org || org.country !== "uk" || !org.companyId) return null
 
@@ -376,7 +376,9 @@ export const companiesRouter = router({
         if (!member) return null
       }
 
-      return getCompaniesHouseProfile(org.companyId)
+      const profile = await getCompaniesHouseProfile(org.companyId)
+      if (!profile) return null
+      return { ...profile, authCode: org.authCode }
     }),
 
   getStats: adminProcedure.query(async () => {

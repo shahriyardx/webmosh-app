@@ -57,6 +57,15 @@ export function CompaniesHouseCard({ orgId }: { orgId: string }) {
               <p className="text-sm font-medium">{data.companyNumber}</p>
             </div>
           </div>
+          {data.authCode && (
+            <div className="flex items-start gap-3">
+              <FileTextIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">Auth Code</p>
+                <p className="text-sm font-mono">{data.authCode}</p>
+              </div>
+            </div>
+          )}
           <div className="flex items-start gap-3">
             <GlobeIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <div>
