@@ -7,6 +7,8 @@ import { z } from "zod"
 import { trpc } from "@/lib/trpc/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { toast } from "sonner"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Field,
   FieldContent,
@@ -16,6 +18,10 @@ import {
 
 const schema = z.object({
   usdToBdtRate: z.string(),
+  invoiceFromName: z.string(),
+  invoiceFromAddress: z.string(),
+  invoiceFromPhone: z.string(),
+  invoiceFromEmail: z.string(),
 })
 
 type Schema = z.infer<typeof schema>
@@ -24,18 +30,31 @@ export default function AdminSettingsPage() {
   const utils = trpc.useUtils()
   const { data: settings, isLoading } = trpc.settings.getAll.useQuery()
   const update = trpc.settings.update.useMutation({
-    onSuccess: () => utils.settings.getAll.invalidate(),
+    onSuccess: () => {
+      utils.settings.getAll.invalidate()
+      toast.success("Settings saved")
+    },
   })
 
   const { control, handleSubmit, reset } = useForm<Schema>({
     resolver: zodResolver(schema),
-    defaultValues: { usdToBdtRate: "" },
+    defaultValues: {
+      usdToBdtRate: "",
+      invoiceFromName: "",
+      invoiceFromAddress: "",
+      invoiceFromPhone: "",
+      invoiceFromEmail: "",
+    },
   })
 
   useEffect(() => {
     if (settings) {
       reset({
         usdToBdtRate: settings.usd_to_bdt_rate ?? "",
+        invoiceFromName: settings.invoice_from_name ?? "",
+        invoiceFromAddress: settings.invoice_from_address ?? "",
+        invoiceFromPhone: settings.invoice_from_phone ?? "",
+        invoiceFromEmail: settings.invoice_from_email ?? "",
       })
     }
   }, [settings, reset])
@@ -79,6 +98,69 @@ export default function AdminSettingsPage() {
                     placeholder="e.g. 120"
                     {...field}
                   />
+                  <FieldError errors={[fieldState.error]} />
+                </FieldContent>
+              </Field>
+            )}
+          />
+
+          <div className="border-t border-border pt-5">
+            <span className="text-sm font-semibold">Invoice Details (FROM)</span>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Shown as the sender on downloadable invoices.
+            </p>
+          </div>
+
+          <Controller
+            control={control}
+            name="invoiceFromName"
+            render={({ field, fieldState }) => (
+              <Field>
+                <FieldLabel>Company Name</FieldLabel>
+                <FieldContent>
+                  <Input placeholder="e.g. WEBMOSH" {...field} />
+                  <FieldError errors={[fieldState.error]} />
+                </FieldContent>
+              </Field>
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="invoiceFromAddress"
+            render={({ field, fieldState }) => (
+              <Field>
+                <FieldLabel>Address</FieldLabel>
+                <FieldContent>
+                  <Textarea rows={2} placeholder="Street, City, Postcode, Country" {...field} />
+                  <FieldError errors={[fieldState.error]} />
+                </FieldContent>
+              </Field>
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="invoiceFromPhone"
+            render={({ field, fieldState }) => (
+              <Field>
+                <FieldLabel>Phone</FieldLabel>
+                <FieldContent>
+                  <Input placeholder="e.g. +8801XXXXXXXXX" {...field} />
+                  <FieldError errors={[fieldState.error]} />
+                </FieldContent>
+              </Field>
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="invoiceFromEmail"
+            render={({ field, fieldState }) => (
+              <Field>
+                <FieldLabel>Email</FieldLabel>
+                <FieldContent>
+                  <Input placeholder="e.g. info@webmosh.com" {...field} />
                   <FieldError errors={[fieldState.error]} />
                 </FieldContent>
               </Field>

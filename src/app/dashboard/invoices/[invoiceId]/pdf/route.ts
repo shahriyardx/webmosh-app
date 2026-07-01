@@ -75,6 +75,14 @@ export async function GET(
       ? undefined
       : await QRCode.toDataURL(QR_CONTENT, { margin: 1, width: 300 }).catch(() => undefined)
 
+  const settingRows = await prisma.setting.findMany({
+    where: {
+      key: { in: ["invoice_from_name", "invoice_from_address", "invoice_from_phone", "invoice_from_email"] },
+    },
+  })
+  const settings: Record<string, string> = {}
+  for (const r of settingRows) settings[r.key] = r.value
+
   const data: InvoicePdfData = {
     invoiceNumber: invoice.id.slice(-8).toUpperCase(),
     date: new Date(invoice.createdAt).toLocaleDateString("en-US", {
@@ -85,6 +93,12 @@ export async function GET(
     status: invoice.status as InvoicePdfData["status"],
     amount: invoice.amount,
     logoUrl: `${env.APP_URL.replace(/\/$/, "")}/logo.png`,
+    from: {
+      name: settings.invoice_from_name,
+      address: settings.invoice_from_address,
+      phone: settings.invoice_from_phone,
+      email: settings.invoice_from_email,
+    },
     billTo,
     item,
     qrDataUrl,

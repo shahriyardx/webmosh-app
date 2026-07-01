@@ -24,10 +24,16 @@ export interface InvoicePdfData {
     title: string
     features: string[]
   }
+  from?: {
+    name?: string | null
+    address?: string | null
+    phone?: string | null
+    email?: string | null
+  }
   qrDataUrl?: string
 }
 
-const COMPANY = {
+const COMPANY_DEFAULT = {
   name: "WEBMOSH",
   phone: "+8801608534154",
   email: "info@webmosh.com",
@@ -181,6 +187,12 @@ function InvoiceDocument({ data }: { data: InvoicePdfData }) {
   const totalDue = paid ? 0 : data.amount
   const amountPaid = paid ? data.amount : 0
   const st = statusStyle[data.status] ?? statusStyle.unpaid
+  const company = {
+    name: data.from?.name || COMPANY_DEFAULT.name,
+    address: data.from?.address || COMPANY_DEFAULT.address,
+    phone: data.from?.phone || COMPANY_DEFAULT.phone,
+    email: data.from?.email || COMPANY_DEFAULT.email,
+  }
 
   return (
     <Document
@@ -194,7 +206,7 @@ function InvoiceDocument({ data }: { data: InvoicePdfData }) {
           <View style={s.brandWrap}>
             {data.logoUrl ? <Image src={data.logoUrl} style={s.logo} /> : null}
             <View>
-              <Text style={s.brandName}>WEBMOSH</Text>
+              <Text style={s.brandName}>{company.name}</Text>
               <Text style={s.brandTag}>Company Formation — UK &amp; US</Text>
             </View>
           </View>
@@ -216,10 +228,10 @@ function InvoiceDocument({ data }: { data: InvoicePdfData }) {
         <View style={s.parties}>
           <View style={s.partyCol}>
             <Text style={s.label}>From</Text>
-            <Text style={s.partyName}>{COMPANY.name}</Text>
-            <Text style={s.partyLine}>{COMPANY.address}</Text>
-            <Text style={s.partyLine}>{COMPANY.phone}</Text>
-            <Text style={s.partyLine}>{COMPANY.email}</Text>
+            <Text style={s.partyName}>{company.name}</Text>
+            <Text style={s.partyLine}>{company.address}</Text>
+            <Text style={s.partyLine}>{company.phone}</Text>
+            <Text style={s.partyLine}>{company.email}</Text>
           </View>
           <View style={s.partyCol}>
             <Text style={s.label}>Bill To</Text>
@@ -300,7 +312,7 @@ function InvoiceDocument({ data }: { data: InvoicePdfData }) {
         <View style={s.footer} fixed>
           <Text style={s.footerText}>Thank you for choosing Webmosh.</Text>
           <Text style={s.footerText}>
-            {COMPANY.email} · {COMPANY.phone}
+            {company.email} · {company.phone}
           </Text>
         </View>
       </Page>
