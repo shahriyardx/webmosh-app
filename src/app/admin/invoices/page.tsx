@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { ReceiptIcon } from "lucide-react"
+import { ReceiptIcon, DownloadIcon } from "lucide-react"
 
 const tabs = [
   { label: "All", value: undefined },
@@ -149,6 +149,16 @@ export default function AdminInvoicesPage() {
                         {inv.status === PaymentStatus.paid && (
                           <span className="text-xs text-green-600">Completed</span>
                         )}
+                        <Button variant="outline" size="icon" className="size-8" asChild>
+                          <a
+                            href={`/dashboard/invoices/${inv.id}/pdf`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Download invoice"
+                          >
+                            <DownloadIcon className="size-4" />
+                          </a>
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>

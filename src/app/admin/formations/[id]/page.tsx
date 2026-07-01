@@ -689,27 +689,37 @@ export default function FormationDetailPage({
                           <Badge variant={is.variant}>{is.label}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          {inv.status === PaymentStatus.processing ? (
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                size="sm"
-                                variant="default"
-                                onClick={() => approveInvoice.mutate({ id: inv.id })}
-                                disabled={approveInvoice.isPending}
+                          <div className="flex items-center justify-end gap-1">
+                            {inv.status === PaymentStatus.processing && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => approveInvoice.mutate({ id: inv.id })}
+                                  disabled={approveInvoice.isPending}
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setInvRejecting({ id: inv.id })}
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+                            <Button variant="outline" size="icon" className="size-8" asChild>
+                              <a
+                                href={`/dashboard/invoices/${inv.id}/pdf`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Download invoice"
                               >
-                                Approve
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setInvRejecting({ id: inv.id })}
-                              >
-                                Reject
-                              </Button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
+                                <DownloadIcon className="size-4" />
+                              </a>
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     )
