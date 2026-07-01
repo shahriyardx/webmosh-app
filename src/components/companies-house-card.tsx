@@ -37,7 +37,13 @@ function humanize(s: string | null) {
 function fmtDate(d: string | null) {
   if (!d) return "—"
   const date = new Date(d)
-  return isNaN(date.getTime()) ? d : date.toLocaleDateString()
+  return isNaN(date.getTime())
+    ? d
+    : date.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
 }
 
 export function CompaniesHouseCard({ orgId }: { orgId: string }) {
