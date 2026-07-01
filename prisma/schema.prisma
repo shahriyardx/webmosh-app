@@ -29,6 +29,7 @@ model User {
 
   members     Member[]
   invitations Invitation[]
+  tickets     Ticket[]
 
   @@unique([email])
   @@map("user")
@@ -257,6 +258,39 @@ model Invoice {
 
   @@index([organizationId])
   @@map("invoice")
+}
+
+enum TicketStatus {
+  open
+  pending
+  closed
+}
+
+model Ticket {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject   String
+  status    TicketStatus    @default(open)
+  messages  TicketMessage[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([userId])
+  @@map("ticket")
+}
+
+model TicketMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId  String
+  fromAdmin Boolean  @default(false)
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@map("ticket_message")
 }
 
 model Mail {

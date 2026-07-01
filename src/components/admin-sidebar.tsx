@@ -24,8 +24,11 @@ import {
   ReceiptIcon,
   ShoppingCartIcon,
   UsersIcon,
+  LifeBuoyIcon,
   Settings,
 } from "lucide-react"
+import { trpc } from "@/lib/trpc/client"
+import { Badge } from "@/components/ui/badge"
 
 const links = [
   { title: "Dashboard", href: "/admin", icon: ShieldIcon },
@@ -48,6 +51,11 @@ const links = [
     title: "Orders",
     href: "/admin/orders",
     icon: ShoppingCartIcon,
+  },
+  {
+    title: "Tickets",
+    href: "/admin/tickets",
+    icon: LifeBuoyIcon,
   },
   {
     title: "Users",
@@ -75,6 +83,7 @@ export function AdminSidebar({
   onSignOut?: () => void
 }) {
   const pathname = usePathname()
+  const { data: openTickets } = trpc.tickets.adminOpenCount.useQuery()
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -109,6 +118,13 @@ export function AdminSidebar({
                   <Link href={link.href}>
                     <link.icon />
                     <span>{link.title}</span>
+                    {link.title === "Tickets" &&
+                      openTickets !== undefined &&
+                      openTickets > 0 && (
+                        <Badge className="ml-auto size-5 rounded-full p-0 text-[10px]">
+                          {openTickets}
+                        </Badge>
+                      )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
