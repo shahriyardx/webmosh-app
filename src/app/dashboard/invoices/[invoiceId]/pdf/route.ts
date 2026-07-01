@@ -3,8 +3,12 @@ import { headers } from "next/headers"
 import { prisma } from "@/lib/prisma"
 import { renderInvoicePdf, type InvoicePdfData } from "@/lib/invoice-pdf"
 import { env } from "@/lib/env"
+import QRCode from "qrcode"
 
 export const runtime = "nodejs"
+
+const QR_CONTENT =
+  "00020101021126540013com.pathaopay01020302041008031991008200186593649045204739953030505802BD5907WEBMOSH60045460625002110186593649003085594973007082f9893880807PAYMENT63049E3F"
 
 export async function GET(
   _req: Request,
@@ -66,6 +70,11 @@ export async function GET(
         email: owner?.user?.email ?? null,
       }
 
+  const qrDataUrl =
+    invoice.status === "paid"
+      ? undefined
+      : await QRCode.toDataURL(QR_CONTENT, { margin: 1, width: 300 }).catch(() => undefined)
+
   const data: InvoicePdfData = {
     invoiceNumber: invoice.id.slice(-8).toUpperCase(),
     date: new Date(invoice.createdAt).toLocaleDateString("en-US", {
@@ -78,6 +87,7 @@ export async function GET(
     logoUrl: `${env.APP_URL.replace(/\/$/, "")}/logo.png`,
     billTo,
     item,
+    qrDataUrl,
   }
 
   let pdf: Buffer

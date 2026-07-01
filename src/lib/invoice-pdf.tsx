@@ -24,6 +24,7 @@ export interface InvoicePdfData {
     title: string
     features: string[]
   }
+  qrDataUrl?: string
 }
 
 const COMPANY = {
@@ -32,15 +33,6 @@ const COMPANY = {
   email: "info@webmosh.com",
   address: "House# 322, Nayanogor Road, Turag, Uttara, Dhaka 1230",
 }
-
-const BANK: [string, string][] = [
-  ["Bank", "The City Bank"],
-  ["Account Number", "2303365324001"],
-  ["Routing", "225851450"],
-  ["Account Name", "MD Samayun Kabir"],
-  ["Branch", "Rangpur"],
-  ["Swift Code", "CIBLBDDH"],
-]
 
 const BRAND = "#0EA5E9"
 const INK = "#0f172a"
@@ -71,8 +63,10 @@ const s = StyleSheet.create({
   logo: { width: 46, height: 46, objectFit: "contain", marginRight: 10 },
   brandName: { fontSize: 16, fontFamily: "Helvetica-Bold", color: INK, letterSpacing: 1 },
   brandTag: { fontSize: 8, color: MUTED, marginTop: 1 },
-  invoiceTitle: { fontSize: 30, fontFamily: "Helvetica-Bold", color: BRAND, textAlign: "right", letterSpacing: 1 },
-  invoiceMeta: { fontSize: 9, color: MUTED, textAlign: "right", marginTop: 4 },
+  headerRight: { width: 200, alignItems: "flex-end" },
+  invoiceTitle: { fontSize: 28, fontFamily: "Helvetica-Bold", color: BRAND, textAlign: "right", letterSpacing: 2, lineHeight: 1 },
+  invoiceMetaBlock: { marginTop: 10, alignItems: "flex-end" },
+  invoiceMeta: { fontSize: 9, color: MUTED, textAlign: "right", lineHeight: 1.4 },
   invoiceMetaValue: { color: INK, fontFamily: "Helvetica-Bold" },
 
   accent: { height: 3, backgroundColor: BRAND, borderRadius: 2, marginTop: 14 },
@@ -149,12 +143,19 @@ const s = StyleSheet.create({
   grandLabel: { fontFamily: "Helvetica-Bold", color: INK },
   grandValue: { fontFamily: "Helvetica-Bold", color: BRAND, fontSize: 13 },
 
-  // Bank
-  bank: { marginTop: 30, borderWidth: 1, borderColor: LINE, borderRadius: 8, padding: 14 },
-  bankGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 6 },
-  bankItem: { width: "50%", marginBottom: 6 },
-  bankLabel: { fontSize: 8, color: MUTED },
-  bankValue: { fontSize: 9.5, color: INK, fontFamily: "Helvetica-Bold" },
+  // Pay QR
+  payBox: {
+    marginTop: 30,
+    borderWidth: 1,
+    borderColor: LINE,
+    borderRadius: 8,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  qr: { width: 96, height: 96, marginRight: 16 },
+  payTitle: { fontSize: 11, fontFamily: "Helvetica-Bold", color: INK },
+  payText: { fontSize: 9, color: MUTED, marginTop: 4, maxWidth: 300 },
 
   // Footer
   footer: {
@@ -197,14 +198,16 @@ function InvoiceDocument({ data }: { data: InvoicePdfData }) {
               <Text style={s.brandTag}>Company Formation — UK &amp; US</Text>
             </View>
           </View>
-          <View>
+          <View style={s.headerRight}>
             <Text style={s.invoiceTitle}>INVOICE</Text>
-            <Text style={s.invoiceMeta}>
-              No. <Text style={s.invoiceMetaValue}>{data.invoiceNumber}</Text>
-            </Text>
-            <Text style={s.invoiceMeta}>
-              Date <Text style={s.invoiceMetaValue}>{data.date}</Text>
-            </Text>
+            <View style={s.invoiceMetaBlock}>
+              <Text style={s.invoiceMeta}>
+                No. <Text style={s.invoiceMetaValue}>{data.invoiceNumber}</Text>
+              </Text>
+              <Text style={s.invoiceMeta}>
+                Date <Text style={s.invoiceMetaValue}>{data.date}</Text>
+              </Text>
+            </View>
           </View>
         </View>
         <View style={s.accent} />
@@ -279,18 +282,19 @@ function InvoiceDocument({ data }: { data: InvoicePdfData }) {
           </View>
         </View>
 
-        {/* Bank */}
-        <View style={s.bank}>
-          <Text style={s.label}>Bank Transfer Details</Text>
-          <View style={s.bankGrid}>
-            {BANK.map(([k, v], i) => (
-              <View key={i} style={s.bankItem}>
-                <Text style={s.bankLabel}>{k}</Text>
-                <Text style={s.bankValue}>{v}</Text>
-              </View>
-            ))}
+        {/* Pay via QR */}
+        {!paid && data.qrDataUrl ? (
+          <View style={s.payBox}>
+            <Image src={data.qrDataUrl} style={s.qr} />
+            <View>
+              <Text style={s.payTitle}>Scan to Pay — Bangla QR</Text>
+              <Text style={s.payText}>
+                Scan this QR with any Bangla QR enabled app (bKash, Nagad, Rocket or your
+                bank app) to pay {money(totalDue)}.
+              </Text>
+            </View>
           </View>
-        </View>
+        ) : null}
 
         {/* Footer */}
         <View style={s.footer} fixed>
