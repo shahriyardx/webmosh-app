@@ -124,7 +124,15 @@ export default function TicketsPage() {
                   type="file"
                   multiple
                   className="hidden"
-                  onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+                  onChange={(e) => {
+                    const picked = Array.from(e.target.files ?? [])
+                    if (picked.length > 3) {
+                      toast.error("You can attach up to 3 files")
+                      setFiles(picked.slice(0, 3))
+                    } else {
+                      setFiles(picked)
+                    }
+                  }}
                 />
                 <Button
                   type="button"

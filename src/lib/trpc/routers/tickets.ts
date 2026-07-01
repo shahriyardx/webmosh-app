@@ -9,7 +9,7 @@ export const ticketsRouter = router({
       z.object({
         subject: z.string().min(1),
         body: z.string().min(1),
-        attachments: z.array(z.string()).default([]),
+        attachments: z.array(z.string()).max(3).default([]),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -58,7 +58,7 @@ export const ticketsRouter = router({
       z.object({
         ticketId: z.string(),
         body: z.string().min(1),
-        attachments: z.array(z.string()).default([]),
+        attachments: z.array(z.string()).max(3).default([]),
       }),
     )
     .mutation(async ({ input, ctx }) => {
