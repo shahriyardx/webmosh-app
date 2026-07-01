@@ -16,7 +16,7 @@ import {
   MultiSelectContent,
   MultiSelectItem,
 } from "@/components/ui/multi-select"
-import { ArrowLeftIcon, PaperclipIcon } from "lucide-react"
+import { ArrowLeftIcon, PaperclipIcon, XIcon } from "lucide-react"
 
 const statusBadge: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
   open: { label: "Open", variant: "default" },
@@ -217,8 +217,29 @@ export function TicketThread({
               } else {
                 setFiles(picked)
               }
+              e.target.value = ""
             }}
           />
+          {files.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {files.map((f, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs"
+                >
+                  <PaperclipIcon className="size-3 shrink-0" />
+                  <span className="max-w-[12rem] truncate">{f.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <XIcon className="size-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {admin ? (
@@ -234,11 +255,6 @@ export function TicketThread({
               )}
             </div>
             <div className="flex items-center gap-2">
-              {files.length > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  {files.length} file(s)
-                </span>
-              )}
               <Button
                 type="button"
                 variant="outline"

@@ -27,7 +27,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { LifeBuoyIcon, PlusIcon, PaperclipIcon } from "lucide-react"
+import { LifeBuoyIcon, PlusIcon, PaperclipIcon, XIcon } from "lucide-react"
 
 const statusBadge: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
   open: { label: "Open", variant: "default" },
@@ -132,6 +132,7 @@ export default function TicketsPage() {
                     } else {
                       setFiles(picked)
                     }
+                    e.target.value = ""
                   }}
                 />
                 <Button
@@ -141,8 +142,28 @@ export default function TicketsPage() {
                   onClick={() => fileRef.current?.click()}
                 >
                   <PaperclipIcon className="size-3" />
-                  {files.length > 0 ? `${files.length} file(s) selected` : "Attach Files"}
+                  Attach Files
                 </Button>
+                {files.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {files.map((f, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs"
+                      >
+                        <PaperclipIcon className="size-3 shrink-0" />
+                        <span className="max-w-[12rem] truncate">{f.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <XIcon className="size-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>
