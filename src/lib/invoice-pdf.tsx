@@ -33,171 +33,272 @@ const COMPANY = {
   address: "House# 322, Nayanogor Road, Turag, Uttara, Dhaka 1230",
 }
 
-const BANK = [
-  "The city Bank",
-  "ACC number : 2303365324001",
-  "Routing: 225851450",
-  "Name: MD Samayun Kabir",
-  "Branch: Rangpur",
-  "Swift Code: CIBLBDDH",
+const BANK: [string, string][] = [
+  ["Bank", "The City Bank"],
+  ["Account Number", "2303365324001"],
+  ["Routing", "225851450"],
+  ["Account Name", "MD Samayun Kabir"],
+  ["Branch", "Rangpur"],
+  ["Swift Code", "CIBLBDDH"],
 ]
 
-const statusLabel: Record<string, string> = {
-  paid: "Paid",
-  unpaid: "Unpaid",
-  processing: "Processing",
-  rejected: "Rejected",
+const BRAND = "#0EA5E9"
+const INK = "#0f172a"
+const MUTED = "#64748b"
+const LINE = "#e2e8f0"
+
+const statusStyle: Record<string, { label: string; color: string; bg: string }> = {
+  paid: { label: "PAID", color: "#15803d", bg: "#dcfce7" },
+  unpaid: { label: "UNPAID", color: "#b45309", bg: "#fef3c7" },
+  processing: { label: "PROCESSING", color: "#1d4ed8", bg: "#dbeafe" },
+  rejected: { label: "REJECTED", color: "#b91c1c", bg: "#fee2e2" },
 }
 
 const s = StyleSheet.create({
-  page: { padding: 40, fontSize: 10, color: "#1f2937", fontFamily: "Helvetica" },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  logo: { width: 70, height: 70, objectFit: "contain" },
-  invoiceTitle: { fontSize: 34, color: "#111827", textAlign: "right" },
-  invoiceNo: { fontSize: 11, color: "#6b7280", textAlign: "right", marginTop: 2 },
+  page: {
+    paddingTop: 44,
+    paddingHorizontal: 44,
+    paddingBottom: 72,
+    fontSize: 9.5,
+    color: INK,
+    fontFamily: "Helvetica",
+    lineHeight: 1.5,
+  },
 
-  metaRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 24, alignItems: "center" },
-  metaLabel: { color: "#6b7280", marginRight: 16 },
+  // Header
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  brandWrap: { flexDirection: "row", alignItems: "center" },
+  logo: { width: 46, height: 46, objectFit: "contain", marginRight: 10 },
+  brandName: { fontSize: 16, fontFamily: "Helvetica-Bold", color: INK, letterSpacing: 1 },
+  brandTag: { fontSize: 8, color: MUTED, marginTop: 1 },
+  invoiceTitle: { fontSize: 30, fontFamily: "Helvetica-Bold", color: BRAND, textAlign: "right", letterSpacing: 1 },
+  invoiceMeta: { fontSize: 9, color: MUTED, textAlign: "right", marginTop: 4 },
+  invoiceMetaValue: { color: INK, fontFamily: "Helvetica-Bold" },
 
-  totalDueBox: {
+  accent: { height: 3, backgroundColor: BRAND, borderRadius: 2, marginTop: 14 },
+
+  // Parties
+  parties: { flexDirection: "row", justifyContent: "space-between", marginTop: 26 },
+  partyCol: { width: "48%" },
+  label: { fontSize: 8, color: MUTED, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 },
+  partyName: { fontFamily: "Helvetica-Bold", fontSize: 11, color: INK },
+  partyLine: { color: "#475569", marginTop: 2 },
+
+  // Status + due summary (right aligned band)
+  summary: {
+    marginTop: 24,
     flexDirection: "row",
     justifyContent: "space-between",
-    backgroundColor: "#f3f4f6",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginTop: 12,
-    width: 260,
-    alignSelf: "flex-end",
-  },
-  statusBox: {
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: "#166534",
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginTop: 8,
-    width: 260,
-    alignSelf: "flex-end",
+    borderColor: LINE,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  statusText: { color: "#166534", fontFamily: "Helvetica-Bold" },
+  summaryLabel: { fontSize: 9, color: MUTED, textTransform: "uppercase", letterSpacing: 1 },
+  summaryDue: { fontSize: 20, fontFamily: "Helvetica-Bold", color: INK, marginTop: 2 },
+  statusPill: {
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+    letterSpacing: 1,
+  },
 
-  bold: { fontFamily: "Helvetica-Bold" },
-  muted: { color: "#6b7280" },
-  block: { marginTop: 24 },
-  line: { marginTop: 2 },
-
+  // Table
   tableHead: {
     flexDirection: "row",
-    backgroundColor: "#374151",
+    backgroundColor: INK,
     color: "#ffffff",
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    marginTop: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 26,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    fontSize: 8.5,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
+  tableBody: { borderWidth: 1, borderTopWidth: 0, borderColor: LINE, borderBottomLeftRadius: 6, borderBottomRightRadius: 6 },
+  itemRow: { flexDirection: "row", paddingHorizontal: 12, paddingVertical: 12 },
   colItem: { flex: 4 },
   colQty: { flex: 1, textAlign: "right" },
-  colRate: { flex: 1.5, textAlign: "right" },
-  colAmount: { flex: 1.5, textAlign: "right" },
+  colRate: { flex: 1.4, textAlign: "right" },
+  colAmount: { flex: 1.4, textAlign: "right" },
+  itemTitle: { fontFamily: "Helvetica-Bold", fontSize: 10, color: INK },
+  feature: { color: MUTED, marginTop: 3, fontSize: 8.5 },
 
-  itemRow: { flexDirection: "row", paddingHorizontal: 8, paddingTop: 10 },
-  feature: { color: "#6b7280", marginTop: 3, fontSize: 9 },
+  // Totals
+  totalsWrap: { flexDirection: "row", justifyContent: "flex-end", marginTop: 18 },
+  totalsBox: { width: 240 },
+  totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
+  totalsLabel: { color: MUTED },
+  totalsValue: { color: INK, fontFamily: "Helvetica-Bold" },
+  grandRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 6,
+    paddingTop: 8,
+    paddingHorizontal: 10,
+    paddingBottom: 8,
+    backgroundColor: "#f0f9ff",
+    borderRadius: 6,
+  },
+  grandLabel: { fontFamily: "Helvetica-Bold", color: INK },
+  grandValue: { fontFamily: "Helvetica-Bold", color: BRAND, fontSize: 13 },
 
-  totalsRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 8 },
-  totalsLabel: { color: "#6b7280", width: 90, textAlign: "right", marginRight: 16 },
-  totalsValue: { width: 70, textAlign: "right" },
+  // Bank
+  bank: { marginTop: 30, borderWidth: 1, borderColor: LINE, borderRadius: 8, padding: 14 },
+  bankGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 6 },
+  bankItem: { width: "50%", marginBottom: 6 },
+  bankLabel: { fontSize: 8, color: MUTED },
+  bankValue: { fontSize: 9.5, color: INK, fontFamily: "Helvetica-Bold" },
 
-  footer: { position: "absolute", bottom: 30, left: 40, right: 40, textAlign: "center", color: "#6b7280", fontSize: 9 },
+  // Footer
+  footer: {
+    position: "absolute",
+    bottom: 32,
+    left: 44,
+    right: 44,
+    borderTopWidth: 1,
+    borderTopColor: LINE,
+    paddingTop: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  footerText: { fontSize: 8, color: MUTED },
 })
+
+function money(n: number) {
+  return `$${n.toFixed(2)}`
+}
 
 function InvoiceDocument({ data }: { data: InvoicePdfData }) {
   const paid = data.status === "paid"
   const totalDue = paid ? 0 : data.amount
   const amountPaid = paid ? data.amount : 0
+  const st = statusStyle[data.status] ?? statusStyle.unpaid
 
   return (
-    <Document>
+    <Document
+      title={`Invoice ${data.invoiceNumber}`}
+      author="Webmosh"
+      subject="Invoice"
+    >
       <Page size="A4" style={s.page}>
         {/* Header */}
-        <View style={s.headerRow}>
-          {data.logoUrl ? <Image src={data.logoUrl} style={s.logo} /> : <View />}
+        <View style={s.header}>
+          <View style={s.brandWrap}>
+            {data.logoUrl ? <Image src={data.logoUrl} style={s.logo} /> : null}
+            <View>
+              <Text style={s.brandName}>WEBMOSH</Text>
+              <Text style={s.brandTag}>Company Formation — UK &amp; US</Text>
+            </View>
+          </View>
           <View>
-            <Text style={s.invoiceTitle}>Invoice</Text>
-            <Text style={s.invoiceNo}># {data.invoiceNumber}</Text>
+            <Text style={s.invoiceTitle}>INVOICE</Text>
+            <Text style={s.invoiceMeta}>
+              No. <Text style={s.invoiceMetaValue}>{data.invoiceNumber}</Text>
+            </Text>
+            <Text style={s.invoiceMeta}>
+              Date <Text style={s.invoiceMetaValue}>{data.date}</Text>
+            </Text>
+          </View>
+        </View>
+        <View style={s.accent} />
+
+        {/* Parties */}
+        <View style={s.parties}>
+          <View style={s.partyCol}>
+            <Text style={s.label}>From</Text>
+            <Text style={s.partyName}>{COMPANY.name}</Text>
+            <Text style={s.partyLine}>{COMPANY.address}</Text>
+            <Text style={s.partyLine}>{COMPANY.phone}</Text>
+            <Text style={s.partyLine}>{COMPANY.email}</Text>
+          </View>
+          <View style={s.partyCol}>
+            <Text style={s.label}>Bill To</Text>
+            <Text style={s.partyName}>{data.billTo.name}</Text>
+            {data.billTo.address ? <Text style={s.partyLine}>{data.billTo.address}</Text> : null}
+            {data.billTo.phone ? <Text style={s.partyLine}>{data.billTo.phone}</Text> : null}
+            {data.billTo.email ? <Text style={s.partyLine}>{data.billTo.email}</Text> : null}
           </View>
         </View>
 
-        {/* Date + total due + status */}
-        <View style={s.metaRow}>
-          <Text style={s.metaLabel}>Date:</Text>
-          <Text style={s.bold}>{data.date}</Text>
-        </View>
-        <View style={s.totalDueBox}>
-          <Text style={s.bold}>Total Due:</Text>
-          <Text style={s.bold}>${totalDue.toFixed(2)}</Text>
-        </View>
-        <View style={s.statusBox}>
-          <Text style={s.statusText}>{statusLabel[data.status] ?? data.status}</Text>
+        {/* Summary band */}
+        <View style={s.summary}>
+          <View>
+            <Text style={s.summaryLabel}>Total Due</Text>
+            <Text style={s.summaryDue}>{money(totalDue)}</Text>
+          </View>
+          <Text style={[s.statusPill, { color: st.color, backgroundColor: st.bg }]}>
+            {st.label}
+          </Text>
         </View>
 
-        {/* From */}
-        <View style={s.block}>
-          <Text style={s.bold}>{COMPANY.name}</Text>
-          <Text style={s.line}>{COMPANY.phone}</Text>
-          <Text style={s.line}>{COMPANY.email}</Text>
-          <Text style={s.line}>{COMPANY.address}</Text>
-        </View>
-
-        {/* Bill To */}
-        <View style={s.block}>
-          <Text style={s.muted}>Bill To:</Text>
-          <Text style={[s.bold, s.line]}>{data.billTo.name}</Text>
-          {data.billTo.phone ? <Text style={s.line}>{data.billTo.phone}</Text> : null}
-          {data.billTo.email ? <Text style={s.line}>{data.billTo.email}</Text> : null}
-          {data.billTo.address ? <Text style={s.line}>{data.billTo.address}</Text> : null}
-        </View>
-
-        {/* Items table */}
+        {/* Items */}
         <View style={s.tableHead}>
-          <Text style={s.colItem}>Item</Text>
-          <Text style={s.colQty}>Quantity</Text>
+          <Text style={s.colItem}>Description</Text>
+          <Text style={s.colQty}>Qty</Text>
           <Text style={s.colRate}>Rate</Text>
           <Text style={s.colAmount}>Amount</Text>
         </View>
-        <View style={s.itemRow}>
-          <View style={s.colItem}>
-            <Text style={s.bold}>{data.item.title}</Text>
-            {data.item.features.map((f, i) => (
-              <Text key={i} style={s.feature}>
-                {i + 1}. {f}
-              </Text>
-            ))}
+        <View style={s.tableBody}>
+          <View style={s.itemRow}>
+            <View style={s.colItem}>
+              <Text style={s.itemTitle}>{data.item.title}</Text>
+              {data.item.features.map((f, i) => (
+                <Text key={i} style={s.feature}>
+                  {i + 1}. {f}
+                </Text>
+              ))}
+            </View>
+            <Text style={s.colQty}>1</Text>
+            <Text style={s.colRate}>{money(data.amount)}</Text>
+            <Text style={s.colAmount}>{money(data.amount)}</Text>
           </View>
-          <Text style={s.colQty}>1</Text>
-          <Text style={s.colRate}>${data.amount.toFixed(2)}</Text>
-          <Text style={s.colAmount}>${data.amount.toFixed(2)}</Text>
         </View>
 
         {/* Totals */}
-        <View style={[s.totalsRow, { marginTop: 28 }]}>
-          <Text style={s.totalsLabel}>Total:</Text>
-          <Text style={s.totalsValue}>${data.amount.toFixed(2)}</Text>
-        </View>
-        <View style={s.totalsRow}>
-          <Text style={s.totalsLabel}>Amount Paid:</Text>
-          <Text style={s.totalsValue}>${amountPaid.toFixed(2)}</Text>
-        </View>
-
-        {/* Bank details */}
-        <View style={{ marginTop: 40 }}>
-          <Text style={s.muted}>Bank Transfer Details :</Text>
-          {BANK.map((b, i) => (
-            <Text key={i} style={s.line}>
-              {b}
-            </Text>
-          ))}
+        <View style={s.totalsWrap}>
+          <View style={s.totalsBox}>
+            <View style={s.totalsRow}>
+              <Text style={s.totalsLabel}>Subtotal</Text>
+              <Text style={s.totalsValue}>{money(data.amount)}</Text>
+            </View>
+            <View style={s.totalsRow}>
+              <Text style={s.totalsLabel}>Amount Paid</Text>
+              <Text style={s.totalsValue}>{money(amountPaid)}</Text>
+            </View>
+            <View style={s.grandRow}>
+              <Text style={s.grandLabel}>Total Due</Text>
+              <Text style={s.grandValue}>{money(totalDue)}</Text>
+            </View>
+          </View>
         </View>
 
-        <Text style={s.footer}>Thanks For Choosing WEBMOSH.</Text>
+        {/* Bank */}
+        <View style={s.bank}>
+          <Text style={s.label}>Bank Transfer Details</Text>
+          <View style={s.bankGrid}>
+            {BANK.map(([k, v], i) => (
+              <View key={i} style={s.bankItem}>
+                <Text style={s.bankLabel}>{k}</Text>
+                <Text style={s.bankValue}>{v}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Footer */}
+        <View style={s.footer} fixed>
+          <Text style={s.footerText}>Thank you for choosing Webmosh.</Text>
+          <Text style={s.footerText}>
+            {COMPANY.email} · {COMPANY.phone}
+          </Text>
+        </View>
       </Page>
     </Document>
   )
