@@ -102,6 +102,28 @@ export function TicketThread({
   const sb = statusBadge[ticket.status] ?? statusBadge.open
   const isClosed = ticket.status === TicketStatus.closed
 
+  const statusDropdown = (
+    <MultiSelect
+      single
+      values={[ticket.status]}
+      onValuesChange={(vals) => {
+        const next = vals[0]
+        if (next && next !== ticket.status) {
+          updateStatus.mutate({ id: ticketId, status: next as TicketStatus })
+        }
+      }}
+    >
+      <MultiSelectTrigger className="h-9 w-44">
+        <MultiSelectValue />
+      </MultiSelectTrigger>
+      <MultiSelectContent>
+        <MultiSelectItem value="open">Open</MultiSelectItem>
+        <MultiSelectItem value="pending">Awaiting reply</MultiSelectItem>
+        <MultiSelectItem value="closed">Closed</MultiSelectItem>
+      </MultiSelectContent>
+    </MultiSelect>
+  )
+
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
       <div className="flex items-center gap-4">
@@ -122,30 +144,6 @@ export function TicketThread({
       </div>
 
       {/* Admin controls */}
-      {admin && (
-        <div className="flex items-center gap-2">
-          <MultiSelect
-            single
-            values={[ticket.status]}
-            onValuesChange={(vals) => {
-              const next = vals[0]
-              if (next && next !== ticket.status) {
-                updateStatus.mutate({ id: ticketId, status: next as TicketStatus })
-              }
-            }}
-          >
-            <MultiSelectTrigger className="h-8 w-44">
-              <MultiSelectValue />
-            </MultiSelectTrigger>
-            <MultiSelectContent>
-              <MultiSelectItem value="open">Open</MultiSelectItem>
-              <MultiSelectItem value="pending">Awaiting reply</MultiSelectItem>
-              <MultiSelectItem value="closed">Closed</MultiSelectItem>
-            </MultiSelectContent>
-          </MultiSelect>
-        </div>
-      )}
-
       {/* Messages */}
       <div className="space-y-3">
         {ticket.messages.map((m) => (
@@ -192,8 +190,11 @@ export function TicketThread({
 
       {/* Reply */}
       {isClosed ? (
-        <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-center text-sm text-muted-foreground">
-          This ticket is closed.
+        <div className="space-y-3">
+          <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-center text-sm text-muted-foreground">
+            This ticket is closed.
+          </div>
+          {admin && <div className="flex justify-start">{statusDropdown}</div>}
         </div>
       ) : (
         <div className="space-y-3">
@@ -212,34 +213,39 @@ export function TicketThread({
           />
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={() => close.mutate({ id: ticketId })}
-                disabled={close.isPending}
-              >
-                Close ticket
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => fileRef.current?.click()}
-                title="Attach files"
-              >
-                <PaperclipIcon className="size-4" />
-              </Button>
+              {admin ? (
+                statusDropdown
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => close.mutate({ id: ticketId })}
+                  disabled={close.isPending}
+                >
+                  Close ticket
+                </Button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
               {files.length > 0 && (
                 <span className="text-xs text-muted-foreground">
                   {files.length} file(s)
                 </span>
               )}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileRef.current?.click()}
+              >
+                <PaperclipIcon className="size-4" />
+                Attach Files
+              </Button>
+              <Button
+                onClick={handleReply}
+                disabled={!body || uploading || reply.isPending}
+              >
+                {uploading || reply.isPending ? "Sending…" : "Send reply"}
+              </Button>
             </div>
-            <Button
-              onClick={handleReply}
-              disabled={!body || uploading || reply.isPending}
-            >
-              {uploading || reply.isPending ? "Sending…" : "Send reply"}
-            </Button>
           </div>
         </div>
       )}

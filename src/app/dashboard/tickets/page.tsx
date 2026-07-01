@@ -133,7 +133,7 @@ export default function TicketsPage() {
                   onClick={() => fileRef.current?.click()}
                 >
                   <PaperclipIcon className="size-3" />
-                  {files.length > 0 ? `${files.length} file(s) selected` : "Attach files"}
+                  {files.length > 0 ? `${files.length} file(s) selected` : "Attach Files"}
                 </Button>
               </div>
             </div>
