@@ -101,8 +101,8 @@ export default function OnboardPage() {
 
   const importCompany = trpc.companies.importCompany.useMutation({
     onSuccess: () => {
-      router.refresh()
-      router.push("/dashboard")
+      // Hard reload so the client session picks up the new active organization
+      window.location.href = "/dashboard"
     },
     onError: (e) => toast.error(e.message),
   })
