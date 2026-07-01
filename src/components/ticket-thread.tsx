@@ -138,6 +138,7 @@ export function TicketThread({
           {admin && (
             <p className="text-xs text-muted-foreground">
               {ticket.user?.name ?? "—"} · {ticket.user?.email}
+              {ticket.organization?.name ? ` · ${ticket.organization.name}` : ""}
             </p>
           )}
         </div>

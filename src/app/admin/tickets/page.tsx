@@ -78,6 +78,7 @@ export default function AdminTicketsPage() {
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead>Subject</TableHead>
+                <TableHead>Company</TableHead>
                 <TableHead>User</TableHead>
                 <TableHead>Messages</TableHead>
                 <TableHead>Status</TableHead>
@@ -94,6 +95,9 @@ export default function AdminTicketsPage() {
                     onClick={() => router.push(`/admin/tickets/${t.id}`)}
                   >
                     <TableCell className="font-medium">{t.subject}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {t.organization?.name ?? "—"}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {t.user?.name ?? "—"}
                       <span className="block text-xs">{t.user?.email}</span>

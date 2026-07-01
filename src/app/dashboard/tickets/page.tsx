@@ -2,7 +2,9 @@
 
 import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
 import { trpc } from "@/lib/trpc/client"
+import { authClient } from "@/lib/auth-client"
 import { uploadFiles } from "@/lib/upload"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -27,6 +29,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  MultiSelect,
+  MultiSelectTrigger,
+  MultiSelectValue,
+  MultiSelectContent,
+  MultiSelectItem,
+} from "@/components/ui/multi-select"
 import { LifeBuoyIcon, PlusIcon, PaperclipIcon, XIcon } from "lucide-react"
 
 const statusBadge: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
@@ -38,14 +47,25 @@ const statusBadge: Record<string, { label: string; variant: "outline" | "seconda
 export default function TicketsPage() {
   const router = useRouter()
   const utils = trpc.useUtils()
+  const { data: session } = authClient.useSession()
   const { data: tickets, isLoading } = trpc.tickets.list.useQuery()
+
+  const { data: orgList } = useQuery({
+    queryKey: ["organizations"],
+    queryFn: () => authClient.organization.list(),
+  })
+  const orgs = orgList?.data ?? []
 
   const [open, setOpen] = useState(false)
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
+  const [orgId, setOrgId] = useState<string>("")
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const activeOrgId = session?.session?.activeOrganizationId ?? ""
+  const selectedOrg = orgId || activeOrgId
 
   const create = trpc.tickets.create.useMutation({
     onSuccess: () => {
@@ -54,6 +74,7 @@ export default function TicketsPage() {
       setOpen(false)
       setSubject("")
       setBody("")
+      setOrgId("")
       setFiles([])
       toast.success("Ticket created")
     },
@@ -63,7 +84,12 @@ export default function TicketsPage() {
     setUploading(true)
     try {
       const attachments = await uploadFiles(files, "ticket")
-      await create.mutateAsync({ subject, body, attachments })
+      await create.mutateAsync({
+        subject,
+        body,
+        attachments,
+        organizationId: selectedOrg || undefined,
+      })
     } catch {
       toast.error("Failed to create ticket")
     } finally {
@@ -100,6 +126,27 @@ export default function TicketsPage() {
               <DialogTitle>New Support Ticket</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              {orgs.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Company</Label>
+                  <MultiSelect
+                    single
+                    values={selectedOrg ? [selectedOrg] : []}
+                    onValuesChange={(vals) => setOrgId(vals[0] ?? "")}
+                  >
+                    <MultiSelectTrigger className="w-full">
+                      <MultiSelectValue placeholder="Select a company" />
+                    </MultiSelectTrigger>
+                    <MultiSelectContent>
+                      {orgs.map((o) => (
+                        <MultiSelectItem key={o.id} value={o.id}>
+                          {o.name}
+                        </MultiSelectItem>
+                      ))}
+                    </MultiSelectContent>
+                  </MultiSelect>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Subject</Label>
                 <Input
@@ -191,6 +238,7 @@ export default function TicketsPage() {
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead>Subject</TableHead>
+                <TableHead>Company</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Updated</TableHead>
               </TableRow>
@@ -205,6 +253,9 @@ export default function TicketsPage() {
                     onClick={() => router.push(`/dashboard/tickets/${t.id}`)}
                   >
                     <TableCell className="font-medium">{t.subject}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {t.organization?.name ?? "—"}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={sb.variant}>{sb.label}</Badge>
                     </TableCell>

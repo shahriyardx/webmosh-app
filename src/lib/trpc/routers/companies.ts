@@ -253,6 +253,12 @@ export const companiesRouter = router({
         },
       })
 
+      // Set the imported company as the active organization
+      await auth.api.setActiveOrganization({
+        body: { organizationId: org.id },
+        headers: hdrs,
+      })
+
       return org
     }),
 

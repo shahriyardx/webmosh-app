@@ -16,13 +16,16 @@ export const ticketsRouter = router({
       z.object({
         subject: z.string().min(1),
         body: z.string().min(1),
+        organizationId: z.string().optional(),
         attachments: z.array(z.string()).max(3).default([]),
       }),
     )
     .mutation(async ({ input, ctx }) => {
+      const orgId = input.organizationId ?? ctx.session?.session?.activeOrganizationId ?? null
       const ticket = await prisma.ticket.create({
         data: {
           userId: ctx.user.id,
+          organizationId: orgId,
           subject: input.subject,
           status: TicketStatus.open,
           messages: {
@@ -48,6 +51,7 @@ export const ticketsRouter = router({
     return prisma.ticket.findMany({
       where: { userId: ctx.user.id },
       orderBy: { updatedAt: "desc" },
+      include: { organization: { select: { name: true } } },
     })
   }),
 
@@ -59,6 +63,7 @@ export const ticketsRouter = router({
         include: {
           messages: { orderBy: { createdAt: "asc" } },
           user: { select: { id: true, name: true, email: true } },
+          organization: { select: { id: true, name: true } },
         },
       })
       if (!ticket) return null
@@ -163,6 +168,7 @@ export const ticketsRouter = router({
         orderBy: { updatedAt: "desc" },
         include: {
           user: { select: { id: true, name: true, email: true } },
+          organization: { select: { name: true } },
           _count: { select: { messages: true } },
         },
       })
