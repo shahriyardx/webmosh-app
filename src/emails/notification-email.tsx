@@ -5,6 +5,7 @@ import {
   Heading,
   Hr,
   Html,
+  Img,
   Link,
   Preview,
   Section,
@@ -19,6 +20,7 @@ export interface NotificationEmailProps {
   details?: { label: string; value: string }[]
   paragraphs?: string[]
   cta?: { label: string; url: string }
+  logoUrl?: string
 }
 
 const main = { backgroundColor: "#f6f6f6", fontFamily: "Arial, sans-serif" }
@@ -30,6 +32,7 @@ const container = {
   borderRadius: "12px",
 }
 const brand = { color: "#0EA5E9", fontSize: "20px", fontWeight: "bold" as const, margin: "0 0 24px" }
+const logo = { height: "36px", width: "auto", margin: "0 0 24px" }
 const h1 = { fontSize: "18px", fontWeight: "bold" as const, color: "#111827", margin: "0 0 12px" }
 const text = { fontSize: "14px", lineHeight: "22px", color: "#374151", margin: "0 0 12px" }
 const detailRow = { fontSize: "14px", lineHeight: "20px", color: "#374151", margin: "0 0 6px" }
@@ -56,6 +59,7 @@ export function NotificationEmail({
   details,
   paragraphs,
   cta,
+  logoUrl,
 }: NotificationEmailProps) {
   return (
     <Html>
@@ -63,7 +67,11 @@ export function NotificationEmail({
       <Preview>{preview ?? heading}</Preview>
       <Body style={main}>
         <Container style={container}>
-          <Text style={brand}>Webmosh</Text>
+          {logoUrl ? (
+            <Img src={logoUrl} alt="Webmosh" style={logo} />
+          ) : (
+            <Text style={brand}>Webmosh</Text>
+          )}
           <Heading style={h1}>{heading}</Heading>
           {greeting && <Text style={text}>{greeting}</Text>}
           <Text style={text}>{intro}</Text>

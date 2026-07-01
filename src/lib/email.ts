@@ -27,7 +27,7 @@ export async function sendMail(
       from: env.EMAIL_FROM,
       to,
       subject,
-      react: NotificationEmail(props),
+      react: NotificationEmail({ logoUrl: appUrl("/logo.png"), ...props }),
     })
   } catch (err) {
     console.error("[email] send failed:", subject, err)
