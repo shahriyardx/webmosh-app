@@ -9,6 +9,7 @@ export const ticketsRouter = router({
       z.object({
         subject: z.string().min(1),
         body: z.string().min(1),
+        attachments: z.array(z.string()).default([]),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -22,6 +23,7 @@ export const ticketsRouter = router({
               senderId: ctx.user.id,
               fromAdmin: false,
               body: input.body,
+              attachments: input.attachments,
             },
           },
         },
@@ -52,7 +54,13 @@ export const ticketsRouter = router({
     }),
 
   reply: protectedProcedure
-    .input(z.object({ ticketId: z.string(), body: z.string().min(1) }))
+    .input(
+      z.object({
+        ticketId: z.string(),
+        body: z.string().min(1),
+        attachments: z.array(z.string()).default([]),
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       const ticket = await prisma.ticket.findUnique({
         where: { id: input.ticketId },
@@ -72,6 +80,7 @@ export const ticketsRouter = router({
           senderId: ctx.user.id,
           fromAdmin: isAdmin,
           body: input.body,
+          attachments: input.attachments,
         },
       })
 

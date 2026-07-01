@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { trpc } from "@/lib/trpc/client"
+import { uploadFiles } from "@/lib/upload"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -26,7 +27,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { LifeBuoyIcon, PlusIcon } from "lucide-react"
+import { LifeBuoyIcon, PlusIcon, PaperclipIcon } from "lucide-react"
 
 const statusBadge: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
   open: { label: "Open", variant: "default" },
@@ -42,6 +43,9 @@ export default function TicketsPage() {
   const [open, setOpen] = useState(false)
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
+  const [files, setFiles] = useState<File[]>([])
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const create = trpc.tickets.create.useMutation({
     onSuccess: () => {
@@ -50,9 +54,22 @@ export default function TicketsPage() {
       setOpen(false)
       setSubject("")
       setBody("")
+      setFiles([])
       toast.success("Ticket created")
     },
   })
+
+  const handleCreate = async () => {
+    setUploading(true)
+    try {
+      const attachments = await uploadFiles(files, "ticket")
+      await create.mutateAsync({ subject, body, attachments })
+    } catch {
+      toast.error("Failed to create ticket")
+    } finally {
+      setUploading(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -100,13 +117,32 @@ export default function TicketsPage() {
                   onChange={(e) => setBody(e.target.value)}
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Attachments</Label>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <PaperclipIcon className="size-3" />
+                  {files.length > 0 ? `${files.length} file(s) selected` : "Attach files"}
+                </Button>
+              </div>
             </div>
             <DialogFooter>
               <Button
-                onClick={() => create.mutate({ subject, body })}
-                disabled={!subject || !body || create.isPending}
+                onClick={handleCreate}
+                disabled={!subject || !body || uploading || create.isPending}
               >
-                {create.isPending ? "Creating…" : "Create Ticket"}
+                {uploading || create.isPending ? "Creating…" : "Create Ticket"}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -284,10 +284,11 @@ model TicketMessage {
   id        String   @id @default(cuid())
   ticketId  String
   ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  senderId  String
-  fromAdmin Boolean  @default(false)
-  body      String
-  createdAt DateTime @default(now())
+  senderId    String
+  fromAdmin   Boolean  @default(false)
+  body        String
+  attachments String[]
+  createdAt   DateTime @default(now())
 
   @@index([ticketId])
   @@map("ticket_message")

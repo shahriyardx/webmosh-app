@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import Link from "next/link"
 import { trpc } from "@/lib/trpc/client"
+import { uploadFiles } from "@/lib/upload"
 import { toast } from "sonner"
 import { TicketStatus } from "@/generated/prisma/enums"
 import { Badge } from "@/components/ui/badge"
@@ -15,7 +16,7 @@ import {
   MultiSelectContent,
   MultiSelectItem,
 } from "@/components/ui/multi-select"
-import { ArrowLeftIcon } from "lucide-react"
+import { ArrowLeftIcon, PaperclipIcon } from "lucide-react"
 
 const statusBadge: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
   open: { label: "Open", variant: "default" },
@@ -35,6 +36,9 @@ export function TicketThread({
   const utils = trpc.useUtils()
   const { data: ticket, isLoading } = trpc.tickets.getById.useQuery({ id: ticketId })
   const [body, setBody] = useState("")
+  const [files, setFiles] = useState<File[]>([])
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const invalidate = () => {
     utils.tickets.getById.invalidate({ id: ticketId })
@@ -48,9 +52,22 @@ export function TicketThread({
     onSuccess: () => {
       invalidate()
       setBody("")
+      setFiles([])
     },
     onError: (e) => toast.error(e.message),
   })
+
+  const handleReply = async () => {
+    setUploading(true)
+    try {
+      const attachments = await uploadFiles(files, "ticket")
+      await reply.mutateAsync({ ticketId, body, attachments })
+    } catch {
+      toast.error("Failed to send reply")
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const updateStatus = trpc.tickets.updateStatus.useMutation({
     onSuccess: () => {
@@ -148,6 +165,26 @@ export function TicketThread({
                 {new Date(m.createdAt).toLocaleString()}
               </p>
               <p className="whitespace-pre-wrap">{m.body}</p>
+              {m.attachments.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {m.attachments.map((url, i) => (
+                    <a
+                      key={url}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs ${
+                        m.fromAdmin
+                          ? "border border-border hover:bg-background/50"
+                          : "bg-white/20 hover:bg-white/30"
+                      }`}
+                    >
+                      <PaperclipIcon className="size-3" />
+                      Attachment {i + 1}
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -166,19 +203,42 @@ export function TicketThread({
             value={body}
             onChange={(e) => setBody(e.target.value)}
           />
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+          />
           <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => close.mutate({ id: ticketId })}
+                disabled={close.isPending}
+              >
+                Close ticket
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => fileRef.current?.click()}
+                title="Attach files"
+              >
+                <PaperclipIcon className="size-4" />
+              </Button>
+              {files.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {files.length} file(s)
+                </span>
+              )}
+            </div>
             <Button
-              variant="outline"
-              onClick={() => close.mutate({ id: ticketId })}
-              disabled={close.isPending}
+              onClick={handleReply}
+              disabled={!body || uploading || reply.isPending}
             >
-              Close ticket
-            </Button>
-            <Button
-              onClick={() => reply.mutate({ ticketId, body })}
-              disabled={!body || reply.isPending}
-            >
-              {reply.isPending ? "Sending…" : "Send reply"}
+              {uploading || reply.isPending ? "Sending…" : "Send reply"}
             </Button>
           </div>
         </div>
