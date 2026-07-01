@@ -144,28 +144,94 @@ export function CompaniesHouseCard({ orgId }: { orgId: string }) {
           </div>
         </div>
 
-        {/* Officers */}
-        {data.officers.filter((o) => !o.resignedOn).length > 0 && (
-          <div className="border-t border-border pt-4">
-            <p className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <UsersIcon className="size-3.5" />
-              Officers
-            </p>
-            <div className="space-y-1.5">
-              {data.officers
-                .filter((o) => !o.resignedOn)
-                .map((o, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{o.name}</span>
-                    <span className="text-xs capitalize text-muted-foreground">
-                      {o.role?.replace(/-/g, " ") ?? ""}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        )}
+      </CardContent>
+    </Card>
+  )
+}
 
+export function OfficersCard({ orgId }: { orgId: string }) {
+  const { data, isLoading } = trpc.companies.companiesHouse.useQuery(
+    { orgId },
+    { enabled: !!orgId },
+  )
+
+  if (isLoading || !data || data.officers.length === 0) return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <UsersIcon className="size-4 text-amber-500" />
+          Officers
+          <span className="text-xs font-normal text-muted-foreground">
+            {data.officerCount} officer{data.officerCount === 1 ? "" : "s"} / {data.resignedCount}{" "}
+            resignation{data.resignedCount === 1 ? "" : "s"}
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="divide-y divide-border">
+          {data.officers.map((o, i) => (
+            <div key={i} className="space-y-3 py-5 first:pt-0 last:pb-0">
+              <p className="font-semibold text-foreground">{o.name}</p>
+
+              {o.address && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Correspondence address</p>
+                  <p className="text-sm">{o.address}</p>
+                </div>
+              )}
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Role</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm capitalize">{humanize(o.role)}</p>
+                    {!o.resignedOn && (
+                      <Badge variant="default" className="h-4 px-1 text-[10px]">ACTIVE</Badge>
+                    )}
+                  </div>
+                </div>
+                {o.dateOfBirth && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Date of birth</p>
+                    <p className="text-sm">{o.dateOfBirth}</p>
+                  </div>
+                )}
+                {o.appointedOn && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Appointed on</p>
+                    <p className="text-sm">{new Date(o.appointedOn).toLocaleDateString()}</p>
+                  </div>
+                )}
+              </div>
+
+              {(o.nationality || o.countryOfResidence) && (
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {o.nationality && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Nationality</p>
+                      <p className="text-sm">{o.nationality}</p>
+                    </div>
+                  )}
+                  {o.countryOfResidence && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Country of residence</p>
+                      <p className="text-sm">{o.countryOfResidence}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {o.resignedOn && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Resigned on</p>
+                  <p className="text-sm">{new Date(o.resignedOn).toLocaleDateString()}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   )

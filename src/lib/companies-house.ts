@@ -25,7 +25,13 @@ export interface CompaniesHouseProfile {
     role: string | null
     appointedOn: string | null
     resignedOn: string | null
+    address: string | null
+    dateOfBirth: string | null
+    nationality: string | null
+    countryOfResidence: string | null
   }[]
+  officerCount: number
+  resignedCount: number
   filings: {
     transactionId: string | null
     date: string | null
@@ -59,7 +65,13 @@ export async function getCompaniesHouseProfile(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const d: any = await res.json()
 
+  const MONTHS = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ]
   let officers: CompaniesHouseProfile["officers"] = []
+  let officerCount = 0
+  let resignedCount = 0
   try {
     const oRes = await fetch(
       `${BASE}/company/${encodeURIComponent(number)}/officers?items_per_page=35`,
@@ -68,13 +80,24 @@ export async function getCompaniesHouseProfile(
     if (oRes.ok) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const od: any = await oRes.json()
+      officerCount = od.active_count ?? 0
+      resignedCount = od.resigned_count ?? 0
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      officers = (od.items ?? []).map((o: any) => ({
-        name: o.name,
-        role: o.officer_role ?? null,
-        appointedOn: o.appointed_on ?? null,
-        resignedOn: o.resigned_on ?? null,
-      }))
+      officers = (od.items ?? []).map((o: any) => {
+        const dob = o.date_of_birth
+        const dobStr =
+          dob?.year && dob?.month ? `${MONTHS[dob.month - 1]} ${dob.year}` : null
+        return {
+          name: o.name,
+          role: o.officer_role ?? null,
+          appointedOn: o.appointed_on ?? null,
+          resignedOn: o.resigned_on ?? null,
+          address: formatAddress(o.address),
+          dateOfBirth: dobStr,
+          nationality: o.nationality ?? null,
+          countryOfResidence: o.country_of_residence ?? null,
+        }
+      })
     }
   } catch {
     // officers optional
@@ -118,6 +141,8 @@ export async function getCompaniesHouseProfile(
     confirmationNextDue: d.confirmation_statement?.next_due ?? null,
     confirmationOverdue: !!d.confirmation_statement?.overdue,
     officers,
+    officerCount,
+    resignedCount,
     filings,
   }
 }

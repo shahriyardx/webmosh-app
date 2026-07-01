@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CompaniesHouseCard, FilingHistoryCard } from "@/components/companies-house-card"
+import { CompaniesHouseCard, OfficersCard, FilingHistoryCard } from "@/components/companies-house-card"
 import {
   Building2Icon,
   GlobeIcon,
@@ -190,6 +190,7 @@ export default function OverviewPage() {
       )}
 
       {activeOrgId && <CompaniesHouseCard orgId={activeOrgId} />}
+      {activeOrgId && <OfficersCard orgId={activeOrgId} />}
       {activeOrgId && <FilingHistoryCard orgId={activeOrgId} />}
 
       {actionDocuments.length > 0 && (
