@@ -12,6 +12,7 @@ import {
   emailUserStatusUpdate,
   emailUserCompanyCompleted,
 } from "@/lib/notify"
+import { getCompaniesHouseProfile } from "@/lib/companies-house"
 
 const directorInput = z.object({
   firstName: z.string().min(1),
@@ -319,6 +320,28 @@ export const companiesRouter = router({
           },
         },
       })
+    }),
+
+  companiesHouse: protectedProcedure
+    .input(z.object({ orgId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const org = await prisma.organization.findUnique({
+        where: { id: input.orgId },
+        select: { companyId: true, country: true },
+      })
+      if (!org || org.country !== "uk" || !org.companyId) return null
+
+      // Access: admin, or a member of the org
+      const isAdmin = ctx.user.role === "admin"
+      if (!isAdmin) {
+        const member = await prisma.member.findFirst({
+          where: { organizationId: input.orgId, userId: ctx.user.id },
+          select: { id: true },
+        })
+        if (!member) return null
+      }
+
+      return getCompaniesHouseProfile(org.companyId)
     }),
 
   getStats: adminProcedure.query(async () => {
