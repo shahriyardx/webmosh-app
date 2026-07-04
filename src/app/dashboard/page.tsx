@@ -372,23 +372,25 @@ export default function OverviewPage() {
         </Card>
       )}
 
-      <div className="flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/5 p-4">
-        <div>
-          <p className="text-sm font-medium text-foreground">Delete this company</p>
-          <p className="text-xs text-muted-foreground">
-            Permanently hides it from your account. This cannot be undone.
-          </p>
+      {!isPersonal && (
+        <div className="flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/5 p-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">Delete this company</p>
+            <p className="text-xs text-muted-foreground">
+              Permanently hides it from your account. This cannot be undone.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            className="text-red-500"
+            onClick={() => setDeleteOpen(true)}
+            disabled={!activeOrgId}
+          >
+            <Trash2Icon className="size-4" />
+            Delete
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          className="text-red-500"
-          onClick={() => setDeleteOpen(true)}
-          disabled={!activeOrgId}
-        >
-          <Trash2Icon className="size-4" />
-          Delete
-        </Button>
-      </div>
+      )}
 
       <DeleteConfirmDialog
         open={deleteOpen}
