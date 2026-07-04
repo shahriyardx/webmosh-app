@@ -3,7 +3,8 @@
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Field, FieldError } from "@/components/ui/field"
+import { Field, FieldError, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import {
   MultiSelect,
   MultiSelectContent,
@@ -16,15 +17,17 @@ import { ukSicCodes, usSicCodes } from "@/sic-codes"
 const schema = z.object({
   sicCode: z.string().min(1, "Select a SIC code"),
   sicDescription: z.string().optional(),
+  website: z.string().optional(),
 })
 
 type Schema = z.infer<typeof schema>
 
 interface StepSicProps {
-  onNext: (data: { sicCode: string; sicDescription?: string }) => void
+  onNext: (data: { sicCode: string; sicDescription?: string; website?: string }) => void
   country: string | undefined
   initialCode?: string
   initialDescription?: string
+  initialWebsite?: string
 }
 
 export function StepSic({
@@ -32,12 +35,14 @@ export function StepSic({
   country,
   initialCode,
   initialDescription,
+  initialWebsite,
 }: StepSicProps) {
   const { control, handleSubmit, setValue } = useForm<Schema>({
     resolver: zodResolver(schema),
     defaultValues: {
       sicCode: initialCode || "",
       sicDescription: initialDescription || "",
+      website: initialWebsite || "",
     },
   })
 
@@ -93,6 +98,17 @@ export function StepSic({
             {fieldState.error && (
               <FieldError errors={[{ message: fieldState.error.message }]} />
             )}
+          </Field>
+        )}
+      />
+
+      <Controller
+        name="website"
+        control={control}
+        render={({ field }) => (
+          <Field>
+            <FieldLabel htmlFor="website">Website (optional)</FieldLabel>
+            <Input id="website" placeholder="https://example.com" {...field} />
           </Field>
         )}
       />

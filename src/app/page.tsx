@@ -13,7 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Building2, FileCheck, Sparkles, Zap } from "lucide-react";
+import { Building2, FileCheck, Sparkles, Code2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -60,13 +60,14 @@ export default function LoginPage() {
             Webmosh
           </Badge>
           <h1 className="text-4xl font-semibold leading-[1.1] tracking-tight text-foreground sm:text-5xl xl:text-6xl">
-            Your business,
+            Build, launch &amp; grow
             <br />
-            <span className="text-amber-500">formed in minutes</span>
+            <span className="text-amber-500">with confidence</span>
           </h1>
           <p className="pt-3 text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Webmosh handles the paperwork so you can focus on building. From LLC
-            to C-Corp — fully digital, nationwide.
+            From professional website design and WordPress development to US LLC
+            and UK LTD formation, Webmosh provides complete business solutions
+            for entrepreneurs and growing companies.
           </p>
         </div>
 
@@ -74,24 +75,24 @@ export default function LoginPage() {
         <div className="mt-12 grid gap-5 sm:grid-cols-2">
           {[
             {
-              icon: Zap,
-              title: "5-minute setup",
-              desc: "Answer a few questions. We handle the rest.",
+              icon: Building2,
+              title: "US & UK formation",
+              desc: "Register a US LLC or UK LTD with a guided, global-ready process.",
             },
             {
-              icon: FileCheck,
-              title: "No hidden fees",
-              desc: "Transparent pricing. You only pay when filed.",
+              icon: Code2,
+              title: "Website development",
+              desc: "WordPress and custom websites for a professional presence.",
             },
             {
               icon: Sparkles,
-              title: "Registered Agent",
-              desc: "Free registered agent service for the first year.",
+              title: "Brand & SEO",
+              desc: "Strategic brand positioning and on-page SEO to stand out.",
             },
             {
-              icon: ArrowRight,
-              title: "50-state coverage",
-              desc: "Form your business in any US state instantly.",
+              icon: FileCheck,
+              title: "Compliance & tax",
+              desc: "Annual renewals, filings, and tax return support.",
             },
           ].map((item, i) => (
             <div
@@ -112,8 +113,8 @@ export default function LoginPage() {
 
         {/* Social proof */}
         <p className="mt-12 text-xs text-muted-foreground/50">
-          Trusted by founders at{" "}
-          <span className="text-muted-foreground">10,000+ companies</span>
+          Trusted by founders —{" "}
+          <span className="text-muted-foreground">400+ companies formed</span>
         </p>
       </div>
 

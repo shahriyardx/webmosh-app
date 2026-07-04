@@ -27,6 +27,7 @@ import {
   PlusIcon,
   ArrowLeftIcon,
   UserIcon,
+  LogOutIcon,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 
@@ -44,6 +45,7 @@ export type FormValues = {
   companyName: string
   sicCode: string
   sicDescription?: string
+  website?: string
   packageId: string
   serviceIds: string[]
   passportUrl: string
@@ -108,6 +110,8 @@ export default function OnboardPage() {
     onError: (e) => toast.error(e.message),
   })
 
+  const { data: hasPersonal } = trpc.companies.hasPersonalCompany.useQuery()
+
   const createPersonal = trpc.companies.createPersonalCompany.useMutation({
     onSuccess: () => {
       window.location.href = "/dashboard"
@@ -149,6 +153,18 @@ export default function OnboardPage() {
         <div className="mx-auto flex w-full max-w-7xl items-center gap-2">
           <Image src="/logo.png" alt="Webmosh" width={32} height={32} className="size-8 object-contain" />
           <span className="text-sm font-semibold tracking-wide">WEBMOSH</span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto"
+            onClick={async () => {
+              await authClient.signOut()
+              router.push("/")
+            }}
+          >
+            <LogOutIcon className="size-4" />
+            Logout
+          </Button>
         </div>
       </header>
 
@@ -197,30 +213,32 @@ export default function OnboardPage() {
                   </div>
                 </CardContent>
               </Card>
-              <Card
-                role="button"
-                tabIndex={0}
-                onClick={() => !createPersonal.isPending && createPersonal.mutate()}
-                className="cursor-pointer transition-all hover:ring-2 hover:ring-amber-500"
-              >
-                <CardContent className="flex flex-col gap-3 py-8">
-                  <div className="flex size-11 items-center justify-center rounded-lg bg-amber-500/10">
-                    {createPersonal.isPending ? (
-                      <Loader2Icon className="size-5 animate-spin text-amber-500" />
-                    ) : (
-                      <UserIcon className="size-5 text-amber-500" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">
-                      {createPersonal.isPending ? "Setting up…" : "I don't have a company"}
-                    </h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Just set up an account — you can add a company later.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              {!hasPersonal && (
+                <Card
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => !createPersonal.isPending && createPersonal.mutate()}
+                  className="cursor-pointer transition-all hover:ring-2 hover:ring-amber-500"
+                >
+                  <CardContent className="flex flex-col gap-3 py-8">
+                    <div className="flex size-11 items-center justify-center rounded-lg bg-amber-500/10">
+                      {createPersonal.isPending ? (
+                        <Loader2Icon className="size-5 animate-spin text-amber-500" />
+                      ) : (
+                        <UserIcon className="size-5 text-amber-500" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">
+                        {createPersonal.isPending ? "Setting up…" : "I don't have a company"}
+                      </h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Just set up an account — you can add a company later.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         )}
@@ -340,6 +358,7 @@ export default function OnboardPage() {
                   country={formData.country}
                   initialCode={formData.sicCode}
                   initialDescription={formData.sicDescription}
+                  initialWebsite={formData.website}
                 />
               )}
               {currentStep === "documents" && (

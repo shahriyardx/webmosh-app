@@ -28,6 +28,7 @@ const createCompanySchema = z.object({
   companyName: z.string().min(1),
   sicCode: z.string().min(1),
   sicDescription: z.string().optional(),
+  website: z.string().optional(),
   packageId: z.string().min(1),
   serviceIds: z.array(z.string()),
   passportUrl: z.string().min(1),
@@ -140,6 +141,7 @@ export const companiesRouter = router({
         companyName,
         sicCode,
         sicDescription,
+        website,
         packageId,
         serviceIds,
         passportUrl,
@@ -163,6 +165,7 @@ export const companiesRouter = router({
           country,
           sicCode,
           sicDescription: sicDescription ?? null,
+          website: website || null,
           packageId,
           serviceIds,
         },
@@ -262,7 +265,26 @@ export const companiesRouter = router({
       return org
     }),
 
+  hasPersonalCompany: protectedProcedure.query(async ({ ctx }) => {
+    const count = await prisma.member.count({
+      where: {
+        userId: ctx.user.id,
+        organization: { type: "personal", deletedAt: null },
+      },
+    })
+    return count > 0
+  }),
+
   createPersonalCompany: protectedProcedure.mutation(async ({ ctx }) => {
+    // Prevent a second personal account
+    const existing = await prisma.member.count({
+      where: {
+        userId: ctx.user.id,
+        organization: { type: "personal", deletedAt: null },
+      },
+    })
+    if (existing > 0) throw new Error("You already have a personal account")
+
     const name = ctx.user.name?.trim() || "My Account"
     const slug = `${slugify(name) || "account"}-${ctx.user.id.slice(-6)}`
     const hdrs = await headers()
@@ -348,6 +370,7 @@ export const companiesRouter = router({
           country: true,
           sicCode: true,
           sicDescription: true,
+          website: true,
           status: true,
           type: true,
           companyId: true,

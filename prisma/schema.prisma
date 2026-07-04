@@ -99,6 +99,7 @@ model Organization {
   country     String?      @map("country")
   sicCode     String?      @map("sic_code")
   sicDescription String?   @map("sic_description")
+  website        String?
   packageId      String?
   serviceIds     String[]
   companyId String?   @map("company_id")

@@ -407,6 +407,22 @@ export default function FormationDetailPage({
                 </div>
               </div>
             )}
+            {org.website && (
+              <div className="flex items-start gap-3">
+                <GlobeIcon className="size-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Website</p>
+                  <a
+                    href={org.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-medium text-amber-600 hover:underline"
+                  >
+                    {org.website}
+                  </a>
+                </div>
+              </div>
+            )}
             <div className="flex items-start gap-3">
               <CalendarIcon className="size-4 shrink-0 text-muted-foreground" />
               <div>

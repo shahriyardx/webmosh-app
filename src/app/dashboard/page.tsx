@@ -204,6 +204,22 @@ export default function OverviewPage() {
               <p className="text-sm font-medium">{org.sicCode ?? "—"}</p>
             </div>
           </div>
+          {org.website && (
+            <div className="flex items-center gap-3">
+              <GlobeIcon className="size-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">Website</p>
+                <a
+                  href={org.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium text-amber-600 hover:underline"
+                >
+                  {org.website}
+                </a>
+              </div>
+            </div>
+          )}
           {org.country === "uk" && org.companyId && (
             <div className="flex items-center gap-3">
               <HashIcon className="size-4 shrink-0 text-muted-foreground" />
