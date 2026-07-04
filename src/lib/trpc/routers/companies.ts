@@ -262,6 +262,33 @@ export const companiesRouter = router({
       return org
     }),
 
+  createPersonalCompany: protectedProcedure.mutation(async ({ ctx }) => {
+    const name = ctx.user.name?.trim() || "My Account"
+    const slug = `${slugify(name) || "account"}-${ctx.user.id.slice(-6)}`
+    const hdrs = await headers()
+
+    const org = await auth.api.createOrganization({
+      body: { name, slug },
+      headers: hdrs,
+    })
+
+    await prisma.organization.update({
+      where: { id: org.id },
+      data: {
+        country: "uk",
+        type: "personal",
+        status: CompanyStatus.completed,
+      },
+    })
+
+    await auth.api.setActiveOrganization({
+      body: { organizationId: org.id },
+      headers: hdrs,
+    })
+
+    return org
+  }),
+
   submitDocument: protectedProcedure
     .input(z.object({ documentId: z.string(), fileUrl: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
@@ -322,6 +349,7 @@ export const companiesRouter = router({
           sicCode: true,
           sicDescription: true,
           status: true,
+          type: true,
           companyId: true,
           authCode: true,
           confirmationStatementDue: true,

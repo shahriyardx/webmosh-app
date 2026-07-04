@@ -85,9 +85,11 @@ export default function OverviewPage() {
     (d) => d.status === "rejected" || d.status === "requested",
   )
 
+  const isPersonal = org?.type === "personal"
+
   // UK filing deadlines come live from Companies House (shown in that card).
   // Only US companies use manually-set deadline dates.
-  const hasCompaniesHouse = org?.country === "uk" && !!org?.companyId
+  const hasCompaniesHouse = org?.country === "uk" && !!org?.companyId && !isPersonal
   const deadlines =
     org && org.country === "us"
       ? [
@@ -118,13 +120,48 @@ export default function OverviewPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground uppercase">{org.name}</h1>
+        <h1 className="text-2xl font-semibold text-foreground uppercase">
+          {isPersonal ? (session?.user?.name ?? org.name) : org.name}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {org.country === "uk" ? "United Kingdom" : "United States"} Company
+          {isPersonal
+            ? "Personal Account"
+            : `${org.country === "uk" ? "United Kingdom" : "United States"} Company`}
         </p>
       </div>
 
-      {!hasCompaniesHouse && (
+      {isPersonal && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Building2Icon className="size-4 text-amber-500" />
+              Account
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex size-11 items-center justify-center rounded-full bg-muted text-base font-medium">
+                {(session?.user?.name ?? "?").charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <p className="text-sm font-medium">{session?.user?.name ?? "—"}</p>
+                <p className="text-xs text-muted-foreground">{session?.user?.email}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <CalendarIcon className="size-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs text-muted-foreground">Member since</p>
+                <p className="text-sm font-medium">
+                  {new Date(org.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!hasCompaniesHouse && !isPersonal && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -209,11 +246,11 @@ export default function OverviewPage() {
       </Card>
       )}
 
-      {activeOrgId && <CompaniesHouseCard orgId={activeOrgId} />}
-      {activeOrgId && <OfficersCard orgId={activeOrgId} />}
-      {activeOrgId && <FilingHistoryCard orgId={activeOrgId} />}
+      {!isPersonal && activeOrgId && <CompaniesHouseCard orgId={activeOrgId} />}
+      {!isPersonal && activeOrgId && <OfficersCard orgId={activeOrgId} />}
+      {!isPersonal && activeOrgId && <FilingHistoryCard orgId={activeOrgId} />}
 
-      {actionDocuments.length > 0 && (
+      {!isPersonal && actionDocuments.length > 0 && (
         <Card className="border-red-500/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">

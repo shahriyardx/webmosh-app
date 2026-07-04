@@ -26,6 +26,7 @@ import {
   Building2Icon,
   PlusIcon,
   ArrowLeftIcon,
+  UserIcon,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 
@@ -107,6 +108,13 @@ export default function OnboardPage() {
     onError: (e) => toast.error(e.message),
   })
 
+  const createPersonal = trpc.companies.createPersonalCompany.useMutation({
+    onSuccess: () => {
+      window.location.href = "/dashboard"
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
   const handleNext = useCallback((stepData: Partial<FormValues>) => {
     setFormData((prev) => ({ ...prev, ...stepData }))
     setCurrentStep((prev) => nextStep(prev) ?? prev)
@@ -147,12 +155,12 @@ export default function OnboardPage() {
       {/* Content */}
       <main className="flex flex-1 flex-col">
         {mode === "choice" && (
-          <div className="mx-auto w-full max-w-3xl px-6 py-12">
+          <div className="mx-auto w-full max-w-5xl px-6 py-12">
             <h1 className="text-2xl font-semibold text-foreground">Get started</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               How would you like to begin?
             </p>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
               <Card
                 role="button"
                 tabIndex={0}
@@ -185,6 +193,30 @@ export default function OnboardPage() {
                     <h3 className="font-semibold text-foreground">I already have a company</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Import an existing UK company with its Company ID & Auth Code.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card
+                role="button"
+                tabIndex={0}
+                onClick={() => !createPersonal.isPending && createPersonal.mutate()}
+                className="cursor-pointer transition-all hover:ring-2 hover:ring-amber-500"
+              >
+                <CardContent className="flex flex-col gap-3 py-8">
+                  <div className="flex size-11 items-center justify-center rounded-lg bg-amber-500/10">
+                    {createPersonal.isPending ? (
+                      <Loader2Icon className="size-5 animate-spin text-amber-500" />
+                    ) : (
+                      <UserIcon className="size-5 text-amber-500" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">
+                      {createPersonal.isPending ? "Setting up…" : "I don't have a company"}
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Just set up an account — you can add a company later.
                     </p>
                   </div>
                 </CardContent>
