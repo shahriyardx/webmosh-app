@@ -170,13 +170,23 @@ export default function LoginPage() {
             <CardFooter className="flex-col items-start gap-2">
               <p className="text-[11px] leading-relaxed text-muted-foreground/50">
                 By continuing, you agree to our{" "}
-                <span className="underline underline-offset-2 hover:text-muted-foreground">
+                <a
+                  href="https://webmosh.com/trams-and-conditions/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-muted-foreground"
+                >
                   Terms
-                </span>{" "}
+                </a>{" "}
                 and{" "}
-                <span className="underline underline-offset-2 hover:text-muted-foreground">
+                <a
+                  href="https://webmosh.com/privacy-policy/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-muted-foreground"
+                >
                   Privacy Policy
-                </span>
+                </a>
                 .
               </p>
             </CardFooter>
