@@ -128,7 +128,7 @@ export const adminRouter = router({
     const docs = await prisma.document.findMany({
       where: { status: DocumentStatus.submitted },
       orderBy: { updatedAt: "desc" },
-      take: 6,
+      take: 4,
       select: {
         id: true,
         name: true,
@@ -206,14 +206,14 @@ export const adminRouter = router({
         if (diff !== 0) return diff
         return b.createdAt.getTime() - a.createdAt.getTime()
       })
-    return sorted.slice(0, 8)
+    return sorted.slice(0, 4)
   }),
 
   /** Recent filings — most-recent document uploads across all clients. */
   recentFilings: adminProcedure.query(async () => {
     const docs = await prisma.document.findMany({
       orderBy: { createdAt: "desc" },
-      take: 6,
+      take: 4,
       select: {
         id: true,
         name: true,
@@ -229,7 +229,7 @@ export const adminRouter = router({
   recentTickets: adminProcedure.query(async () => {
     const tickets = await prisma.ticket.findMany({
       orderBy: { updatedAt: "desc" },
-      take: 6,
+      take: 4,
       select: {
         id: true,
         subject: true,

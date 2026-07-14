@@ -115,6 +115,17 @@ export default function OnboardPage() {
 
   const utils = trpc.useUtils()
 
+  const { data: settings } = trpc.settings.getAll.useQuery(undefined, {
+    enabled: mode === "personal",
+  })
+  const usdToBdtRate = settings?.usd_to_bdt_rate
+    ? parseFloat(settings.usd_to_bdt_rate)
+    : null
+  const bdtAmount =
+    usdToBdtRate && personalCheckout
+      ? (personalCheckout.amount * usdToBdtRate).toFixed(2)
+      : null
+
   const createCompany = trpc.companies.createCompany.useMutation({
     onSuccess: (org) => {
       utils.companies.myCompanies.invalidate()
@@ -365,9 +376,16 @@ export default function OnboardPage() {
                     ))}
                     <div className="flex items-center justify-between bg-muted/40 px-5 py-3 text-base font-bold">
                       <span>Total Due</span>
-                      <span className="text-sky-500">
-                        ${personalCheckout.amount.toFixed(2)}
-                      </span>
+                      <div className="text-right">
+                        <p className="text-sky-500">
+                          ${personalCheckout.amount.toFixed(2)}
+                        </p>
+                        {bdtAmount && (
+                          <p className="text-xs font-medium text-muted-foreground">
+                            ৳{bdtAmount} BDT
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -385,9 +403,11 @@ export default function OnboardPage() {
                       <p className="text-center text-sm text-muted-foreground">
                         Scan with any Bangla QR enabled app (bKash, Nagad,
                         Rocket, bank app) and pay{" "}
-                        <strong>
-                          ${personalCheckout.amount.toFixed(2)}
-                        </strong>
+                        {bdtAmount ? (
+                          <strong>৳{bdtAmount}</strong>
+                        ) : (
+                          <strong>${personalCheckout.amount.toFixed(2)}</strong>
+                        )}
                       </p>
                     </div>
                     <div className="space-y-2">
@@ -433,7 +453,12 @@ export default function OnboardPage() {
                 </p>
                 <Button
                   className="mt-6"
-                  onClick={() => router.push("/dashboard")}
+                  onClick={async () => {
+                    // Prime the cache so the dashboard guard doesn't see the
+                    // stale empty [] from a prior visit and bounce back here.
+                    await utils.companies.myCompanies.refetch()
+                    router.push("/dashboard")
+                  }}
                 >
                   Go to Dashboard
                   <ChevronRightIcon className="ml-1 size-4" />

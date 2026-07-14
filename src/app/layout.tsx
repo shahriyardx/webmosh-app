@@ -27,8 +27,8 @@ const description =
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Webmosh — Company Formation for the UK & US",
-    template: "%s · Webmosh",
+    default: "WEBMOSH - Marketing, Optimization, Solutions, Hosting",
+    template: "%s · WEBMOSH",
   },
   description,
   applicationName: "Webmosh",
@@ -48,14 +48,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Webmosh",
-    title: "Webmosh — Company Formation for the UK & US",
+    title: "WEBMOSH - Marketing, Optimization, Solutions, Hosting",
     description,
     url: siteUrl,
     images: [{ url: "/logo.png", width: 500, height: 500, alt: "Webmosh" }],
   },
   twitter: {
     card: "summary",
-    title: "Webmosh — Company Formation for the UK & US",
+    title: "WEBMOSH - Marketing, Optimization, Solutions, Hosting",
     description,
     images: ["/logo.png"],
   },
