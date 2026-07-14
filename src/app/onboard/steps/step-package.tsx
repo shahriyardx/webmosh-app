@@ -39,7 +39,7 @@ export function StepPackage({ country, onNext, initialValue }: StepPackageProps)
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="size-5 animate-pulse rounded-full bg-amber-500/50" />
+        <div className="size-5 animate-pulse rounded-full bg-sky-500/50" />
       </div>
     )
   }
@@ -78,12 +78,12 @@ export function StepPackage({ country, onNext, initialValue }: StepPackageProps)
               onClick={() => setSelectedId(pkg.id)}
               className={`relative rounded-xl border p-5 text-left transition-all ${
                 isSelected
-                  ? "border-amber-500 bg-amber-500/5 ring-1 ring-amber-500"
-                  : "border-border bg-background hover:border-amber-500/50"
+                  ? "border-sky-500 bg-sky-500/5 ring-1 ring-sky-500"
+                  : "border-border bg-background hover:border-sky-500/50"
               }`}
             >
               {isSelected && (
-                <div className="absolute right-3 top-3 flex size-6 items-center justify-center rounded-full bg-amber-500 text-white">
+                <div className="absolute right-3 top-3 flex size-6 items-center justify-center rounded-full bg-sky-500 text-white">
                   <CheckIcon className="size-3.5" />
                 </div>
               )}

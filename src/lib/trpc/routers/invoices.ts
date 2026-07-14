@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { adminProcedure, protectedProcedure, router } from "../server"
+import { adminProcedure, assertOrgMember, protectedProcedure, router } from "../server"
 import { prisma } from "@/lib/prisma"
 import { PaymentStatus } from "@/generated/prisma/enums"
 import Stripe from "stripe"
@@ -68,28 +68,56 @@ async function attachItemInfo(
 }
 
 export const invoicesRouter = router({
-  list: protectedProcedure.query(async ({ ctx }) => {
-    const orgId = ctx.session?.session?.activeOrganizationId
-    if (!orgId) return []
-    const invoices = await prisma.invoice.findMany({
-      where: { organizationId: orgId, deletedAt: null },
-      orderBy: { createdAt: "desc" },
+  list: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      await assertOrgMember(ctx.user.id, input.organizationId)
+      const invoices = await prisma.invoice.findMany({
+        where: { organizationId: input.organizationId, deletedAt: null },
+        orderBy: { createdAt: "desc" },
+      })
+      return attachItemInfo(invoices)
+    }),
+
+  listForUser: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.user.id
+    const members = await prisma.member.findMany({
+      where: { userId },
+      select: { organizationId: true },
     })
-    return attachItemInfo(invoices)
+    const orgIds = members.map((m) => m.organizationId)
+    if (!orgIds.length) return []
+    const [invoices, orgs] = await Promise.all([
+      prisma.invoice.findMany({
+        where: { organizationId: { in: orgIds }, deletedAt: null },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.organization.findMany({
+        where: { id: { in: orgIds } },
+        select: { id: true, name: true, type: true },
+      }),
+    ])
+    const orgMap = new Map(orgs.map((o) => [o.id, o]))
+    const enriched = await attachItemInfo(invoices)
+    return enriched.map((inv) => ({ ...inv, organization: orgMap.get(inv.organizationId) ?? null }))
   }),
 
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input, ctx }) => {
-      const orgId = ctx.session?.session?.activeOrganizationId
       const invoice = await prisma.invoice.findUnique({
         where: { id: input.id },
       })
       if (!invoice || invoice.deletedAt) return null
 
-      // User can only view their own org's invoices unless admin
-      const isAdmin = ctx.session?.user?.role === "admin"
-      if (invoice.organizationId !== orgId && !isAdmin) return null
+      const isAdmin = ctx.user.role === "admin"
+      if (!isAdmin) {
+        const member = await prisma.member.findFirst({
+          where: { userId: ctx.user.id, organizationId: invoice.organizationId },
+          select: { id: true },
+        })
+        if (!member) return null
+      }
 
       const enriched = await attachItemInfo([invoice])
       return enriched[0]
@@ -120,13 +148,11 @@ export const invoicesRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const orgId = ctx.session?.session?.activeOrganizationId
       const invoice = await prisma.invoice.findUnique({
         where: { id: input.invoiceId },
       })
-      if (!invoice || invoice.organizationId !== orgId) {
-        throw new Error("Invoice not found")
-      }
+      if (!invoice) throw new Error("Invoice not found")
+      await assertOrgMember(ctx.user.id, invoice.organizationId)
       if (invoice.status !== PaymentStatus.unpaid) {
         throw new Error("Invoice is not in unpaid status")
       }
@@ -163,13 +189,11 @@ export const invoicesRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const orgId = ctx.session?.session?.activeOrganizationId
       const invoice = await prisma.invoice.findUnique({
         where: { id: input.invoiceId },
       })
-      if (!invoice || invoice.organizationId !== orgId) {
-        throw new Error("Invoice not found")
-      }
+      if (!invoice) throw new Error("Invoice not found")
+      await assertOrgMember(ctx.user.id, invoice.organizationId)
       if (invoice.status !== PaymentStatus.unpaid) {
         throw new Error("Invoice is not in unpaid status")
       }
@@ -208,7 +232,7 @@ export const invoicesRouter = router({
       const stripe = new Stripe(secretKey)
       const checkout = await stripe.checkout.sessions.create({
         mode: "payment",
-        customer_email: ctx.session?.user?.email ?? undefined,
+        customer_email: ctx.user.email ?? undefined,
         line_items: [
           {
             quantity: 1,
@@ -255,13 +279,11 @@ export const invoicesRouter = router({
       const invoiceId = checkout.metadata?.invoiceId
       if (!invoiceId) throw new Error("No invoice ID in session")
 
-      const orgId = ctx.session?.session?.activeOrganizationId
       const invoice = await prisma.invoice.findUnique({
         where: { id: invoiceId },
       })
-      if (!invoice || invoice.organizationId !== orgId) {
-        throw new Error("Invoice not found")
-      }
+      if (!invoice) throw new Error("Invoice not found")
+      await assertOrgMember(ctx.user.id, invoice.organizationId)
 
       const updated = await prisma.invoice.update({
         where: { id: invoiceId },
@@ -323,20 +345,52 @@ export const invoicesRouter = router({
     .input(
       z.object({
         organizationId: z.string(),
-        amount: z.number().positive(),
+        // Legacy path: single amount + description.
+        amount: z.number().positive().optional(),
         description: z.string().optional(),
+        // New path: multiple line items (title + amount each).
+        items: z
+          .array(
+            z.object({
+              title: z.string().min(1),
+              amount: z.number().positive(),
+            }),
+          )
+          .optional(),
+        // Override the default recipient (org owner) with a custom name+email.
+        receiverName: z.string().optional(),
+        receiverEmail: z.string().email().optional(),
       }),
     )
     .mutation(async ({ input }) => {
+      const items = input.items ?? []
+      const total = items.length
+        ? items.reduce((s, i) => s + i.amount, 0)
+        : input.amount ?? 0
+      if (total <= 0) {
+        throw new Error("Invoice must have a positive total.")
+      }
+      const description =
+        input.description ||
+        (items.length
+          ? items.map((i) => `${i.title} — $${i.amount}`).join("; ")
+          : null)
+
       const invoice = await prisma.invoice.create({
         data: {
           organizationId: input.organizationId,
-          amount: input.amount,
-          description: input.description || null,
+          amount: total,
+          description,
+          items: items.length ? items : undefined,
+          receiverName: input.receiverName?.trim() || null,
+          receiverEmail: input.receiverEmail?.trim() || null,
           status: PaymentStatus.unpaid,
         },
       })
-      await emailUserNewInvoice(input.organizationId, invoice).catch(() => {})
+      await emailUserNewInvoice(input.organizationId, invoice, {
+        toEmail: input.receiverEmail ?? undefined,
+        toName: input.receiverName ?? undefined,
+      }).catch(() => {})
       return invoice
     }),
 
@@ -347,5 +401,143 @@ export const invoicesRouter = router({
         where: { id: input.id },
         data: { deletedAt: new Date() },
       })
+    }),
+
+  /** Re-send the invoice email as a reminder ("Reminder: …" subject). */
+  sendReminder: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      const invoice = await prisma.invoice.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          amount: true,
+          description: true,
+          organizationId: true,
+          receiverEmail: true,
+          receiverName: true,
+        },
+      })
+      if (!invoice) throw new Error("Invoice not found")
+      await emailUserNewInvoice(
+        invoice.organizationId,
+        {
+          id: invoice.id,
+          amount: invoice.amount,
+          description: invoice.description,
+        },
+        {
+          toEmail: invoice.receiverEmail ?? undefined,
+          toName: invoice.receiverName ?? undefined,
+          reminder: true,
+        },
+      )
+      return { ok: true }
+    }),
+
+  /**
+   * Create an invoice for a client who doesn't yet exist in the system.
+   * Provisions a User + Organization + Member (owner) atomically, then
+   * attaches the invoice. When the client later signs in with Google using
+   * the same email, better-auth links to this user, so the invoice will show
+   * up on their dashboard immediately.
+   */
+  createForNewClient: adminProcedure
+    .input(
+      z.object({
+        clientName: z.string().min(1),
+        clientEmail: z.string().email(),
+        companyName: z.string().min(1),
+        items: z
+          .array(
+            z.object({
+              title: z.string().min(1),
+              amount: z.number().positive(),
+            }),
+          )
+          .min(1),
+        description: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const existing = await prisma.user.findUnique({
+        where: { email: input.clientEmail },
+        select: { id: true },
+      })
+      if (existing) {
+        throw new Error(
+          `A client already exists with ${input.clientEmail}. Pick them from the existing client list instead.`,
+        )
+      }
+
+      const total = input.items.reduce((s, i) => s + i.amount, 0)
+      if (total <= 0) throw new Error("Invoice must have a positive total.")
+
+      // Unique slug — retry with a numeric suffix on collision.
+      const baseSlug =
+        input.companyName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "") || "company"
+      let slug = baseSlug
+      for (let i = 1; i < 10; i++) {
+        const clash = await prisma.organization.findFirst({
+          where: { slug },
+          select: { id: true },
+        })
+        if (!clash) break
+        slug = `${baseSlug}-${i}`
+      }
+
+      const result = await prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            id: crypto.randomUUID(),
+            name: input.clientName,
+            email: input.clientEmail,
+            emailVerified: false,
+            role: "user",
+          },
+          select: { id: true, name: true, email: true },
+        })
+        const org = await tx.organization.create({
+          data: {
+            name: input.companyName,
+            slug,
+            createdAt: new Date(),
+          },
+          select: { id: true, name: true },
+        })
+        await tx.member.create({
+          data: {
+            organizationId: org.id,
+            userId: user.id,
+            role: "owner",
+            createdAt: new Date(),
+          },
+        })
+        const description =
+          input.description ||
+          input.items.map((i) => `${i.title} — $${i.amount}`).join("; ")
+        const invoice = await tx.invoice.create({
+          data: {
+            organizationId: org.id,
+            amount: total,
+            description,
+            items: input.items,
+            receiverName: user.name,
+            receiverEmail: user.email,
+            status: PaymentStatus.unpaid,
+          },
+        })
+        return { user, org, invoice }
+      })
+
+      await emailUserNewInvoice(result.org.id, result.invoice, {
+        toEmail: result.user.email,
+        toName: result.user.name,
+      }).catch(() => {})
+
+      return result.invoice
     }),
 })

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { adminProcedure, protectedProcedure, router } from "../server"
+import { adminProcedure, assertOrgMember, protectedProcedure, router } from "../server"
 import { prisma } from "@/lib/prisma"
 import { TicketStatus } from "@/generated/prisma/enums"
 import {
@@ -21,7 +21,8 @@ export const ticketsRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const orgId = input.organizationId ?? ctx.session?.session?.activeOrganizationId ?? null
+      const orgId = input.organizationId ?? null
+      if (orgId) await assertOrgMember(ctx.user.id, orgId)
       const ticket = await prisma.ticket.create({
         data: {
           userId: ctx.user.id,
@@ -47,17 +48,20 @@ export const ticketsRouter = router({
       return ticket
     }),
 
-  list: protectedProcedure.query(async ({ ctx }) => {
-    const orgId = ctx.session?.session?.activeOrganizationId
-    return prisma.ticket.findMany({
-      where: {
-        userId: ctx.user.id,
-        ...(orgId ? { organizationId: orgId } : {}),
-      },
-      orderBy: { updatedAt: "desc" },
-      include: { organization: { select: { name: true } } },
-    })
-  }),
+  list: protectedProcedure
+    .input(z.object({ organizationId: z.string().optional() }).optional())
+    .query(async ({ input, ctx }) => {
+      const orgId = input?.organizationId
+      if (orgId) await assertOrgMember(ctx.user.id, orgId)
+      return prisma.ticket.findMany({
+        where: {
+          userId: ctx.user.id,
+          ...(orgId ? { organizationId: orgId } : {}),
+        },
+        orderBy: { updatedAt: "desc" },
+        include: { organization: { select: { name: true } } },
+      })
+    }),
 
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
@@ -123,6 +127,7 @@ export const ticketsRouter = router({
           ticket.user.name,
           ticket.id,
           ticket.subject,
+          ticket.organizationId,
         ).catch(() => {})
       } else {
         await emailAdminTicketReply(ticket.user.name, ticket.id, ticket.subject).catch(() => {})
@@ -155,6 +160,7 @@ export const ticketsRouter = router({
           ticket.id,
           ticket.subject,
           TicketStatus.closed,
+          ticket.organizationId,
         ).catch(() => {})
       } else {
         await emailAdminTicketClosed(ticket.user.name, ticket.id, ticket.subject).catch(() => {})
@@ -192,6 +198,7 @@ export const ticketsRouter = router({
         updated.id,
         updated.subject,
         input.status,
+        updated.organizationId,
       ).catch(() => {})
       return updated
     }),
@@ -202,16 +209,19 @@ export const ticketsRouter = router({
     })
   }),
 
-  pendingCount: protectedProcedure.query(async ({ ctx }) => {
-    const orgId = ctx.session?.session?.activeOrganizationId
-    return prisma.ticket.count({
-      where: {
-        userId: ctx.user.id,
-        status: TicketStatus.pending,
-        ...(orgId ? { organizationId: orgId } : {}),
-      },
-    })
-  }),
+  pendingCount: protectedProcedure
+    .input(z.object({ organizationId: z.string().optional() }).optional())
+    .query(async ({ input, ctx }) => {
+      const orgId = input?.organizationId
+      if (orgId) await assertOrgMember(ctx.user.id, orgId)
+      return prisma.ticket.count({
+        where: {
+          userId: ctx.user.id,
+          status: TicketStatus.pending,
+          ...(orgId ? { organizationId: orgId } : {}),
+        },
+      })
+    }),
 
   adminOpenCount: adminProcedure.query(async () => {
     return prisma.ticket.count({ where: { status: TicketStatus.open } })

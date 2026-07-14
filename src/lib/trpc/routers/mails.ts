@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { adminProcedure, protectedProcedure, router } from "../server"
+import { adminProcedure, assertOrgMember, protectedProcedure, router } from "../server"
 import { prisma } from "@/lib/prisma"
 import { emailUserNewMail } from "@/lib/notify"
 
@@ -37,36 +37,69 @@ export const mailsRouter = router({
       })
     }),
 
-  list: protectedProcedure.query(async ({ ctx }) => {
-    const orgId = ctx.session?.session?.activeOrganizationId
-    if (!orgId) return []
-    return prisma.mail.findMany({
-      where: { organizationId: orgId },
-      orderBy: { createdAt: "desc" },
-    })
-  }),
+  list: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      await assertOrgMember(ctx.user.id, input.organizationId)
+      return prisma.mail.findMany({
+        where: { organizationId: input.organizationId },
+        orderBy: { createdAt: "desc" },
+      })
+    }),
 
-  unreadCount: protectedProcedure.query(async ({ ctx }) => {
-    const orgId = ctx.session?.session?.activeOrganizationId
-    if (!orgId) return 0
-    return prisma.mail.count({
-      where: { organizationId: orgId, read: false },
-    })
-  }),
+  unreadCount: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      await assertOrgMember(ctx.user.id, input.organizationId)
+      return prisma.mail.count({
+        where: { organizationId: input.organizationId, read: false },
+      })
+    }),
 
   markRead: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const orgId = ctx.session?.session?.activeOrganizationId
       const mail = await prisma.mail.findUnique({ where: { id: input.id } })
-      if (!mail || mail.organizationId !== orgId) {
-        throw new Error("Mail not found")
-      }
+      if (!mail) throw new Error("Mail not found")
+      await assertOrgMember(ctx.user.id, mail.organizationId)
       return prisma.mail.update({
         where: { id: input.id },
         data: { read: true },
       })
     }),
+
+  listForUser: protectedProcedure.query(async ({ ctx }) => {
+    const members = await prisma.member.findMany({
+      where: { userId: ctx.user.id, organization: { deletedAt: null } },
+      select: { organizationId: true },
+    })
+    const orgIds = members.map((m) => m.organizationId)
+    if (!orgIds.length) return []
+    const [mails, orgs] = await Promise.all([
+      prisma.mail.findMany({
+        where: { organizationId: { in: orgIds } },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.organization.findMany({
+        where: { id: { in: orgIds } },
+        select: { id: true, name: true },
+      }),
+    ])
+    const orgMap = new Map(orgs.map((o) => [o.id, o]))
+    return mails.map((m) => ({ ...m, organization: orgMap.get(m.organizationId) ?? null }))
+  }),
+
+  unreadCountForUser: protectedProcedure.query(async ({ ctx }) => {
+    const members = await prisma.member.findMany({
+      where: { userId: ctx.user.id, organization: { deletedAt: null } },
+      select: { organizationId: true },
+    })
+    const orgIds = members.map((m) => m.organizationId)
+    if (!orgIds.length) return 0
+    return prisma.mail.count({
+      where: { organizationId: { in: orgIds }, read: false },
+    })
+  }),
 
   delete: adminProcedure
     .input(z.object({ id: z.string() }))

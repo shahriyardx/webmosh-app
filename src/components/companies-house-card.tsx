@@ -60,7 +60,7 @@ export function CompaniesHouseCard({ orgId }: { orgId: string }) {
       <CardHeader>
         <CardTitle className="flex items-center justify-between text-base">
           <div className="flex items-center gap-2">
-            <LandmarkIcon className="size-4 text-amber-500" />
+            <LandmarkIcon className="size-4 text-sky-500" />
             Companies House
           </div>
           {data.status && (
@@ -167,7 +167,7 @@ export function OfficersCard({ orgId }: { orgId: string }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <UsersIcon className="size-4 text-amber-500" />
+          <UsersIcon className="size-4 text-sky-500" />
           Officers
           <span className="text-xs font-normal text-muted-foreground">
             {data.officerCount} officer{data.officerCount === 1 ? "" : "s"} / {data.resignedCount}{" "}
@@ -255,7 +255,7 @@ export function FilingHistoryCard({ orgId }: { orgId: string }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <FileTextIcon className="size-4 text-amber-500" />
+          <FileTextIcon className="size-4 text-sky-500" />
           Filing History
         </CardTitle>
       </CardHeader>

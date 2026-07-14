@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter, usePathname } from "next/navigation"
-import { useQuery } from "@tanstack/react-query"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/auth-client"
+import { trpc } from "@/lib/trpc/client"
 import { AppSidebar } from "@/components/app-sidebar"
 import {
   SidebarProvider,
@@ -24,62 +24,41 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const pathname = usePathname()
   const { data: session, isPending: authPending } = authClient.useSession()
-  const [settingActive, setSettingActive] = useState(false)
+  const isAdmin = session?.user?.role === "admin"
+  const { data: companies, isLoading: companiesLoading } =
+    trpc.companies.myCompanies.useQuery(undefined, {
+      enabled: !!session && !isAdmin,
+    })
 
-  const { data: orgList, isLoading: orgsLoading } = useQuery({
-    queryKey: ["organizations"],
-    queryFn: () => authClient.organization.list(),
-    enabled: !!session,
-  })
-
-  const organizations = orgList?.data ?? []
-  const activeOrgId = session?.session?.activeOrganizationId
-
-  // Auth check
   useEffect(() => {
     if (!authPending && !session) {
       router.push("/")
+      return
     }
-  }, [session, authPending, router])
-
-  // No orgs → onboard
-  useEffect(() => {
-    if (session && !orgsLoading && orgList && !organizations.length) {
-      router.push("/onboard")
-    }
-  }, [session, orgsLoading, orgList, organizations.length, router])
-
-  // Has orgs but no active → set first as active
-  useEffect(() => {
     if (
+      !authPending &&
       session &&
-      !orgsLoading &&
-      organizations.length > 0 &&
-      !activeOrgId &&
-      !settingActive
+      !isAdmin &&
+      !companiesLoading &&
+      companies &&
+      companies.length === 0
     ) {
-      setSettingActive(true)
-      authClient.organization
-        .setActive({ organizationId: organizations[0].id })
-        .then(() => {
-          router.refresh()
-        })
+      router.replace("/onboard")
     }
-  }, [session, orgsLoading, organizations, activeOrgId, settingActive, router])
+  }, [session, authPending, isAdmin, companies, companiesLoading, router])
 
-  // Loading state
-  if (authPending || (session && orgsLoading)) {
+  if (authPending || (session && !isAdmin && companiesLoading)) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">
-        <div className="size-5 animate-pulse rounded-full bg-amber-500/50" />
+        <div className="size-5 animate-pulse rounded-full bg-sky-500/50" />
       </div>
     )
   }
 
   if (!session) return null
-  if (!organizations.length) return null
+  // Freshly-onboarding users have no org yet — hide chrome while we redirect.
+  if (!isAdmin && companies && companies.length === 0) return null
 
   const handleSignOut = async () => {
     await authClient.signOut()
@@ -103,9 +82,7 @@ export default function DashboardLayout({
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbPage>
-                    {pathname === "/dashboard" ? "Dashboard" : ""}
-                  </BreadcrumbPage>
+                  <BreadcrumbPage>Dashboard</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>

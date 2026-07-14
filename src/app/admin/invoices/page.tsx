@@ -1,10 +1,28 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { trpc } from "@/lib/trpc/client"
 import { PaymentStatus } from "@/generated/prisma/enums"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -13,9 +31,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { ReceiptIcon, DownloadIcon, Trash2Icon } from "lucide-react"
+import {
+  ReceiptIcon,
+  DownloadIcon,
+  Trash2Icon,
+  PlusIcon,
+  XIcon,
+  BellIcon,
+} from "lucide-react"
 import { toast } from "sonner"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import { formatInvoiceNumber } from "@/lib/invoice-number"
 
 const tabs = [
   { label: "All", value: undefined },
@@ -37,6 +63,7 @@ export default function AdminInvoicesPage() {
 
   const utils = trpc.useUtils()
   const { data: invoices, isLoading } = trpc.invoices.listAll.useQuery({ status })
+  const { data: clientOptions } = trpc.admin.clientsWithCompanies.useQuery()
   const approve = trpc.invoices.approve.useMutation({
     onSuccess: () => utils.invoices.listAll.invalidate(),
   })
@@ -55,22 +82,108 @@ export default function AdminInvoicesPage() {
       toast.success("Invoice deleted")
     },
   })
+  const sendReminder = trpc.invoices.sendReminder.useMutation({
+    onSuccess: () => toast.success("Reminder email sent"),
+    onError: (e) => toast.error(e.message),
+  })
+
+  const [createOpen, setCreateOpen] = useState(false)
+  const emptyInvoice = {
+    mode: "existing" as "existing" | "new",
+    userId: "",
+    organizationId: "",
+    // custom-client fields (mode === "new")
+    clientName: "",
+    clientEmail: "",
+    companyName: "",
+    // shared
+    description: "",
+    items: [{ title: "", amount: "" }] as { title: string; amount: string }[],
+  }
+  const [newInvoice, setNewInvoice] = useState(emptyInvoice)
+
+  const selectedClient = useMemo(
+    () => clientOptions?.find((c) => c.id === newInvoice.userId) ?? null,
+    [clientOptions, newInvoice.userId],
+  )
+
+  const parsedItems = newInvoice.items
+    .map((i) => ({ title: i.title.trim(), amount: Number(i.amount) }))
+    .filter((i) => i.title.length > 0 && i.amount > 0)
+  const total = parsedItems.reduce((s, i) => s + i.amount, 0)
+
+  const create = trpc.invoices.create.useMutation({
+    onSuccess: () => {
+      utils.invoices.listAll.invalidate()
+      setCreateOpen(false)
+      setNewInvoice(emptyInvoice)
+      toast.success("Invoice created")
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const createForNewClient = trpc.invoices.createForNewClient.useMutation({
+    onSuccess: () => {
+      utils.invoices.listAll.invalidate()
+      setCreateOpen(false)
+      setNewInvoice(emptyInvoice)
+      toast.success("Invoice created and client provisioned")
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
+  const canCreate =
+    parsedItems.length > 0 &&
+    total > 0 &&
+    (newInvoice.mode === "existing"
+      ? newInvoice.organizationId.length > 0
+      : newInvoice.clientName.trim().length > 0 &&
+        newInvoice.companyName.trim().length > 0 &&
+        isValidEmail(newInvoice.clientEmail)) &&
+    !create.isPending &&
+    !createForNewClient.isPending
+
+  const updateItem = (idx: number, patch: Partial<{ title: string; amount: string }>) => {
+    setNewInvoice((s) => ({
+      ...s,
+      items: s.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)),
+    }))
+  }
+  const addItem = () =>
+    setNewInvoice((s) => ({
+      ...s,
+      items: [...s.items, { title: "", amount: "" }],
+    }))
+  const removeItem = (idx: number) =>
+    setNewInvoice((s) => ({
+      ...s,
+      items:
+        s.items.length === 1
+          ? [{ title: "", amount: "" }]
+          : s.items.filter((_, i) => i !== idx),
+    }))
 
   if (isLoading) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        <div className="size-5 animate-pulse rounded-full bg-amber-500/50" />
+        <div className="size-5 animate-pulse rounded-full bg-sky-500/50" />
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Invoices</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage all formation invoices.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Invoices</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage all formation invoices.
+          </p>
+        </div>
+        <Button onClick={() => setCreateOpen(true)}>
+          <PlusIcon className="size-4" />
+          New Invoice
+        </Button>
       </div>
 
       {/* Tabs */}
@@ -82,7 +195,7 @@ export default function AdminInvoicesPage() {
             onClick={() => setStatus(tab.value)}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               status === tab.value
-                ? "bg-amber-500/10 text-amber-500"
+                ? "bg-sky-500/10 text-sky-500"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -101,6 +214,7 @@ export default function AdminInvoicesPage() {
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
+                <TableHead className="w-28">Invoice #</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Method</TableHead>
@@ -114,6 +228,9 @@ export default function AdminInvoicesPage() {
                 const sb = statusBadge[inv.status] ?? statusBadge.unpaid
                 return (
                   <TableRow key={inv.id}>
+                    <TableCell className="font-mono text-xs">
+                      {formatInvoiceNumber(inv.number)}
+                    </TableCell>
                     <TableCell className="font-medium">
                       {inv.organization?.name ?? "—"}
                     </TableCell>
@@ -161,7 +278,7 @@ export default function AdminInvoicesPage() {
                         )}
                         <Button variant="outline" size="icon" className="size-8" asChild>
                           <a
-                            href={`/dashboard/invoices/${inv.id}/pdf`}
+                            href={`/companies/${inv.organizationId}/invoices/${inv.id}/pdf`}
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Download invoice"
@@ -169,6 +286,21 @@ export default function AdminInvoicesPage() {
                             <DownloadIcon className="size-4" />
                           </a>
                         </Button>
+                        {inv.status !== PaymentStatus.paid && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="size-8"
+                            title="Send reminder email"
+                            disabled={
+                              sendReminder.isPending &&
+                              sendReminder.variables?.id === inv.id
+                            }
+                            onClick={() => sendReminder.mutate({ id: inv.id })}
+                          >
+                            <BellIcon className="size-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="icon"
@@ -227,6 +359,279 @@ export default function AdminInvoicesPage() {
           </div>
         </div>
       )}
+
+      {/* Create invoice dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>New Invoice</DialogTitle>
+            <DialogDescription>
+              Bill a client for one or more services. Optionally override the
+              recipient name and email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5">
+            {/* Mode toggle */}
+            <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1">
+              {(["existing", "new"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() =>
+                    setNewInvoice((s) => ({
+                      ...s,
+                      mode: m,
+                      userId: "",
+                      organizationId: "",
+                      clientName: "",
+                      clientEmail: "",
+                      companyName: "",
+                    }))
+                  }
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    newInvoice.mode === m
+                      ? "bg-sky-500/10 text-sky-500"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {m === "existing" ? "Existing client" : "New client"}
+                </button>
+              ))}
+            </div>
+
+            {newInvoice.mode === "existing" ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="inv-client">Client</Label>
+                  <Select
+                    value={newInvoice.userId}
+                    onValueChange={(v) =>
+                      setNewInvoice((s) => ({
+                        ...s,
+                        userId: v,
+                        organizationId: "",
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="inv-client" className="w-full">
+                      <SelectValue placeholder="Choose a client…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(clientOptions ?? []).map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name || c.email}
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {c.email}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="inv-company">Company</Label>
+                  <Select
+                    value={newInvoice.organizationId}
+                    onValueChange={(v) =>
+                      setNewInvoice((s) => ({ ...s, organizationId: v }))
+                    }
+                    disabled={!selectedClient}
+                  >
+                    <SelectTrigger id="inv-company" className="w-full">
+                      <SelectValue
+                        placeholder={
+                          selectedClient
+                            ? selectedClient.companies.length === 0
+                              ? "This client has no companies"
+                              : "Choose a company…"
+                            : "Select a client first"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(selectedClient?.companies ?? []).map((co) => (
+                        <SelectItem key={co.id} value={co.id}>
+                          {co.name}
+                          {co.country && (
+                            <span className="ml-2 text-xs uppercase text-muted-foreground">
+                              {co.country}
+                            </span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Autofilled, non-editable email */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="inv-email">Recipient email</Label>
+                  <Input
+                    id="inv-email"
+                    type="email"
+                    readOnly
+                    disabled
+                    value={selectedClient?.email ?? ""}
+                    placeholder="Auto-filled from selected client"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="new-client-name">Client name</Label>
+                  <Input
+                    id="new-client-name"
+                    placeholder="Jane Doe"
+                    value={newInvoice.clientName}
+                    onChange={(e) =>
+                      setNewInvoice((s) => ({
+                        ...s,
+                        clientName: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="new-client-company">Company name</Label>
+                  <Input
+                    id="new-client-company"
+                    placeholder="Acme Ltd"
+                    value={newInvoice.companyName}
+                    onChange={(e) =>
+                      setNewInvoice((s) => ({
+                        ...s,
+                        companyName: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="new-client-email">Client email</Label>
+                  <Input
+                    id="new-client-email"
+                    type="email"
+                    placeholder="jane@acme.com"
+                    value={newInvoice.clientEmail}
+                    onChange={(e) =>
+                      setNewInvoice((s) => ({
+                        ...s,
+                        clientEmail: e.target.value,
+                      }))
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    A client account will be created under this email. When
+                    they sign in with the matching Google account, the invoice
+                    will appear on their dashboard.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Line items */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Line items</Label>
+                <span className="text-xs text-muted-foreground">
+                  {parsedItems.length} item{parsedItems.length === 1 ? "" : "s"} · $
+                  {total.toFixed(2)}
+                </span>
+              </div>
+              <div className="space-y-2 rounded-lg border border-border p-3">
+                {newInvoice.items.map((it, idx) => (
+                  <div key={idx} className="flex items-start gap-2">
+                    <Input
+                      className="flex-1"
+                      placeholder={`Service ${idx + 1} (e.g. Annual filing)`}
+                      value={it.title}
+                      onChange={(e) => updateItem(idx, { title: e.target.value })}
+                    />
+                    <Input
+                      className="w-32"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Amount"
+                      value={it.amount}
+                      onChange={(e) => updateItem(idx, { amount: e.target.value })}
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-9 shrink-0 text-muted-foreground hover:text-red-500"
+                      onClick={() => removeItem(idx)}
+                      title="Remove item"
+                    >
+                      <XIcon className="size-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addItem}
+                >
+                  <PlusIcon className="size-3.5" />
+                  Add another service
+                </Button>
+              </div>
+            </div>
+
+            {/* Optional description */}
+            <div className="space-y-1.5">
+              <Label htmlFor="inv-desc">Notes / description (optional)</Label>
+              <Textarea
+                id="inv-desc"
+                rows={2}
+                placeholder="Anything the customer should know…"
+                value={newInvoice.description}
+                onChange={(e) =>
+                  setNewInvoice((s) => ({ ...s, description: e.target.value }))
+                }
+              />
+            </div>
+
+          </div>
+          <DialogFooter className="items-center sm:justify-between">
+            <span className="text-sm font-medium">
+              Total: <span className="text-lg font-bold">${total.toFixed(2)}</span>
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setCreateOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={!canCreate}
+                onClick={() => {
+                  if (newInvoice.mode === "existing") {
+                    create.mutate({
+                      organizationId: newInvoice.organizationId,
+                      items: parsedItems,
+                      description: newInvoice.description.trim() || undefined,
+                    })
+                  } else {
+                    createForNewClient.mutate({
+                      clientName: newInvoice.clientName.trim(),
+                      clientEmail: newInvoice.clientEmail.trim(),
+                      companyName: newInvoice.companyName.trim(),
+                      items: parsedItems,
+                      description: newInvoice.description.trim() || undefined,
+                    })
+                  }
+                }}
+              >
+                {create.isPending || createForNewClient.isPending
+                  ? "Creating…"
+                  : "Create invoice"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

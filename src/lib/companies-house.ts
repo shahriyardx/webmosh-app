@@ -146,3 +146,25 @@ export async function getCompaniesHouseProfile(
     filings,
   }
 }
+
+/** Lightweight fetch of just the filing due-dates from Companies House. */
+export async function getCompaniesHouseDates(
+  number: string,
+): Promise<{
+  accountsNextDue: string | null
+  confirmationNextDue: string | null
+} | null> {
+  const auth = authHeader()
+  if (!auth) return null
+  const res = await fetch(`${BASE}/company/${encodeURIComponent(number)}`, {
+    headers: { Authorization: auth },
+    next: { revalidate: 3600 },
+  })
+  if (!res.ok) return null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const d: any = await res.json()
+  return {
+    accountsNextDue: d.accounts?.next_due ?? null,
+    confirmationNextDue: d.confirmation_statement?.next_due ?? null,
+  }
+}

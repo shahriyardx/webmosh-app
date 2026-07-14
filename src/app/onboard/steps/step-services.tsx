@@ -52,7 +52,7 @@ export function StepServices({ country, onNext, initialValue }: StepServicesProp
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="size-5 animate-pulse rounded-full bg-amber-500/50" />
+        <div className="size-5 animate-pulse rounded-full bg-sky-500/50" />
       </div>
     )
   }
@@ -91,12 +91,12 @@ export function StepServices({ country, onNext, initialValue }: StepServicesProp
                 }}
                 className={`relative flex cursor-pointer flex-col transition-all ${
                   isSelected
-                    ? "ring-2 ring-amber-500"
+                    ? "ring-2 ring-sky-500"
                     : "hover:ring-foreground/20"
                 }`}
               >
                 {isSelected && (
-                  <div className="absolute right-3 top-3 flex size-5 items-center justify-center rounded-full bg-amber-500 text-white">
+                  <div className="absolute right-3 top-3 flex size-5 items-center justify-center rounded-full bg-sky-500 text-white">
                     <CheckIcon className="size-3" />
                   </div>
                 )}

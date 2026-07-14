@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { adminProcedure, protectedProcedure, router } from "../server"
+import { adminProcedure, assertOrgMember, protectedProcedure, router } from "../server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -12,7 +12,7 @@ import {
   emailUserStatusUpdate,
   emailUserCompanyCompleted,
 } from "@/lib/notify"
-import { getCompaniesHouseProfile } from "@/lib/companies-house"
+import { getCompaniesHouseProfile, getCompaniesHouseDates } from "@/lib/companies-house"
 
 const directorInput = z.object({
   firstName: z.string().min(1),
@@ -256,12 +256,6 @@ export const companiesRouter = router({
         },
       })
 
-      // Set the imported company as the active organization
-      await auth.api.setActiveOrganization({
-        body: { organizationId: org.id },
-        headers: hdrs,
-      })
-
       return org
     }),
 
@@ -303,23 +297,16 @@ export const companiesRouter = router({
       },
     })
 
-    await auth.api.setActiveOrganization({
-      body: { organizationId: org.id },
-      headers: hdrs,
-    })
-
     return org
   }),
 
   submitDocument: protectedProcedure
-    .input(z.object({ documentId: z.string(), fileUrl: z.string().min(1) }))
+    .input(z.object({ organizationId: z.string(), documentId: z.string(), fileUrl: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
-      const orgId = ctx.session?.session?.activeOrganizationId
-      if (!orgId) throw new Error("No active organization")
+      await assertOrgMember(ctx.user.id, input.organizationId)
 
-      // Verify document belongs to user's org
       const doc = await prisma.document.findFirst({
-        where: { id: input.documentId, organizationId: orgId },
+        where: { id: input.documentId, organizationId: input.organizationId },
       })
       if (!doc) throw new Error("Document not found")
 
@@ -330,26 +317,61 @@ export const companiesRouter = router({
       })
 
       const org = await prisma.organization.findUnique({
-        where: { id: orgId },
+        where: { id: input.organizationId },
         select: { name: true },
       })
-      await emailAdminDocumentResubmitted(orgId, updated.name, org?.name ?? "a company").catch(() => {})
+      await emailAdminDocumentResubmitted(input.organizationId, updated.name, org?.name ?? "a company").catch(() => {})
 
       return updated
     }),
 
   getPendingDocCount: protectedProcedure
-    .query(async ({ ctx }) => {
-      const orgId = ctx.session?.session?.activeOrganizationId
-      if (!orgId) return 0
-
+    .input(z.object({ organizationId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      await assertOrgMember(ctx.user.id, input.organizationId)
       return prisma.document.count({
         where: {
-          organizationId: orgId,
+          organizationId: input.organizationId,
           status: { in: [DocumentStatus.requested, DocumentStatus.rejected] },
         },
       })
     }),
+
+  documentsForUser: protectedProcedure.query(async ({ ctx }) => {
+    const members = await prisma.member.findMany({
+      where: { userId: ctx.user.id, organization: { deletedAt: null } },
+      select: { organizationId: true },
+    })
+    const orgIds = members.map((m) => m.organizationId)
+    if (!orgIds.length) return []
+    const [docs, orgs] = await Promise.all([
+      prisma.document.findMany({
+        where: { organizationId: { in: orgIds } },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.organization.findMany({
+        where: { id: { in: orgIds } },
+        select: { id: true, name: true },
+      }),
+    ])
+    const orgMap = new Map(orgs.map((o) => [o.id, o]))
+    return docs.map((d) => ({ ...d, organization: orgMap.get(d.organizationId) ?? null }))
+  }),
+
+  pendingDocCountForUser: protectedProcedure.query(async ({ ctx }) => {
+    const members = await prisma.member.findMany({
+      where: { userId: ctx.user.id, organization: { deletedAt: null } },
+      select: { organizationId: true },
+    })
+    const orgIds = members.map((m) => m.organizationId)
+    if (!orgIds.length) return 0
+    return prisma.document.count({
+      where: {
+        organizationId: { in: orgIds },
+        status: { in: [DocumentStatus.requested, DocumentStatus.rejected] },
+      },
+    })
+  }),
 
   getDocuments: protectedProcedure
     .input(z.object({ orgId: z.string() }))
@@ -646,15 +668,50 @@ export const companiesRouter = router({
       return doc
     }),
 
-  // User's own non-deleted companies (for the org switcher)
+  // User's own non-deleted companies (for the Companies list page)
   myCompanies: protectedProcedure.query(async ({ ctx }) => {
     const members = await prisma.member.findMany({
       where: { userId: ctx.user.id, organization: { deletedAt: null } },
       select: {
-        organization: { select: { id: true, name: true, slug: true, logo: true } },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logo: true,
+            type: true,
+            country: true,
+            status: true,
+            companyId: true,
+            createdAt: true,
+            confirmationStatementDue: true,
+            accountsFilingDue: true,
+          },
+        },
       },
     })
-    return members.map((m) => m.organization)
+    const orgs = members.map((m) => m.organization)
+
+    // Enrich UK companies with live Companies House filing dates (1h fetch cache).
+    // DB overrides win; otherwise fall back to what CH reports.
+    const enriched = await Promise.all(
+      orgs.map(async (o) => {
+        if (o.country !== "uk" || !o.companyId) return o
+        if (o.confirmationStatementDue && o.accountsFilingDue) return o
+        const dates = await getCompaniesHouseDates(o.companyId).catch(() => null)
+        if (!dates) return o
+        return {
+          ...o,
+          confirmationStatementDue:
+            o.confirmationStatementDue ??
+            (dates.confirmationNextDue ? new Date(dates.confirmationNextDue) : null),
+          accountsFilingDue:
+            o.accountsFilingDue ??
+            (dates.accountsNextDue ? new Date(dates.accountsNextDue) : null),
+        }
+      }),
+    )
+    return enriched
   }),
 
   // User soft-deletes their own company; reassigns active org
@@ -672,7 +729,6 @@ export const companiesRouter = router({
         data: { deletedAt: new Date() },
       })
 
-      // Pick another available company for this user
       const next = await prisma.member.findFirst({
         where: {
           userId: ctx.user.id,
@@ -681,12 +737,6 @@ export const companiesRouter = router({
         },
         select: { organizationId: true },
         orderBy: { createdAt: "desc" },
-      })
-
-      const hdrs = await headers()
-      await auth.api.setActiveOrganization({
-        body: { organizationId: next?.organizationId ?? null },
-        headers: hdrs,
       })
 
       return { nextActiveOrgId: next?.organizationId ?? null }

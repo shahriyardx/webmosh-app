@@ -20,10 +20,11 @@ export interface InvoicePdfData {
     email?: string | null;
     address?: string | null;
   };
-  item: {
+  items: {
     title: string;
-    features: string[];
-  };
+    amount: number;
+    features?: string[];
+  }[];
   from?: {
     name?: string | null;
     address?: string | null;
@@ -329,19 +330,21 @@ function InvoiceDocument({ data }: { data: InvoicePdfData }) {
           <Text style={s.colAmount}>Amount</Text>
         </View>
         <View style={s.tableBody}>
-          <View style={s.itemRow}>
-            <View style={s.colItem}>
-              <Text style={s.itemTitle}>{data.item.title}</Text>
-              {data.item.features.map((f, i) => (
-                <Text key={i} style={s.feature}>
-                  {i + 1}. {f}
-                </Text>
-              ))}
+          {data.items.map((it, i) => (
+            <View key={i} style={s.itemRow}>
+              <View style={s.colItem}>
+                <Text style={s.itemTitle}>{it.title}</Text>
+                {(it.features ?? []).map((f, j) => (
+                  <Text key={j} style={s.feature}>
+                    {j + 1}. {f}
+                  </Text>
+                ))}
+              </View>
+              <Text style={s.colQty}>1</Text>
+              <Text style={s.colRate}>{money(it.amount)}</Text>
+              <Text style={s.colAmount}>{money(it.amount)}</Text>
             </View>
-            <Text style={s.colQty}>1</Text>
-            <Text style={s.colRate}>{money(data.amount)}</Text>
-            <Text style={s.colAmount}>{money(data.amount)}</Text>
-          </View>
+          ))}
         </View>
 
         {/* Totals */}

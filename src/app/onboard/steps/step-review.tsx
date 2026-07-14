@@ -138,7 +138,7 @@ export function StepReview({ data }: StepReviewProps) {
         <span className="text-xl font-bold">${grandTotal}</span>
       </div>
 
-      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-5 py-4">
+      <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 px-5 py-4">
         <p className="text-sm text-muted-foreground">
           By placing this order, you agree to our{" "}
           <span className="underline underline-offset-2">Terms of Service</span>{" "}

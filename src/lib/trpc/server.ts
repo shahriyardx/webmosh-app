@@ -1,7 +1,21 @@
 import { initTRPC, TRPCError } from "@trpc/server"
 import superjson from "superjson"
 import { auth } from "../auth"
+import { prisma } from "../prisma"
 import { headers } from "next/headers"
+
+export async function assertOrgMember(userId: string, organizationId: string) {
+  const member = await prisma.member.findFirst({
+    where: { userId, organizationId },
+    select: { id: true },
+  })
+  if (!member) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Not a member of this organization",
+    })
+  }
+}
 
 export async function createTRPCContext() {
   const session = await auth.api.getSession({

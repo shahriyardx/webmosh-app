@@ -1,5 +1,6 @@
 import { prisma } from "./prisma"
 import { sendMail, notifyAdmin, appUrl } from "./email"
+import { formatInvoiceNumber } from "./invoice-number"
 
 /** Owner (email + name) of an organization, or null. */
 async function orgOwner(organizationId: string) {
@@ -34,18 +35,58 @@ const statusLabels: Record<string, string> = {
 export async function emailUserNewInvoice(
   organizationId: string,
   invoice: { id: string; amount: number; description?: string | null },
+  override?: { toEmail?: string; toName?: string; reminder?: boolean },
 ) {
-  const owner = await orgOwner(organizationId)
-  if (!owner?.email) return
-  await sendMail(owner.email, "New invoice on your account", {
-    heading: "You have a new invoice",
-    greeting: `Hi ${owner.name ?? "there"},`,
-    intro: "A new invoice has been added to your account and is ready for payment.",
-    details: [
-      { label: "Amount", value: `$${invoice.amount}` },
-      ...(invoice.description ? [{ label: "For", value: invoice.description }] : []),
-    ],
-    cta: { label: "View & Pay", url: appUrl(`/dashboard/invoices/${invoice.id}`) },
+  let toEmail = override?.toEmail
+  let toName = override?.toName
+  if (!toEmail) {
+    const owner = await orgOwner(organizationId)
+    if (!owner?.email) return
+    toEmail = owner.email
+    toName = toName ?? owner.name ?? undefined
+  }
+  const isReminder = override?.reminder === true
+
+  // Fetch the stored line items (advanced create dialog) + sequential number
+  // — fall back to a single row from the description/amount for legacy invoices.
+  const stored = await prisma.invoice.findUnique({
+    where: { id: invoice.id },
+    select: { items: true, amount: true, description: true, number: true },
+  })
+  const raw = stored?.items as
+    | { title: string; amount: number }[]
+    | null
+    | undefined
+  const items =
+    Array.isArray(raw) && raw.length > 0
+      ? raw.map((r) => ({ title: r.title, amount: r.amount }))
+      : [
+          {
+            title: invoice.description || "Company Formation",
+            amount: invoice.amount,
+          },
+        ]
+
+  const invoiceNumber = formatInvoiceNumber(stored?.number)
+  const subject = isReminder
+    ? `Reminder: Invoice ${invoiceNumber} is still awaiting payment`
+    : `You have a new invoice ${invoiceNumber}`
+  const heading = isReminder
+    ? `Reminder: Invoice ${invoiceNumber} is still unpaid`
+    : `You have a new invoice ${invoiceNumber}`
+  const intro = isReminder
+    ? "This is a friendly reminder that your invoice is still awaiting payment. The breakdown is below — please settle at your earliest convenience."
+    : "A new payment has been added to your account. Here's a breakdown of the charges."
+  await sendMail(toEmail, subject, {
+    heading,
+    greeting: `Hi ${toName ?? "there"},`,
+    intro,
+    items,
+    total: invoice.amount,
+    cta: {
+      label: "View & Pay",
+      url: appUrl(`/companies/${organizationId}/invoices/${invoice.id}`),
+    },
   })
 }
 
@@ -57,7 +98,7 @@ export async function emailUserDocumentRequested(organizationId: string, docName
     greeting: `Hi ${owner.name ?? "there"},`,
     intro: `Our team has requested a document to continue processing your company.`,
     details: [{ label: "Document", value: docName }],
-    cta: { label: "Upload Document", url: appUrl("/dashboard/documents") },
+    cta: { label: "Upload Document", url: appUrl(`/companies/${organizationId}/documents`) },
   })
 }
 
@@ -79,7 +120,7 @@ export async function emailUserDocumentReviewed(
         ? `Your document "${docName}" has been approved.`
         : `Your document "${docName}" was rejected and needs to be re-uploaded.`,
       details: !approved && reason ? [{ label: "Reason", value: reason }] : undefined,
-      cta: { label: "View Documents", url: appUrl("/dashboard/documents") },
+      cta: { label: "View Documents", url: appUrl(`/companies/${organizationId}/documents`) },
     },
   )
 }
@@ -93,7 +134,7 @@ export async function emailUserStatusUpdate(organizationId: string, status: stri
     greeting: `Hi ${owner.name ?? "there"},`,
     intro: `The status of ${name} has been updated.`,
     details: [{ label: "New status", value: statusLabels[status] ?? status }],
-    cta: { label: "View Dashboard", url: appUrl("/dashboard") },
+    cta: { label: "View Dashboard", url: appUrl(`/companies/${organizationId}/overview`) },
   })
 }
 
@@ -115,7 +156,7 @@ export async function emailUserCompanyCompleted(organizationId: string) {
     greeting: `Hi ${owner.name ?? "there"},`,
     intro: `Great news — ${org.name} has been successfully formed.`,
     details,
-    cta: { label: "View Dashboard", url: appUrl("/dashboard") },
+    cta: { label: "View Dashboard", url: appUrl(`/companies/${organizationId}/overview`) },
   })
 }
 
@@ -127,7 +168,7 @@ export async function emailUserNewMail(organizationId: string, subject: string) 
     greeting: `Hi ${owner.name ?? "there"},`,
     intro: "New mail has been added to your company account.",
     details: [{ label: "Subject", value: subject }],
-    cta: { label: "Read Mail", url: appUrl("/dashboard/mail") },
+    cta: { label: "Read Mail", url: appUrl(`/companies/${organizationId}/mail`) },
   })
 }
 
@@ -149,7 +190,7 @@ export async function emailUserPayment(
         ? `We've received and confirmed your payment of $${amount}.`
         : `We couldn't verify your payment of $${amount}. Please try again.`,
       details: !approved && reason ? [{ label: "Reason", value: reason }] : undefined,
-      cta: { label: "View Invoices", url: appUrl("/dashboard/invoices") },
+      cta: { label: "View Payments", url: appUrl(`/companies/${organizationId}/invoices`) },
     },
   )
 }
@@ -166,8 +207,14 @@ export async function emailUserOrderStatus(
     heading: "Your order status has changed",
     greeting: `Hi ${owner.name ?? "there"},`,
     intro: `Your order for "${serviceTitle}" is now ${statusLabels[status] ?? status}.`,
-    cta: { label: "View Order", url: appUrl(`/dashboard/orders/${orderId}`) },
+    cta: { label: "View Order", url: appUrl(`/companies/${organizationId}/orders/${orderId}`) },
   })
+}
+
+function ticketUrl(organizationId: string | null, ticketId: string) {
+  return organizationId
+    ? appUrl(`/companies/${organizationId}/tickets/${ticketId}`)
+    : appUrl("/dashboard")
 }
 
 export async function emailUserTicketReply(
@@ -175,12 +222,13 @@ export async function emailUserTicketReply(
   toName: string | null,
   ticketId: string,
   subject: string,
+  organizationId: string | null,
 ) {
   await sendMail(toEmail, `Re: ${subject}`, {
     heading: "Support replied to your ticket",
     greeting: `Hi ${toName ?? "there"},`,
     intro: `Our support team replied to your ticket "${subject}".`,
-    cta: { label: "View Ticket", url: appUrl(`/dashboard/tickets/${ticketId}`) },
+    cta: { label: "View Ticket", url: ticketUrl(organizationId, ticketId) },
   })
 }
 
@@ -190,12 +238,13 @@ export async function emailUserTicketStatus(
   ticketId: string,
   subject: string,
   status: string,
+  organizationId: string | null,
 ) {
   await sendMail(toEmail, `Ticket ${statusLabels[status] ?? status}: ${subject}`, {
     heading: "Your ticket status changed",
     greeting: `Hi ${toName ?? "there"},`,
     intro: `The status of your ticket "${subject}" is now ${statusLabels[status] ?? status}.`,
-    cta: { label: "View Ticket", url: appUrl(`/dashboard/tickets/${ticketId}`) },
+    cta: { label: "View Ticket", url: ticketUrl(organizationId, ticketId) },
   })
 }
 

@@ -320,7 +320,7 @@ export default function FormationDetailPage({
   if (isLoading) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        <div className="size-5 animate-pulse rounded-full bg-amber-500/50" />
+        <div className="size-5 animate-pulse rounded-full bg-sky-500/50" />
       </div>
     )
   }
@@ -379,7 +379,7 @@ export default function FormationDetailPage({
       <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Building2Icon className="size-4 text-amber-500" />
+              <Building2Icon className="size-4 text-sky-500" />
               Company Details
             </CardTitle>
           </CardHeader>
@@ -416,7 +416,7 @@ export default function FormationDetailPage({
                     href={org.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm font-medium text-amber-600 hover:underline"
+                    className="text-sm font-medium text-sky-600 hover:underline"
                   >
                     {org.website}
                   </a>
@@ -449,7 +449,7 @@ export default function FormationDetailPage({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <SettingsIcon className="size-4 text-amber-500" />
+            <SettingsIcon className="size-4 text-sky-500" />
             Admin Settings
           </CardTitle>
         </CardHeader>
@@ -549,7 +549,7 @@ export default function FormationDetailPage({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <UserIcon className="size-4 text-amber-500" />
+              <UserIcon className="size-4 text-sky-500" />
               Directors
             </CardTitle>
           </CardHeader>
@@ -589,7 +589,7 @@ export default function FormationDetailPage({
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-base">
             <div className="flex items-center gap-2">
-              <FileTextIcon className="size-4 text-amber-500" />
+              <FileTextIcon className="size-4 text-sky-500" />
               Documents
             </div>
             <Button
@@ -682,7 +682,7 @@ export default function FormationDetailPage({
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-base">
             <div className="flex items-center gap-2">
-              <ReceiptIcon className="size-4 text-amber-500" />
+              <ReceiptIcon className="size-4 text-sky-500" />
               Invoices
             </div>
             <Button size="sm" variant="outline" onClick={() => setInvoiceModal(true)}>
@@ -744,7 +744,7 @@ export default function FormationDetailPage({
                             )}
                             <Button variant="outline" size="icon" className="size-8" asChild>
                               <a
-                                href={`/dashboard/invoices/${inv.id}/pdf`}
+                                href={`/companies/${id}/invoices/${inv.id}/pdf`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title="Download invoice"
@@ -778,7 +778,7 @@ export default function FormationDetailPage({
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-base">
             <div className="flex items-center gap-2">
-              <MailIcon className="size-4 text-amber-500" />
+              <MailIcon className="size-4 text-sky-500" />
               Mail
             </div>
             <Button size="sm" variant="outline" onClick={() => setMailModal(true)}>

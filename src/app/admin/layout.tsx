@@ -21,7 +21,7 @@ import {
 const breadcrumbTitles: Record<string, string> = {
   "/admin": "Admin Dashboard",
   "/admin/packages": "Packages",
-  "/admin/users": "Users",
+  "/admin/users": "Clients",
   "/admin/formations": "Formations",
   "/admin/documents": "Documents",
   "/admin/tickets": "Tickets",
@@ -50,7 +50,7 @@ export default function AdminLayout({
   if (isPending) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">
-        <div className="size-5 animate-pulse rounded-full bg-amber-500/50" />
+        <div className="size-5 animate-pulse rounded-full bg-sky-500/50" />
       </div>
     )
   }

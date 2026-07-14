@@ -21,7 +21,7 @@ import {
   MultiSelectContent,
   MultiSelectItem,
 } from "@/components/ui/multi-select"
-import { UsersIcon, LogInIcon } from "lucide-react"
+import { UsersIcon, LogInIcon, ArrowRightIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 export default function AdminUsersPage() {
@@ -74,7 +74,7 @@ export default function AdminUsersPage() {
   if (isLoading) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        <div className="size-5 animate-pulse rounded-full bg-amber-500/50" />
+        <div className="size-5 animate-pulse rounded-full bg-sky-500/50" />
       </div>
     )
   }
@@ -82,16 +82,16 @@ export default function AdminUsersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Users</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Clients</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage all users and their roles.
+          Manage all clients and their roles.
         </p>
       </div>
 
       {!users || users.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <UsersIcon className="size-10 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">No users found.</p>
+          <p className="text-sm text-muted-foreground">No clients found.</p>
         </div>
       ) : (
         <div className="rounded-lg border border-border">
@@ -102,7 +102,7 @@ export default function AdminUsersPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead className="w-44 text-right">Role</TableHead>
-                <TableHead className="w-32 text-right">Actions</TableHead>
+                <TableHead className="w-56 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -110,18 +110,27 @@ export default function AdminUsersPage() {
                 const role = (u.role as string) ?? "user"
                 const isSelf = u.id === session?.user?.id
                 return (
-                  <TableRow key={u.id}>
+                  <TableRow
+                    key={u.id}
+                    className="cursor-pointer"
+                    onClick={() => router.push(`/admin/users/${u.id}`)}
+                  >
                     <TableCell className="font-medium">
                       {u.name || "—"}
                       {isSelf && (
                         <span className="ml-2 text-xs text-muted-foreground">(You)</span>
+                      )}
+                      {u.banned && (
+                        <Badge variant="destructive" className="ml-2">
+                          Suspended
+                        </Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{u.email}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {new Date(u.createdAt).toLocaleDateString()}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end">
                         {isSelf ? (
                           <Badge variant={role === "admin" ? "default" : "outline"}>
@@ -152,18 +161,31 @@ export default function AdminUsersPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
-                      {!isSelf && (
+                    <TableCell
+                      className="text-right"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex justify-end gap-2">
+                        {!isSelf && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleImpersonate(u.id)}
+                            disabled={impersonatingId === u.id}
+                          >
+                            <LogInIcon className="size-3.5" />
+                            {impersonatingId === u.id ? "…" : "Impersonate"}
+                          </Button>
+                        )}
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          onClick={() => handleImpersonate(u.id)}
-                          disabled={impersonatingId === u.id}
+                          onClick={() => router.push(`/admin/users/${u.id}`)}
                         >
-                          <LogInIcon className="size-3.5" />
-                          {impersonatingId === u.id ? "…" : "Impersonate"}
+                          View
+                          <ArrowRightIcon className="size-3.5" />
                         </Button>
-                      )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 )

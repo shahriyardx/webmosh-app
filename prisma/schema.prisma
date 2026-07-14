@@ -18,6 +18,8 @@ model User {
   email         String
   emailVerified Boolean   @default(false)
   image         String?
+  phone         String?
+  address       String?
   role          String?   @default("user")
   banned        Boolean   @default(false)
   banReason     String?
@@ -254,10 +256,14 @@ model Setting {
 
 model Invoice {
   id             String        @id @default(cuid())
+  number         Int           @unique @default(autoincrement())
   organizationId String
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   amount         Float
   description    String?
+  items          Json?
+  receiverName   String?       @map("receiver_name")
+  receiverEmail  String?       @map("receiver_email")
   paymentMethod  String?       @map("payment_method")
   transactionId  String?       @map("transaction_id")
   status         PaymentStatus @default(unpaid)

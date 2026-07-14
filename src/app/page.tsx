@@ -39,7 +39,7 @@ export default function LoginPage() {
   if (isPending) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">
-        <div className="size-5 animate-pulse rounded-full bg-amber-500/50" />
+        <div className="size-5 animate-pulse rounded-full bg-sky-500/50" />
       </div>
     );
   }
@@ -54,7 +54,7 @@ export default function LoginPage() {
         <div className="animate-fade-in max-w-xl space-y-2">
           <Badge
             variant="outline"
-            className="border-amber-500/30 bg-amber-500/10 text-amber-500"
+            className="border-sky-500/30 bg-sky-500/10 text-sky-500"
           >
             <Building2 className="mr-1 size-3" />
             Webmosh
@@ -62,7 +62,7 @@ export default function LoginPage() {
           <h1 className="text-4xl font-semibold leading-[1.1] tracking-tight text-foreground sm:text-5xl xl:text-6xl">
             Build, launch &amp; grow
             <br />
-            <span className="text-amber-500">with confidence</span>
+            <span className="text-sky-500">with confidence</span>
           </h1>
           <p className="pt-3 text-base leading-relaxed text-muted-foreground sm:text-lg">
             From professional website design and WordPress development to US LLC
@@ -97,10 +97,10 @@ export default function LoginPage() {
           ].map((item, i) => (
             <div
               key={item.title}
-              className="group animate-fade-in-up space-y-1.5 rounded-xl border border-border bg-card/20 px-5 py-4 transition-colors hover:border-amber-500/20 hover:bg-amber-500/3"
+              className="group animate-fade-in-up space-y-1.5 rounded-xl border border-border bg-card/20 px-5 py-4 transition-colors hover:border-sky-500/20 hover:bg-sky-500/3"
               style={{ animationDelay: `${200 + i * 100}ms` }}
             >
-              <item.icon className="size-4 text-amber-500/70" />
+              <item.icon className="size-4 text-sky-500/70" />
               <h3 className="text-sm font-medium text-foreground">
                 {item.title}
               </h3>
@@ -124,7 +124,7 @@ export default function LoginPage() {
         <div className="mb-8 lg:hidden">
           <Badge
             variant="outline"
-            className="border-amber-500/30 bg-amber-500/10 text-amber-500"
+            className="border-sky-500/30 bg-sky-500/10 text-sky-500"
           >
             <Building2 className="mr-1 size-3" />
             Webmosh

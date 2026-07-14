@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { NavUser } from "@/components/nav-user"
+import { ThemeToggle } from "@/components/theme-toggle"
 import {
   Sidebar,
   SidebarContent,
@@ -58,7 +59,7 @@ const links = [
     icon: LifeBuoyIcon,
   },
   {
-    title: "Users",
+    title: "Clients",
     href: "/admin/users",
     icon: UsersIcon,
   },
@@ -90,13 +91,20 @@ export function AdminSidebar({
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <div className="flex items-center gap-2 px-2 py-1">
-              <div className="flex aspect-square size-8 items-center justify-center">
-                <Image src="/logo.png" alt="Webmosh" width={32} height={32} className="size-full object-contain" />
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">Webmosh</span>
-                <span className="truncate text-xs text-muted-foreground">
+            <div className="flex items-center gap-2.5 px-2 py-2">
+              <Image
+                src="/logo.png"
+                alt="Webmosh"
+                width={36}
+                height={36}
+                className="size-9 shrink-0 object-contain"
+                priority
+              />
+              <div className="grid flex-1 leading-tight">
+                <span className="truncate text-xl font-bold uppercase tracking-tight">
+                  Webmosh
+                </span>
+                <span className="truncate text-xs font-medium uppercase tracking-widest text-muted-foreground">
                   Admin
                 </span>
               </div>
@@ -133,6 +141,7 @@ export function AdminSidebar({
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
+        <ThemeToggle />
         <NavUser user={user} onLogout={onSignOut} />
       </SidebarFooter>
       <SidebarRail />

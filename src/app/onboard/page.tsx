@@ -5,10 +5,12 @@ import { z } from "zod"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { toast } from "sonner"
+import { QRCodeSVG } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
+import { formatInvoiceNumber } from "@/lib/invoice-number"
 import { authClient } from "@/lib/auth-client"
 import { StepCountry } from "./steps/step-country"
 import { StepName } from "./steps/step-name"
@@ -86,7 +88,22 @@ function prevStep(id: StepId): StepId | null {
 export default function OnboardPage() {
   const router = useRouter()
   const { data: session, isPending: authPending } = authClient.useSession()
-  const [mode, setMode] = useState<"choice" | "create" | "import">("choice")
+  const [mode, setMode] = useState<"choice" | "create" | "import" | "personal">(
+    "choice",
+  )
+  const [personalServiceIds, setPersonalServiceIds] = useState<string[]>([])
+  const [personalCheckout, setPersonalCheckout] = useState<{
+    organizationId: string
+    invoiceId: string
+    invoiceNumber: number
+    amount: number
+    items: { title: string; amount: number }[]
+    paid: boolean
+  } | null>(null)
+  const [personalTxnId, setPersonalTxnId] = useState("")
+
+  const QR_CONTENT =
+    "00020101021126540013com.pathaopay01020302041008031991008200186593649045204739953030505802BD5907WEBMOSH60045460625002110186593649003085594973007082f9893880807PAYMENT63049E3F"
   const [currentStep, setCurrentStep] = useState<StepId>(firstStep)
   const [formData, setFormData] = useState<Partial<FormValues>>({})
   const [isUploading, setIsUploading] = useState(false)
@@ -96,28 +113,52 @@ export default function OnboardPage() {
   const [importCompanyId, setImportCompanyId] = useState("")
   const [importAuthCode, setImportAuthCode] = useState("")
 
+  const utils = trpc.useUtils()
+
   const createCompany = trpc.companies.createCompany.useMutation({
-    onSuccess: () => {
-      router.push("/dashboard")
+    onSuccess: (org) => {
+      utils.companies.myCompanies.invalidate()
+      utils.companies.hasPersonalCompany.invalidate()
+      router.push(`/companies/${org.id}/overview`)
     },
   })
 
   const importCompany = trpc.companies.importCompany.useMutation({
-    onSuccess: () => {
-      // Hard reload so the client session picks up the new active organization
-      window.location.href = "/dashboard"
+    onSuccess: (org) => {
+      utils.companies.myCompanies.invalidate()
+      router.push(`/companies/${org.id}/overview`)
     },
     onError: (e) => toast.error(e.message),
   })
 
   const { data: hasPersonal } = trpc.companies.hasPersonalCompany.useQuery()
+  const { data: services, isLoading: servicesLoading } = trpc.services.list.useQuery(
+    undefined,
+    { enabled: mode === "personal" },
+  )
 
-  const createPersonal = trpc.companies.createPersonalCompany.useMutation({
-    onSuccess: () => {
-      window.location.href = "/dashboard"
+  const checkoutPersonal = trpc.serviceOrders.checkoutPersonal.useMutation({
+    onSuccess: (data) => {
+      utils.companies.myCompanies.invalidate()
+      utils.companies.hasPersonalCompany.invalidate()
+      setPersonalCheckout({ ...data, paid: false })
     },
     onError: (e) => toast.error(e.message),
   })
+
+  const submitPersonalPayment = trpc.invoices.submitTransaction.useMutation({
+    onSuccess: () => {
+      setPersonalCheckout((c) => (c ? { ...c, paid: true } : c))
+      toast.success("Payment submitted — we'll verify shortly.")
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  const togglePersonalService = (id: string) => {
+    setPersonalServiceIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    )
+  }
 
   const handleNext = useCallback((stepData: Partial<FormValues>) => {
     setFormData((prev) => ({ ...prev, ...stepData }))
@@ -136,7 +177,7 @@ export default function OnboardPage() {
   if (authPending) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">
-        <div className="size-5 animate-pulse rounded-full bg-amber-500/50" />
+        <div className="size-5 animate-pulse rounded-full bg-sky-500/50" />
       </div>
     )
   }
@@ -181,11 +222,11 @@ export default function OnboardPage() {
                 role="button"
                 tabIndex={0}
                 onClick={() => setMode("create")}
-                className="cursor-pointer transition-all hover:ring-2 hover:ring-amber-500"
+                className="cursor-pointer transition-all hover:ring-2 hover:ring-sky-500"
               >
                 <CardContent className="flex flex-col gap-3 py-8">
-                  <div className="flex size-11 items-center justify-center rounded-lg bg-amber-500/10">
-                    <PlusIcon className="size-5 text-amber-500" />
+                  <div className="flex size-11 items-center justify-center rounded-lg bg-sky-500/10">
+                    <PlusIcon className="size-5 text-sky-500" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground">Create a company</h3>
@@ -199,11 +240,11 @@ export default function OnboardPage() {
                 role="button"
                 tabIndex={0}
                 onClick={() => setMode("import")}
-                className="cursor-pointer transition-all hover:ring-2 hover:ring-amber-500"
+                className="cursor-pointer transition-all hover:ring-2 hover:ring-sky-500"
               >
                 <CardContent className="flex flex-col gap-3 py-8">
-                  <div className="flex size-11 items-center justify-center rounded-lg bg-amber-500/10">
-                    <Building2Icon className="size-5 text-amber-500" />
+                  <div className="flex size-11 items-center justify-center rounded-lg bg-sky-500/10">
+                    <Building2Icon className="size-5 text-sky-500" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground">I already have a company</h3>
@@ -217,23 +258,19 @@ export default function OnboardPage() {
                 <Card
                   role="button"
                   tabIndex={0}
-                  onClick={() => !createPersonal.isPending && createPersonal.mutate()}
-                  className="cursor-pointer transition-all hover:ring-2 hover:ring-amber-500"
+                  onClick={() => setMode("personal")}
+                  className="cursor-pointer transition-all hover:ring-2 hover:ring-sky-500"
                 >
                   <CardContent className="flex flex-col gap-3 py-8">
-                    <div className="flex size-11 items-center justify-center rounded-lg bg-amber-500/10">
-                      {createPersonal.isPending ? (
-                        <Loader2Icon className="size-5 animate-spin text-amber-500" />
-                      ) : (
-                        <UserIcon className="size-5 text-amber-500" />
-                      )}
+                    <div className="flex size-11 items-center justify-center rounded-lg bg-sky-500/10">
+                      <UserIcon className="size-5 text-sky-500" />
                     </div>
                     <div>
                       <h3 className="font-semibold text-foreground">
-                        {createPersonal.isPending ? "Setting up…" : "I don't have a company"}
+                        I don&apos;t have a company
                       </h3>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Just set up an account — you can add a company later.
+                        Just want a service? Pick from our catalog and pay.
                       </p>
                     </div>
                   </CardContent>
@@ -298,6 +335,250 @@ export default function OnboardPage() {
           </div>
         )}
 
+        {mode === "personal" && personalCheckout && (
+          <div className="mx-auto w-full max-w-xl px-6 py-12">
+            {!personalCheckout.paid ? (
+              <>
+                <h1 className="text-2xl font-semibold text-foreground">
+                  Payment
+                </h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Invoice {formatInvoiceNumber(personalCheckout.invoiceNumber)}
+                </p>
+
+                {/* Items summary */}
+                <div className="mt-6 rounded-xl border border-border">
+                  <div className="border-b border-border px-5 py-3 text-sm font-semibold">
+                    Order summary
+                  </div>
+                  <div className="divide-y divide-border">
+                    {personalCheckout.items.map((it, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between px-5 py-3 text-sm"
+                      >
+                        <span>{it.title}</span>
+                        <span className="font-medium">
+                          ${it.amount.toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between bg-muted/40 px-5 py-3 text-base font-bold">
+                      <span>Total Due</span>
+                      <span className="text-sky-500">
+                        ${personalCheckout.amount.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* QR + txn id */}
+                <div className="mt-6 rounded-xl border border-border">
+                  <div className="border-b border-border px-5 py-3 text-sm font-semibold">
+                    Pay with Bangla QR
+                  </div>
+                  <div className="space-y-5 px-5 py-4">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="rounded-xl bg-white p-4">
+                        <QRCodeSVG value={QR_CONTENT} size={220} level="M" />
+                      </div>
+                      <p className="text-center text-sm text-muted-foreground">
+                        Scan with any Bangla QR enabled app (bKash, Nagad,
+                        Rocket, bank app) and pay{" "}
+                        <strong>
+                          ${personalCheckout.amount.toFixed(2)}
+                        </strong>
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Transaction ID (TrxID)</Label>
+                      <Input
+                        placeholder="Paste the transaction ID after paying"
+                        value={personalTxnId}
+                        onChange={(e) => setPersonalTxnId(e.target.value)}
+                      />
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={() =>
+                        submitPersonalPayment.mutate({
+                          invoiceId: personalCheckout.invoiceId,
+                          paymentMethod: "BanglaQR",
+                          transactionId: personalTxnId,
+                        })
+                      }
+                      disabled={
+                        !personalTxnId || submitPersonalPayment.isPending
+                      }
+                    >
+                      {submitPersonalPayment.isPending
+                        ? "Submitting…"
+                        : "Confirm Payment"}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center">
+                <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-emerald-500/10">
+                  <CheckIcon className="size-7 text-emerald-500" />
+                </div>
+                <h1 className="mt-4 text-2xl font-semibold text-foreground">
+                  Payment submitted
+                </h1>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  We&apos;ve received your transaction and will verify it shortly.
+                  You can head to your dashboard now — the invoice status will
+                  update once verified.
+                </p>
+                <Button
+                  className="mt-6"
+                  onClick={() => router.push("/dashboard")}
+                >
+                  Go to Dashboard
+                  <ChevronRightIcon className="ml-1 size-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {mode === "personal" && !personalCheckout && (
+          <div className="mx-auto w-full max-w-5xl px-6 py-12">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("choice")
+                setPersonalServiceIds([])
+              }}
+              className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeftIcon className="size-4" />
+              Back
+            </button>
+            <h1 className="text-2xl font-semibold text-foreground">
+              Choose your services
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Select at least one service to continue. We&apos;ll set up your
+              personal account and take you straight to checkout.
+            </p>
+
+            {servicesLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="size-5 animate-pulse rounded-full bg-sky-500/50" />
+              </div>
+            ) : !services?.length ? (
+              <div className="mt-8 rounded-xl border border-border px-5 py-8 text-center text-sm text-muted-foreground">
+                No services are available right now.
+              </div>
+            ) : (
+              <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {services.map((svc) => {
+                  const isSelected = personalServiceIds.includes(svc.id)
+                  return (
+                    <Card
+                      key={svc.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => togglePersonalService(svc.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault()
+                          togglePersonalService(svc.id)
+                        }
+                      }}
+                      className={`relative flex cursor-pointer flex-col transition-all ${
+                        isSelected
+                          ? "ring-2 ring-sky-500"
+                          : "hover:ring-foreground/20"
+                      }`}
+                    >
+                      {isSelected && (
+                        <div className="absolute right-3 top-3 flex size-5 items-center justify-center rounded-full bg-sky-500 text-white">
+                          <CheckIcon className="size-3" />
+                        </div>
+                      )}
+                      <CardContent className="flex flex-1 flex-col gap-3 py-6">
+                        <div>
+                          <div className="flex items-baseline gap-2">
+                            <h3 className="font-semibold text-foreground">
+                              {svc.title}
+                            </h3>
+                            <span className="text-xs uppercase text-muted-foreground">
+                              {svc.country}
+                            </span>
+                          </div>
+                          {svc.description && (
+                            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                              {svc.description}
+                            </p>
+                          )}
+                        </div>
+                        {svc.features.length > 0 && (
+                          <ul className="space-y-1">
+                            {svc.features.slice(0, 3).map((f, i) => (
+                              <li
+                                key={i}
+                                className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                              >
+                                <CheckIcon className="size-3 shrink-0 text-emerald-500" />
+                                {f}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <div className="mt-auto flex items-baseline justify-between pt-3">
+                          <span className="text-base font-bold text-foreground">
+                            ${svc.price}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Footer with total + continue */}
+            <div className="mt-8 flex items-center justify-between rounded-xl border border-border bg-muted/30 px-5 py-4">
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {personalServiceIds.length}{" "}
+                  service{personalServiceIds.length === 1 ? "" : "s"} selected
+                </p>
+                <p className="text-xl font-bold text-foreground">
+                  $
+                  {(services ?? [])
+                    .filter((s) => personalServiceIds.includes(s.id))
+                    .reduce((t, s) => t + s.price, 0)
+                    .toFixed(2)}
+                </p>
+              </div>
+              <Button
+                disabled={
+                  personalServiceIds.length === 0 || checkoutPersonal.isPending
+                }
+                onClick={() =>
+                  checkoutPersonal.mutate({ serviceIds: personalServiceIds })
+                }
+              >
+                {checkoutPersonal.isPending ? (
+                  <>
+                    <Loader2Icon className="mr-1 size-4 animate-spin" />
+                    Setting up…
+                  </>
+                ) : (
+                  <>
+                    Continue to payment
+                    <ChevronRightIcon className="ml-1 size-4" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {mode === "create" && (
         <>
         <div className="w-full flex-1 px-6">
@@ -311,9 +592,9 @@ export default function OnboardPage() {
                     <div
                       className={`flex size-8 items-center justify-center rounded-full text-sm font-medium transition-colors ${
                         i < currentIdx
-                          ? "bg-amber-500 text-white"
+                          ? "bg-sky-500 text-white"
                           : i === currentIdx
-                            ? "bg-amber-500/10 text-amber-500 border border-amber-500"
+                            ? "bg-sky-500/10 text-sky-500 border border-sky-500"
                             : "bg-muted text-muted-foreground"
                       }`}
                     >
@@ -432,7 +713,7 @@ export default function OnboardPage() {
               </Button>
             ) : (
               <Button
-                className="bg-amber-500 hover:bg-amber-600 text-white"
+                className="bg-sky-500 hover:bg-sky-600 text-white"
                 onClick={() => createCompany.mutate(formData as FormValues)}
                 disabled={createCompany.isPending}
               >

@@ -2,8 +2,9 @@
 
 import { usePathname } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { NavUser } from "@/components/nav-user"
-import { TeamSwitcher } from "@/components/team-switcher"
+import { ThemeToggle } from "@/components/theme-toggle"
 import {
   Sidebar,
   SidebarContent,
@@ -17,7 +18,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import {
-  GalleryVerticalEndIcon,
+  Building2Icon,
   LayoutDashboardIcon,
   FileTextIcon,
   ConciergeBellIcon,
@@ -32,23 +33,15 @@ import { trpc } from "@/lib/trpc/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
-const links = [
-  { title: "Overview", href: "/dashboard", icon: LayoutDashboardIcon },
-  { title: "Documents", href: "/dashboard/documents", icon: FileTextIcon },
-  { title: "Services", href: "/dashboard/services", icon: ConciergeBellIcon },
-  { title: "Orders", href: "/dashboard/orders", icon: ShoppingCartIcon },
-  { title: "Invoices", href: "/dashboard/invoices", icon: ReceiptIcon },
-  { title: "Mail", href: "/dashboard/mail", icon: MailIcon },
-  { title: "Support", href: "/dashboard/tickets", icon: LifeBuoyIcon },
-]
-
 export function AppSidebar({
   user,
   onSignOut,
+  companyId,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   user: { name: string; email: string; avatar?: string }
   onSignOut?: () => void
+  companyId?: string
 }) {
   const pathname = usePathname()
 
@@ -60,46 +53,106 @@ export function AppSidebar({
     window.location.href = "/admin"
   }
 
-  const { data: myCompanies } = trpc.companies.myCompanies.useQuery()
-  const hasOrgs = (myCompanies?.length ?? 0) > 0
+  const base = companyId ? `/companies/${companyId}` : "/account"
+  const scopedLinks = [
+    { title: "Dashboard", href: "/dashboard", icon: LayoutDashboardIcon },
+    { title: "Documents", href: `${base}/documents`, icon: FileTextIcon },
+    { title: "Services", href: `${base}/services`, icon: ConciergeBellIcon },
+    { title: "Orders", href: `${base}/orders`, icon: ShoppingCartIcon },
+    { title: "Payments", href: `${base}/invoices`, icon: ReceiptIcon },
+    { title: "Mail", href: `${base}/mail`, icon: MailIcon },
+    { title: "Support", href: `${base}/tickets`, icon: LifeBuoyIcon },
+  ]
 
-  const { data: pendingDocCount } =
-    trpc.companies.getPendingDocCount.useQuery()
+  const companiesActive =
+    pathname === "/companies" ||
+    (!!companyId && pathname === `/companies/${companyId}/overview`)
 
-  const { data: unreadMailCount } = trpc.mails.unreadCount.useQuery()
+  const { data: scopedPendingDocCount } =
+    trpc.companies.getPendingDocCount.useQuery(
+      { organizationId: companyId ?? "" },
+      { enabled: !!companyId },
+    )
+  const { data: userPendingDocCount } =
+    trpc.companies.pendingDocCountForUser.useQuery(undefined, {
+      enabled: !companyId,
+    })
+  const pendingDocCount = companyId ? scopedPendingDocCount : userPendingDocCount
 
-  const { data: pendingTicketCount } = trpc.tickets.pendingCount.useQuery()
+  const { data: scopedUnreadMailCount } = trpc.mails.unreadCount.useQuery(
+    { organizationId: companyId ?? "" },
+    { enabled: !!companyId },
+  )
+  const { data: userUnreadMailCount } = trpc.mails.unreadCountForUser.useQuery(
+    undefined,
+    { enabled: !companyId },
+  )
+  const unreadMailCount = companyId ? scopedUnreadMailCount : userUnreadMailCount
+
+  const { data: pendingTicketCount } = trpc.tickets.pendingCount.useQuery(
+    companyId ? { organizationId: companyId } : undefined,
+  )
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        {hasOrgs ? (
-          <TeamSwitcher />
-        ) : (
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <div className="flex items-center gap-2 px-2 py-1">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <GalleryVerticalEndIcon />
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">Webmosh</span>
-                </div>
-              </div>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        )}
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-2.5 px-2 py-2 transition-opacity hover:opacity-80"
+            >
+              <Image
+                src="/logo.png"
+                alt="Webmosh"
+                width={36}
+                height={36}
+                className="size-9 shrink-0 object-contain"
+                priority
+              />
+              <span className="truncate text-xl font-bold uppercase tracking-tight">
+                Webmosh
+              </span>
+            </Link>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
           <SidebarMenu>
-            {links.map((link) => (
+            {scopedLinks.slice(0, 1).map((link) => (
               <SidebarMenuItem key={link.href}>
                 <SidebarMenuButton
                   asChild
                   tooltip={link.title}
                   isActive={pathname === link.href}
+                >
+                  <Link href={link.href}>
+                    <link.icon />
+                    <span>{link.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                tooltip="Companies"
+                isActive={companiesActive}
+              >
+                <Link href="/companies">
+                  <Building2Icon />
+                  <span>Companies</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            {scopedLinks.slice(1).map((link) => (
+              <SidebarMenuItem key={link.href}>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={link.title}
+                  isActive={pathname.startsWith(link.href)}
                 >
                   <Link href={link.href}>
                     <link.icon />
@@ -146,6 +199,7 @@ export function AppSidebar({
             </span>
           </Button>
         )}
+        <ThemeToggle />
         <NavUser user={user} onLogout={onSignOut} />
       </SidebarFooter>
       <SidebarRail />

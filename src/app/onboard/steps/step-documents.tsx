@@ -198,8 +198,8 @@ function DocUpload({
   return (
     <div className="rounded-xl border border-border p-5">
       <div className="flex items-center gap-3 mb-4">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-amber-500/10">
-          <Icon className="size-5 text-amber-500" />
+        <div className="flex size-10 items-center justify-center rounded-lg bg-sky-500/10">
+          <Icon className="size-5 text-sky-500" />
         </div>
         <div>
           <p className="text-sm font-medium">{config.label}</p>
@@ -234,8 +234,8 @@ function DocUpload({
           onDragLeave={handleDragLeave}
           className={`flex cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed py-10 transition-colors ${
             dragging
-              ? "border-amber-500 bg-amber-500/10"
-              : "border-border hover:border-amber-500/50 hover:bg-amber-500/5"
+              ? "border-sky-500 bg-sky-500/10"
+              : "border-border hover:border-sky-500/50 hover:bg-sky-500/5"
           }`}
         >
           <UploadIcon className="size-7 text-muted-foreground" />

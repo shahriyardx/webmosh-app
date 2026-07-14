@@ -1,421 +1,657 @@
 "use client"
 
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/auth-client"
 import { trpc } from "@/lib/trpc/client"
-import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CompaniesHouseCard, OfficersCard, FilingHistoryCard } from "@/components/companies-house-card"
-import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
 import {
-  Building2Icon,
-  GlobeIcon,
-  HashIcon,
-  FileTextIcon,
+  UserIcon,
   CalendarIcon,
-  CalendarClockIcon,
+  Building2Icon,
   ReceiptIcon,
   MailIcon,
-  AlertCircleIcon,
-  Trash2Icon,
+  ShoppingCartIcon,
+  ConciergeBellIcon,
+  LifeBuoyIcon,
+  ArrowRightIcon,
+  CheckIcon,
+  PlusIcon,
+  FileTextIcon,
+  StarIcon,
+  DollarSignIcon,
+  type LucideIcon,
 } from "lucide-react"
 
-function dueMeta(date: Date) {
-  const now = new Date()
-  const due = new Date(date)
-  const days = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-  let tone: "danger" | "warn" | "ok" = "ok"
-  if (days < 0 || days <= 14) tone = "danger"
-  else if (days <= 30) tone = "warn"
-  let note = `${days} days left`
-  if (days < 0) note = `Overdue by ${Math.abs(days)} days`
-  else if (days === 0) note = "Due today"
-  return { days, tone, note }
+const STATUS_STYLES: Record<string, string> = {
+  paid: "bg-emerald-500/15 text-emerald-500 ring-emerald-500/25",
+  unpaid: "bg-amber-500/15 text-amber-500 ring-amber-500/25",
+  processing: "bg-sky-500/15 text-sky-500 ring-sky-500/25",
+  rejected: "bg-red-500/15 text-red-500 ring-red-500/25",
 }
 
-const toneStyles: Record<string, string> = {
-  danger: "border-red-500/30 bg-red-500/5",
-  warn: "border-amber-500/30 bg-amber-500/5",
-  ok: "border-border",
-}
-
-const toneText: Record<string, string> = {
-  danger: "text-red-600",
-  warn: "text-amber-600",
-  ok: "text-muted-foreground",
-}
-
-export default function OverviewPage() {
-  const { data: session } = authClient.useSession()
-  const activeOrgId = session?.session?.activeOrganizationId
-
-  const { data: org, isLoading } = trpc.companies.getOverview.useQuery(
-    { orgId: activeOrgId ?? "" },
-    { enabled: !!activeOrgId },
+function StatusPill({ status }: { status: string }) {
+  const cls = STATUS_STYLES[status] ?? STATUS_STYLES.unpaid
+  return (
+    <span
+      className={`inline-flex items-center rounded-md px-2 py-0.5 text-sm font-semibold capitalize ring-1 ring-inset ${cls}`}
+    >
+      {status}
+    </span>
   )
+}
 
+type StatColor = "blue" | "emerald" | "violet" | "cyan"
+
+const STAT_COLORS: Record<StatColor, { bg: string; text: string }> = {
+  blue: { bg: "bg-blue-500/10", text: "text-blue-500" },
+  emerald: { bg: "bg-emerald-500/10", text: "text-emerald-500" },
+  violet: { bg: "bg-violet-500/10", text: "text-violet-500" },
+  cyan: { bg: "bg-cyan-500/10", text: "text-cyan-500" },
+}
+
+const COMPANY_COLORS = [
+  { bg: "bg-rose-500/20", text: "text-rose-400" },
+  { bg: "bg-orange-500/20", text: "text-orange-400" },
+  { bg: "bg-amber-500/20", text: "text-amber-400" },
+  { bg: "bg-emerald-500/20", text: "text-emerald-400" },
+  { bg: "bg-teal-500/20", text: "text-teal-400" },
+  { bg: "bg-cyan-500/20", text: "text-cyan-400" },
+  { bg: "bg-blue-500/20", text: "text-blue-400" },
+  { bg: "bg-indigo-500/20", text: "text-indigo-400" },
+  { bg: "bg-violet-500/20", text: "text-violet-400" },
+  { bg: "bg-purple-500/20", text: "text-purple-400" },
+  { bg: "bg-pink-500/20", text: "text-pink-400" },
+  { bg: "bg-sky-500/20", text: "text-sky-400" },
+]
+
+function companyColor(name: string) {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash + name.charCodeAt(i)) & 0xffff
+  }
+  return COMPANY_COLORS[hash % COMPANY_COLORS.length]
+}
+
+function initials(name: string) {
+  const parts = name.split(/\s+/).filter(Boolean).slice(0, 2)
+  const letters = parts.map((w) => w[0]?.toUpperCase() ?? "").join("")
+  return letters || "?"
+}
+
+export default function DashboardPage() {
   const router = useRouter()
-  const utils = trpc.useUtils()
-  const [deleteOpen, setDeleteOpen] = useState(false)
+  const { data: session } = authClient.useSession()
+  const { data: allCompanies } = trpc.companies.myCompanies.useQuery()
+  // "Companies" section shows real companies only — personal accounts are
+  // represented by the Account overview card.
+  const companies = allCompanies?.filter((c) => c.type !== "personal")
+  const { data: invoices } = trpc.invoices.listForUser.useQuery()
+  const { data: orders } = trpc.serviceOrders.listForUser.useQuery()
+  const { data: mails } = trpc.mails.listForUser.useQuery()
+  const { data: services } = trpc.services.list.useQuery()
+  const { data: openTicketsCount } = trpc.tickets.openCount.useQuery()
 
-  const { data: invoices } = trpc.invoices.list.useQuery()
-  const { data: mails } = trpc.mails.list.useQuery()
+  const user = session?.user
+  const firstName = user?.name?.split(" ")[0] ?? "there"
 
-  const deleteCompany = trpc.companies.deleteCompany.useMutation({
-    onSuccess: (res) => {
-      utils.companies.myCompanies.invalidate()
-      if (res.nextActiveOrgId) {
-        router.push("/dashboard")
-        router.refresh()
-      } else {
-        router.push("/onboard")
-      }
+  const totalPaid = (invoices ?? [])
+    .filter((inv) => inv.status === "paid")
+    .reduce((sum, inv) => sum + (inv.amount ?? 0), 0)
+  const openOrders = (orders ?? []).filter((o) => o.status !== "completed")
+
+  const recentOrders = (orders ?? []).slice(0, 4)
+  const recentInvoices = (invoices ?? []).slice(0, 4)
+  const recentMails = (mails ?? []).slice(0, 4)
+
+  const userCountries = new Set(
+    (companies ?? [])
+      .filter((c) => c.type !== "personal" && c.country)
+      .map((c) => c.country as string),
+  )
+  const recommended = (services ?? [])
+    .filter((s) => (userCountries.size > 0 ? userCountries.has(s.country) : true))
+    .slice(0, 3)
+
+  const stats: {
+    label: string
+    value: string | number
+    icon: LucideIcon
+    href: string
+    color: StatColor
+    linkLabel: string
+  }[] = [
+    {
+      label: "Companies",
+      value: companies?.length ?? 0,
+      icon: Building2Icon,
+      href: "/companies",
+      color: "blue",
+      linkLabel: "View all companies",
     },
-  })
-
-  const pendingInvoices = (invoices ?? []).filter(
-    (inv) => inv.status === "unpaid" || inv.status === "processing",
-  )
-  const unreadMails = (mails ?? []).filter((m) => !m.read)
-
-  const actionDocuments = (org?.documents ?? []).filter(
-    (d) => d.status === "rejected" || d.status === "requested",
-  )
-
-  const isPersonal = org?.type === "personal"
-
-  // UK filing deadlines come live from Companies House (shown in that card).
-  // Only US companies use manually-set deadline dates.
-  const hasCompaniesHouse = org?.country === "uk" && !!org?.companyId && !isPersonal
-  const deadlines =
-    org && org.country === "us"
-      ? [
-          { label: "State Filing Due", date: org.stateFilingDue },
-          { label: "Federal Filing Due", date: org.federalFilingDue },
-          { label: "State Tax Due", date: org.stateTaxDue },
-        ]
-          .filter((d): d is { label: string; date: Date } => d.date != null)
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      : []
-
-  if (isLoading) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center">
-        <div className="size-5 animate-pulse rounded-full bg-amber-500/50" />
-      </div>
-    )
-  }
-
-  if (!org) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <p className="text-sm text-muted-foreground">Organization not found.</p>
-      </div>
-    )
-  }
+    {
+      label: "Open orders",
+      value: openOrders.length,
+      icon: ShoppingCartIcon,
+      href: "/account/orders",
+      color: "emerald",
+      linkLabel: "View all orders",
+    },
+    {
+      label: "Open tickets",
+      value: openTicketsCount ?? 0,
+      icon: LifeBuoyIcon,
+      href: "/account/tickets",
+      color: "violet",
+      linkLabel: "Go to support",
+    },
+    {
+      label: "Total paid",
+      value: `$${totalPaid.toLocaleString()}`,
+      icon: ReceiptIcon,
+      href: "/account/invoices",
+      color: "cyan",
+      linkLabel: "View payments",
+    },
+  ]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground uppercase">
-          {isPersonal ? (session?.user?.name ?? org.name) : org.name}
+        <h1 className="text-2xl font-semibold text-foreground">
+          Welcome back, {firstName} <span className="ml-1">👋</span>
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {isPersonal
-            ? "Personal Account"
-            : `${org.country === "uk" ? "United Kingdom" : "United States"} Company`}
+        <p className="mt-1 text-base text-muted-foreground">
+          Here&apos;s what&apos;s happening with your business today.
         </p>
       </div>
 
-      {isPersonal && (
-        <Card>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((s) => {
+          const c = STAT_COLORS[s.color]
+          return (
+            <Link
+              key={s.label}
+              href={s.href}
+              className="group flex flex-col rounded-2xl border border-border p-5 transition-colors hover:bg-muted/30"
+            >
+              <div className="flex items-center gap-4">
+                <div
+                  className={`flex size-12 shrink-0 items-center justify-center rounded-xl ${c.bg}`}
+                >
+                  <s.icon className={`size-6 ${c.text}`} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-3xl font-bold leading-none text-foreground">
+                    {s.value}
+                  </p>
+                  <p className="mt-1.5 text-base text-muted-foreground">
+                    {s.label}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-5 flex items-center gap-1 text-sm text-muted-foreground transition-colors group-hover:text-sky-500">
+                {s.linkLabel}
+                <ArrowRightIcon className="size-3" />
+              </div>
+            </Link>
+          )
+        })}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <Card className="rounded-2xl">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Building2Icon className="size-4 text-amber-500" />
-              Account
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <div className="flex size-7 items-center justify-center rounded-lg bg-sky-500/10">
+                <UserIcon className="size-4 text-sky-500" />
+              </div>
+              Account overview
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-full bg-muted text-base font-medium">
-                {(session?.user?.name ?? "?").charAt(0).toUpperCase()}
+              <div className="flex size-11 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-sky-500 text-lg font-semibold text-white">
+                {initials(user?.name ?? "?")}
               </div>
-              <div>
-                <p className="text-sm font-medium">{session?.user?.name ?? "—"}</p>
-                <p className="text-xs text-muted-foreground">{session?.user?.email}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <CalendarIcon className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Member since</p>
-                <p className="text-sm font-medium">
-                  {new Date(org.createdAt).toLocaleDateString()}
+              <div className="min-w-0">
+                <p className="truncate text-base font-medium">
+                  {user?.name ?? "—"}
+                </p>
+                <p className="truncate text-sm text-muted-foreground">
+                  {user?.email}
                 </p>
               </div>
             </div>
+            {user?.createdAt && (
+              <div className="flex items-center gap-3 border-t border-border pt-4">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+                  <CalendarIcon className="size-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Member since</p>
+                  <p className="text-base font-medium">
+                    {new Date(user.createdAt).toLocaleDateString(undefined, {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
-      )}
 
-      {!hasCompaniesHouse && !isPersonal && (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Building2Icon className="size-4 text-amber-500" />
-            Company Details
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-3">
-            <GlobeIcon className="size-4 shrink-0 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Country</p>
-              <p className="text-sm font-medium">
-                {org.country === "uk" ? "United Kingdom" : "United States"}
-              </p>
+        <Card className="rounded-2xl">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <div className="flex size-7 items-center justify-center rounded-lg bg-sky-500/10">
+                <Building2Icon className="size-4 text-sky-500" />
+              </div>
+              Your companies
+            </CardTitle>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/onboard">
+                  <PlusIcon className="size-3" />
+                  Add company
+                </Link>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/companies">
+                  View all
+                  <ArrowRightIcon className="size-3" />
+                </Link>
+              </Button>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Status</p>
-              <Badge
-                variant={
-                  org.status === "rejected"
-                    ? "destructive"
-                    : org.status === "processing"
-                      ? "default"
-                      : "secondary"
-                }
-                className="mt-0.5"
-              >
-                {org.status}
-              </Badge>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <HashIcon className="size-4 shrink-0 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">SIC Code</p>
-              <p className="text-sm font-medium">{org.sicCode ?? "—"}</p>
-            </div>
-          </div>
-          {org.website && (
-            <div className="flex items-center gap-3">
-              <GlobeIcon className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Website</p>
-                <a
-                  href={org.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-medium text-amber-600 hover:underline"
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {!companies?.length ? (
+              <EmptyRow
+                icon={Building2Icon}
+                message="No companies yet."
+                actionLabel="Create Company"
+                actionHref="/onboard"
+              />
+            ) : (
+              companies.slice(0, 4).map((c) => {
+                const csDate = c.confirmationStatementDue
+                  ? new Date(c.confirmationStatementDue)
+                  : null
+                const accDate = c.accountsFilingDue
+                  ? new Date(c.accountsFilingDue)
+                  : null
+                const csDue = csDate
+                  ? csDate.toLocaleDateString(undefined, {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : null
+                const accDue = accDate
+                  ? accDate.toLocaleDateString(undefined, {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : null
+                const csUrgency = getDueUrgency(csDate)
+                const accUrgency = getDueUrgency(accDate)
+                const needsAction =
+                  csUrgency === "urgent" || accUrgency === "urgent"
+                const color = companyColor(c.name)
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => router.push(`/companies/${c.id}/overview`)}
+                    className={`flex w-full items-center gap-4 rounded-xl border p-3 text-left transition-colors hover:bg-muted/40 ${
+                      needsAction
+                        ? "border-red-500/40 bg-red-500/5"
+                        : "border-border"
+                    }`}
+                  >
+                    <div
+                      className={`flex size-11 shrink-0 items-center justify-center rounded-lg ${color.bg}`}
+                    >
+                      <span className={`text-base font-bold ${color.text}`}>
+                        {initials(c.name)}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-base font-semibold uppercase">
+                          {c.name}
+                        </p>
+                        {needsAction && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-red-500/15 px-1.5 py-0.5 text-xs font-bold uppercase tracking-wider text-red-500">
+                            Take action
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                        {c.type === "personal"
+                          ? "Personal Account"
+                          : c.country === "uk"
+                            ? "United Kingdom"
+                            : "United States"}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-5">
+                      {csDue && (
+                        <DateColumn
+                          label="Confirmation"
+                          value={csDue}
+                          icon={CalendarIcon}
+                          urgency={csUrgency}
+                        />
+                      )}
+                      {accDue && (
+                        <DateColumn
+                          label="Accounts"
+                          value={accDue}
+                          icon={FileTextIcon}
+                          urgency={accUrgency}
+                        />
+                      )}
+                      <ArrowRightIcon className="size-4 text-muted-foreground" />
+                    </div>
+                  </button>
+                )
+              })
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="rounded-2xl">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <div className="flex size-7 items-center justify-center rounded-lg bg-sky-500/10">
+                <ShoppingCartIcon className="size-4 text-sky-500" />
+              </div>
+              Recent orders
+            </CardTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/account/orders">
+                View all
+                <ArrowRightIcon className="size-3" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {!recentOrders.length ? (
+              <EmptyRow
+                icon={ShoppingCartIcon}
+                message="No orders yet."
+                actionLabel="Browse Services"
+                actionHref="/account/services"
+              />
+            ) : (
+              recentOrders.map((o) => {
+                const inv = o.invoice
+                return (
+                  <Link
+                    key={o.id}
+                    href={`/account/orders/${o.id}`}
+                    className="flex items-center justify-between rounded-xl border border-border p-3 transition-colors hover:bg-muted/40"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-medium">
+                        {o.service?.title ?? "Service"}
+                      </p>
+                      <p className="mt-0.5 text-sm uppercase text-muted-foreground">
+                        {o.organization?.name ?? "—"}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      {inv && <StatusPill status={inv.status} />}
+                      <span className="text-base font-semibold">
+                        ${inv?.amount ?? "—"}
+                      </span>
+                    </div>
+                  </Link>
+                )
+              })
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <div className="flex size-7 items-center justify-center rounded-lg bg-sky-500/10">
+                <MailIcon className="size-4 text-sky-500" />
+              </div>
+              Recent mail
+            </CardTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/account/mail">
+                View all
+                <ArrowRightIcon className="size-3" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {!recentMails.length ? (
+              <EmptyRow
+                icon={MailIcon}
+                message="No mail yet."
+                description="We'll notify you when you receive new messages."
+              />
+            ) : (
+              recentMails.map((m) => (
+                <Link
+                  key={m.id}
+                  href="/account/mail"
+                  className="flex items-start justify-between gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/40"
                 >
-                  {org.website}
-                </a>
-              </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      {!m.read && (
+                        <span className="size-2 shrink-0 rounded-full bg-sky-500" />
+                      )}
+                      <p
+                        className={`truncate text-base ${m.read ? "" : "font-semibold"}`}
+                      >
+                        {m.subject}
+                      </p>
+                    </div>
+                    <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                      <span className="uppercase">
+                        {m.organization?.name ?? "—"}
+                      </span>{" "}
+                      · {m.from}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm text-muted-foreground">
+                    {new Date(m.createdAt).toLocaleDateString()}
+                  </span>
+                </Link>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="rounded-2xl">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <div className="flex size-7 items-center justify-center rounded-lg bg-sky-500/10">
+              <DollarSignIcon className="size-4 text-sky-500" />
             </div>
+            Recent payments
+          </CardTitle>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/account/invoices">
+              View all
+              <ArrowRightIcon className="size-3" />
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {!recentInvoices.length ? (
+            <EmptyRow icon={ReceiptIcon} message="No payments yet." />
+          ) : (
+            recentInvoices.map((inv) => (
+              <Link
+                key={inv.id}
+                href={`/account/invoices/${inv.id}`}
+                className="flex items-center justify-between rounded-xl border border-border p-3 transition-colors hover:bg-muted/40"
+              >
+                <div className="min-w-0">
+                  <p className="text-base font-semibold">${inv.amount}</p>
+                  <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                    <span className="uppercase">
+                      {inv.organization?.name ?? "—"}
+                    </span>{" "}
+                    · {new Date(inv.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <StatusPill status={inv.status} />
+              </Link>
+            ))
           )}
-          {org.country === "uk" && org.companyId && (
-            <div className="flex items-center gap-3">
-              <HashIcon className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Company ID</p>
-                <p className="text-sm font-medium">{org.companyId}</p>
-              </div>
-            </div>
-          )}
-          {org.country === "uk" && org.authCode && (
-            <div className="flex items-center gap-3">
-              <HashIcon className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Auth Code</p>
-                <p className="text-sm font-mono">{org.authCode}</p>
-              </div>
-            </div>
-          )}
-          {org.sicDescription && (
-            <div className="flex items-center gap-3">
-              <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Business Activity
-                </p>
-                <p className="text-sm font-medium">{org.sicDescription}</p>
-              </div>
-            </div>
-          )}
-          <div className="flex items-center gap-3">
-            <CalendarIcon className="size-4 shrink-0 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Created</p>
-              <p className="text-sm font-medium">
-                {new Date(org.createdAt).toLocaleDateString()}
-              </p>
-            </div>
-          </div>
         </CardContent>
       </Card>
-      )}
 
-      {!isPersonal && activeOrgId && <CompaniesHouseCard orgId={activeOrgId} />}
-      {!isPersonal && activeOrgId && <OfficersCard orgId={activeOrgId} />}
-      {!isPersonal && activeOrgId && <FilingHistoryCard orgId={activeOrgId} />}
-
-      {!isPersonal && actionDocuments.length > 0 && (
-        <Card className="border-red-500/30">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <AlertCircleIcon className="size-4 text-red-500" />
-              Documents Need Attention
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {actionDocuments.map((doc) => (
-              <div
-                key={doc.id}
-                className="flex items-center justify-between rounded-lg border border-border p-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{doc.name}</p>
-                  <p className="text-xs text-red-600">
-                    {doc.status === "rejected"
-                      ? doc.rejectReason
-                        ? `Rejected: ${doc.rejectReason}`
-                        : "Rejected — please re-upload"
-                      : "Requested — please upload"}
-                  </p>
-                </div>
-                <Button size="sm" asChild>
-                  <Link href="/dashboard/documents">Upload</Link>
-                </Button>
+      {recommended.length > 0 && (
+        <Card className="rounded-2xl">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <div className="flex size-7 items-center justify-center rounded-lg bg-amber-500/10">
+                <StarIcon className="size-4 fill-amber-500 text-amber-500" />
               </div>
+              Recommended services
+            </CardTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/account/services">
+                Browse all
+                <ArrowRightIcon className="size-3" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {recommended.map((svc) => (
+              <Link
+                key={svc.id}
+                href="/account/services"
+                className="flex flex-col rounded-xl border border-border p-4 transition-colors hover:bg-muted/40"
+              >
+                <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-cyan-500/10">
+                  <ConciergeBellIcon className="size-5 text-cyan-500" />
+                </div>
+                <p className="text-base font-semibold">{svc.title}</p>
+                {svc.description && (
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                    {svc.description}
+                  </p>
+                )}
+                {svc.features?.length > 0 && (
+                  <ul className="mt-3 space-y-1">
+                    {svc.features.slice(0, 2).map((f, i) => (
+                      <li
+                        key={i}
+                        className="flex items-center gap-1.5 text-sm text-muted-foreground"
+                      >
+                        <CheckIcon className="size-3 shrink-0 text-emerald-500" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                  <span className="text-base font-bold">${svc.price}</span>
+                  <span className="rounded-md bg-muted/60 px-1.5 py-0.5 text-xs font-semibold uppercase text-muted-foreground">
+                    {svc.country}
+                  </span>
+                </div>
+              </Link>
             ))}
           </CardContent>
         </Card>
       )}
+    </div>
+  )
+}
 
-      {deadlines.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CalendarClockIcon className="size-4 text-amber-500" />
-              Filing Deadlines
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {deadlines.map((d) => {
-              const meta = dueMeta(d.date)
-              return (
-                <div
-                  key={d.label}
-                  className={`flex items-center justify-between rounded-lg border p-3 ${toneStyles[meta.tone]}`}
-                >
-                  <div>
-                    <p className="text-sm font-medium">{d.label}</p>
-                    <p className={`text-xs ${toneText[meta.tone]}`}>{meta.note}</p>
-                  </div>
-                  <p className="text-sm font-medium">
-                    {new Date(d.date).toLocaleDateString()}
-                  </p>
-                </div>
-              )
-            })}
-          </CardContent>
-        </Card>
-      )}
+type DueUrgency = "urgent" | "soon" | "normal"
 
-      {pendingInvoices.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ReceiptIcon className="size-4 text-amber-500" />
-              Pending Invoices
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {pendingInvoices.map((inv) => (
-              <div
-                key={inv.id}
-                className="flex items-center justify-between rounded-lg border border-border p-3"
-              >
-                <div>
-                  <p className="text-sm font-medium">${inv.amount}</p>
-                  <p className="text-xs text-muted-foreground capitalize">
-                    {inv.status === "unpaid" ? "Unpaid" : "Processing"}
-                  </p>
-                </div>
-                <Button size="sm" asChild>
-                  <Link href={`/dashboard/invoices/${inv.id}`}>
-                    {inv.status === "unpaid" ? "Pay Now" : "View"}
-                  </Link>
-                </Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+function getDueUrgency(date: Date | null): DueUrgency {
+  if (!date) return "normal"
+  const days = Math.floor(
+    (date.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+  )
+  if (days <= 30) return "urgent"
+  if (days <= 60) return "soon"
+  return "normal"
+}
 
-      {unreadMails.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <MailIcon className="size-4 text-amber-500" />
-              Unread Mail
-              <Badge className="ml-1">{unreadMails.length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {unreadMails.map((m) => (
-              <div
-                key={m.id}
-                className="flex items-center justify-between rounded-lg border border-border p-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{m.subject}</p>
-                  <p className="text-xs text-muted-foreground">From: {m.from}</p>
-                </div>
-                <Button size="sm" variant="outline" asChild>
-                  <Link href="/dashboard/mail">View</Link>
-                </Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {!isPersonal && (
-        <div className="flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/5 p-4">
-          <div>
-            <p className="text-sm font-medium text-foreground">Delete this company</p>
-            <p className="text-xs text-muted-foreground">
-              Permanently hides it from your account. This cannot be undone.
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            className="text-red-500"
-            onClick={() => setDeleteOpen(true)}
-            disabled={!activeOrgId}
-          >
-            <Trash2Icon className="size-4" />
-            Delete
-          </Button>
-        </div>
-      )}
-
-      <DeleteConfirmDialog
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        title="Delete company"
-        description={`Delete "${org.name}"? You will lose access to it and this cannot be undone.`}
-        onConfirm={() => activeOrgId && deleteCompany.mutate({ id: activeOrgId })}
-        loading={deleteCompany.isPending}
+function DateColumn({
+  label,
+  value,
+  icon: Icon,
+  urgency,
+}: {
+  label: string
+  value: string
+  icon: LucideIcon
+  urgency: DueUrgency
+}) {
+  const isUrgent = urgency === "urgent"
+  return (
+    <div className="flex items-center gap-2">
+      <Icon
+        className={`size-4 shrink-0 ${
+          isUrgent ? "text-red-500" : "text-muted-foreground"
+        }`}
       />
+      <div className="text-left leading-tight">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
+        <p
+          className={`text-sm font-semibold ${
+            isUrgent ? "text-red-500" : "text-foreground"
+          }`}
+        >
+          {value}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function EmptyRow({
+  icon: Icon,
+  message,
+  description,
+  actionLabel,
+  actionHref,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  message: string
+  description?: string
+  actionLabel?: string
+  actionHref?: string
+}) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-10 text-center">
+      <div className="mb-1 flex size-14 items-center justify-center rounded-2xl bg-sky-500/10">
+        <Icon className="size-7 text-sky-500/70" />
+      </div>
+      <p className="text-base font-medium text-foreground">{message}</p>
+      {description && (
+        <p className="max-w-xs text-sm text-muted-foreground">{description}</p>
+      )}
+      {actionLabel && actionHref && (
+        <Button size="sm" variant="outline" asChild className="mt-2">
+          <Link href={actionHref}>{actionLabel}</Link>
+        </Button>
+      )}
     </div>
   )
 }

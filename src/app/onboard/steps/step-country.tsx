@@ -61,9 +61,9 @@ export function StepCountry({ onNext, initialValue }: StepCountryProps) {
             // biome-ignore lint/a11y/noLabelWithoutControl: Radix RadioGroupItem inside label
             <label
               key={item.value}
-              className={`flex cursor-pointer flex-col gap-3 rounded-xl border p-5 transition-colors hover:border-amber-500/50 has-[[data-state=checked]]:border-amber-500 has-[[data-state=checked]]:bg-amber-500/5 ${
+              className={`flex cursor-pointer flex-col gap-3 rounded-xl border p-5 transition-colors hover:border-sky-500/50 has-[[data-state=checked]]:border-sky-500 has-[[data-state=checked]]:bg-sky-500/5 ${
                 value === item.value
-                  ? "border-amber-500 bg-amber-500/5"
+                  ? "border-sky-500 bg-sky-500/5"
                   : "border-border"
               }`}
             >

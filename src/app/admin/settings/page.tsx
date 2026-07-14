@@ -62,7 +62,7 @@ export default function AdminSettingsPage() {
   if (isLoading) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        <div className="size-5 animate-pulse rounded-full bg-amber-500/50" />
+        <div className="size-5 animate-pulse rounded-full bg-sky-500/50" />
       </div>
     )
   }
