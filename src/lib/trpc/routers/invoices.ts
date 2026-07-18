@@ -9,6 +9,7 @@ import {
   emailAdminPaymentSubmitted,
   emailAdminInvoicePaid,
 } from "@/lib/notify"
+import { createAdminNotification } from "@/lib/notifications"
 
 export type EnrichedInvoice = Awaited<ReturnType<typeof prisma.invoice.findMany>>[number] & {
   item: { type: "service" | "package"; title: string } | null
@@ -176,6 +177,12 @@ export const invoicesRouter = router({
         input.paymentMethod,
         input.transactionId,
       ).catch(() => {})
+      await createAdminNotification({
+        kind: "invoice.payment_submitted",
+        title: `Payment submitted: $${invoice.amount.toFixed(2)}`,
+        body: `${org?.name ?? "A customer"} submitted a ${input.paymentMethod} transaction. Please verify.`,
+        link: "/admin/invoices",
+      })
 
       return updated
     }),

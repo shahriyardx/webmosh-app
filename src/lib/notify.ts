@@ -1,6 +1,7 @@
 import { prisma } from "./prisma"
 import { sendMail, notifyAdmin, appUrl } from "./email"
 import { formatInvoiceNumber } from "./invoice-number"
+import { resolveTemplate } from "./email-templates"
 
 /** Owner (email + name) of an organization, or null. */
 async function orgOwner(organizationId: string) {
@@ -68,23 +69,23 @@ export async function emailUserNewInvoice(
         ]
 
   const invoiceNumber = formatInvoiceNumber(stored?.number)
-  const subject = isReminder
-    ? `Reminder: Invoice ${invoiceNumber} is still awaiting payment`
-    : `You have a new invoice ${invoiceNumber}`
-  const heading = isReminder
-    ? `Reminder: Invoice ${invoiceNumber} is still unpaid`
-    : `You have a new invoice ${invoiceNumber}`
-  const intro = isReminder
-    ? "This is a friendly reminder that your invoice is still awaiting payment. The breakdown is below — please settle at your earliest convenience."
-    : "A new payment has been added to your account. Here's a breakdown of the charges."
-  await sendMail(toEmail, subject, {
-    heading,
+  const t = await resolveTemplate(
+    isReminder ? "user.invoice_reminder" : "user.invoice_created",
+    {
+      name: toName ?? "there",
+      invoiceNumber,
+      amount: String(invoice.amount),
+    },
+  )
+  if (!t) return
+  await sendMail(toEmail, t.subject, {
+    heading: t.heading,
     greeting: `Hi ${toName ?? "there"},`,
-    intro,
+    intro: t.intro,
     items,
     total: invoice.amount,
     cta: {
-      label: "View & Pay",
+      label: t.ctaLabel ?? "View & Pay",
       url: appUrl(`/companies/${organizationId}/invoices/${invoice.id}`),
     },
   })
@@ -93,12 +94,20 @@ export async function emailUserNewInvoice(
 export async function emailUserDocumentRequested(organizationId: string, docName: string) {
   const owner = await orgOwner(organizationId)
   if (!owner?.email) return
-  await sendMail(owner.email, "Document requested", {
-    heading: "We need a document from you",
+  const t = await resolveTemplate("user.document_requested", {
+    name: owner.name ?? "there",
+    documentName: docName,
+  })
+  if (!t) return
+  await sendMail(owner.email, t.subject, {
+    heading: t.heading,
     greeting: `Hi ${owner.name ?? "there"},`,
-    intro: `Our team has requested a document to continue processing your company.`,
+    intro: t.intro,
     details: [{ label: "Document", value: docName }],
-    cta: { label: "Upload Document", url: appUrl(`/companies/${organizationId}/documents`) },
+    cta: {
+      label: t.ctaLabel ?? "Upload Document",
+      url: appUrl(`/companies/${organizationId}/documents`),
+    },
   })
 }
 
@@ -110,31 +119,47 @@ export async function emailUserDocumentReviewed(
 ) {
   const owner = await orgOwner(organizationId)
   if (!owner?.email) return
-  await sendMail(
-    owner.email,
-    approved ? "Document approved" : "Document needs attention",
+  const t = await resolveTemplate(
+    approved ? "user.document_approved" : "user.document_rejected",
     {
-      heading: approved ? "Your document was approved" : "Your document was rejected",
-      greeting: `Hi ${owner.name ?? "there"},`,
-      intro: approved
-        ? `Your document "${docName}" has been approved.`
-        : `Your document "${docName}" was rejected and needs to be re-uploaded.`,
-      details: !approved && reason ? [{ label: "Reason", value: reason }] : undefined,
-      cta: { label: "View Documents", url: appUrl(`/companies/${organizationId}/documents`) },
+      name: owner.name ?? "there",
+      documentName: docName,
+      reason: reason ?? "",
     },
   )
+  if (!t) return
+  await sendMail(owner.email, t.subject, {
+    heading: t.heading,
+    greeting: `Hi ${owner.name ?? "there"},`,
+    intro: t.intro,
+    details: !approved && reason ? [{ label: "Reason", value: reason }] : undefined,
+    cta: {
+      label: t.ctaLabel ?? "View Documents",
+      url: appUrl(`/companies/${organizationId}/documents`),
+    },
+  })
 }
 
 export async function emailUserStatusUpdate(organizationId: string, status: string) {
   const owner = await orgOwner(organizationId)
   if (!owner?.email) return
   const name = await orgName(organizationId)
-  await sendMail(owner.email, "Company status updated", {
-    heading: "Your company status has changed",
+  const statusLabel = statusLabels[status] ?? status
+  const t = await resolveTemplate("user.company_status_updated", {
+    name: owner.name ?? "there",
+    companyName: name,
+    status: statusLabel,
+  })
+  if (!t) return
+  await sendMail(owner.email, t.subject, {
+    heading: t.heading,
     greeting: `Hi ${owner.name ?? "there"},`,
-    intro: `The status of ${name} has been updated.`,
-    details: [{ label: "New status", value: statusLabels[status] ?? status }],
-    cta: { label: "View Dashboard", url: appUrl(`/companies/${organizationId}/overview`) },
+    intro: t.intro,
+    details: [{ label: "New status", value: statusLabel }],
+    cta: {
+      label: t.ctaLabel ?? "View Dashboard",
+      url: appUrl(`/companies/${organizationId}/overview`),
+    },
   })
 }
 
@@ -151,24 +176,40 @@ export async function emailUserCompanyCompleted(organizationId: string) {
     details.push({ label: "Company ID", value: org.companyId })
   if (org.country === "uk" && org.authCode)
     details.push({ label: "Auth Code", value: org.authCode })
-  await sendMail(owner.email, "Your company is ready 🎉", {
-    heading: "Your company formation is complete",
+  const t = await resolveTemplate("user.company_completed", {
+    name: owner.name ?? "there",
+    companyName: org.name,
+  })
+  if (!t) return
+  await sendMail(owner.email, t.subject, {
+    heading: t.heading,
     greeting: `Hi ${owner.name ?? "there"},`,
-    intro: `Great news — ${org.name} has been successfully formed.`,
+    intro: t.intro,
     details,
-    cta: { label: "View Dashboard", url: appUrl(`/companies/${organizationId}/overview`) },
+    cta: {
+      label: t.ctaLabel ?? "View Dashboard",
+      url: appUrl(`/companies/${organizationId}/overview`),
+    },
   })
 }
 
 export async function emailUserNewMail(organizationId: string, subject: string) {
   const owner = await orgOwner(organizationId)
   if (!owner?.email) return
-  await sendMail(owner.email, "New mail received", {
-    heading: "You have new mail",
+  const t = await resolveTemplate("user.mail_received", {
+    name: owner.name ?? "there",
+    mailSubject: subject,
+  })
+  if (!t) return
+  await sendMail(owner.email, t.subject, {
+    heading: t.heading,
     greeting: `Hi ${owner.name ?? "there"},`,
-    intro: "New mail has been added to your company account.",
+    intro: t.intro,
     details: [{ label: "Subject", value: subject }],
-    cta: { label: "Read Mail", url: appUrl(`/companies/${organizationId}/mail`) },
+    cta: {
+      label: t.ctaLabel ?? "Read Mail",
+      url: appUrl(`/companies/${organizationId}/mail`),
+    },
   })
 }
 
@@ -180,19 +221,25 @@ export async function emailUserPayment(
 ) {
   const owner = await orgOwner(organizationId)
   if (!owner?.email) return
-  await sendMail(
-    owner.email,
-    approved ? "Payment confirmed" : "Payment could not be verified",
+  const t = await resolveTemplate(
+    approved ? "user.payment_approved" : "user.payment_rejected",
     {
-      heading: approved ? "Payment confirmed" : "Payment rejected",
-      greeting: `Hi ${owner.name ?? "there"},`,
-      intro: approved
-        ? `We've received and confirmed your payment of $${amount}.`
-        : `We couldn't verify your payment of $${amount}. Please try again.`,
-      details: !approved && reason ? [{ label: "Reason", value: reason }] : undefined,
-      cta: { label: "View Payments", url: appUrl(`/companies/${organizationId}/invoices`) },
+      name: owner.name ?? "there",
+      amount: String(amount),
+      reason: reason ?? "",
     },
   )
+  if (!t) return
+  await sendMail(owner.email, t.subject, {
+    heading: t.heading,
+    greeting: `Hi ${owner.name ?? "there"},`,
+    intro: t.intro,
+    details: !approved && reason ? [{ label: "Reason", value: reason }] : undefined,
+    cta: {
+      label: t.ctaLabel ?? "View Payments",
+      url: appUrl(`/companies/${organizationId}/invoices`),
+    },
+  })
 }
 
 export async function emailUserOrderStatus(
@@ -203,11 +250,20 @@ export async function emailUserOrderStatus(
 ) {
   const owner = await orgOwner(organizationId)
   if (!owner?.email) return
-  await sendMail(owner.email, "Order status updated", {
-    heading: "Your order status has changed",
+  const t = await resolveTemplate("user.order_status_updated", {
+    name: owner.name ?? "there",
+    serviceTitle,
+    status: statusLabels[status] ?? status,
+  })
+  if (!t) return
+  await sendMail(owner.email, t.subject, {
+    heading: t.heading,
     greeting: `Hi ${owner.name ?? "there"},`,
-    intro: `Your order for "${serviceTitle}" is now ${statusLabels[status] ?? status}.`,
-    cta: { label: "View Order", url: appUrl(`/companies/${organizationId}/orders/${orderId}`) },
+    intro: t.intro,
+    cta: {
+      label: t.ctaLabel ?? "View Order",
+      url: appUrl(`/companies/${organizationId}/orders/${orderId}`),
+    },
   })
 }
 
@@ -224,11 +280,16 @@ export async function emailUserTicketReply(
   subject: string,
   organizationId: string | null,
 ) {
-  await sendMail(toEmail, `Re: ${subject}`, {
-    heading: "Support replied to your ticket",
+  const t = await resolveTemplate("user.ticket_reply", {
+    name: toName ?? "there",
+    ticketSubject: subject,
+  })
+  if (!t) return
+  await sendMail(toEmail, t.subject, {
+    heading: t.heading,
     greeting: `Hi ${toName ?? "there"},`,
-    intro: `Our support team replied to your ticket "${subject}".`,
-    cta: { label: "View Ticket", url: ticketUrl(organizationId, ticketId) },
+    intro: t.intro,
+    cta: { label: t.ctaLabel ?? "View Ticket", url: ticketUrl(organizationId, ticketId) },
   })
 }
 
@@ -240,21 +301,39 @@ export async function emailUserTicketStatus(
   status: string,
   organizationId: string | null,
 ) {
-  await sendMail(toEmail, `Ticket ${statusLabels[status] ?? status}: ${subject}`, {
-    heading: "Your ticket status changed",
+  const t = await resolveTemplate("user.ticket_status", {
+    name: toName ?? "there",
+    ticketSubject: subject,
+    status: statusLabels[status] ?? status,
+  })
+  if (!t) return
+  await sendMail(toEmail, t.subject, {
+    heading: t.heading,
     greeting: `Hi ${toName ?? "there"},`,
-    intro: `The status of your ticket "${subject}" is now ${statusLabels[status] ?? status}.`,
-    cta: { label: "View Ticket", url: ticketUrl(organizationId, ticketId) },
+    intro: t.intro,
+    cta: { label: t.ctaLabel ?? "View Ticket", url: ticketUrl(organizationId, ticketId) },
   })
 }
 
 export async function emailUserWelcome(toEmail: string, toName: string | null) {
-  await sendMail(toEmail, "Welcome to Webmosh", {
-    heading: "Welcome to Webmosh",
+  const t = await resolveTemplate("user.welcome", { name: toName ?? "there" })
+  if (!t) return
+  await sendMail(toEmail, t.subject, {
+    heading: t.heading,
     greeting: `Hi ${toName ?? "there"},`,
-    intro:
-      "Thanks for joining Webmosh. You can now form and manage your UK or US company from your dashboard.",
-    cta: { label: "Get Started", url: appUrl("/dashboard") },
+    intro: t.intro,
+    cta: { label: t.ctaLabel ?? "Get Started", url: appUrl("/dashboard") },
+  })
+}
+
+export async function emailFreelancerInvite(toEmail: string) {
+  const t = await resolveTemplate("freelancer.invite", { email: toEmail })
+  if (!t) return
+  await sendMail(toEmail, t.subject, {
+    heading: t.heading,
+    greeting: "Hi,",
+    intro: t.intro,
+    cta: { label: t.ctaLabel ?? "Sign in with Google", url: appUrl("/") },
   })
 }
 
@@ -266,14 +345,20 @@ export async function emailAdminNewTicket(
   ticketId: string,
   subject: string,
 ) {
-  await notifyAdmin(`New support ticket: ${subject}`, {
-    heading: "New support ticket",
-    intro: "A customer has opened a new support ticket.",
+  const t = await resolveTemplate("admin.ticket_created", {
+    userName: userName ?? "—",
+    userEmail,
+    ticketSubject: subject,
+  })
+  if (!t) return
+  await notifyAdmin(t.subject, {
+    heading: t.heading,
+    intro: t.intro,
     details: [
       { label: "From", value: `${userName ?? "—"} (${userEmail})` },
       { label: "Subject", value: subject },
     ],
-    cta: { label: "View Ticket", url: appUrl(`/admin/tickets/${ticketId}`) },
+    cta: { label: t.ctaLabel ?? "View Ticket", url: appUrl(`/admin/tickets/${ticketId}`) },
   })
 }
 
@@ -282,10 +367,15 @@ export async function emailAdminTicketReply(
   ticketId: string,
   subject: string,
 ) {
-  await notifyAdmin(`Ticket reply: ${subject}`, {
-    heading: "Customer replied to a ticket",
-    intro: `${userName ?? "A customer"} replied to ticket "${subject}".`,
-    cta: { label: "View Ticket", url: appUrl(`/admin/tickets/${ticketId}`) },
+  const t = await resolveTemplate("admin.ticket_reply", {
+    userName: userName ?? "A customer",
+    ticketSubject: subject,
+  })
+  if (!t) return
+  await notifyAdmin(t.subject, {
+    heading: t.heading,
+    intro: t.intro,
+    cta: { label: t.ctaLabel ?? "View Ticket", url: appUrl(`/admin/tickets/${ticketId}`) },
   })
 }
 
@@ -294,34 +384,49 @@ export async function emailAdminTicketClosed(
   ticketId: string,
   subject: string,
 ) {
-  await notifyAdmin(`Ticket closed: ${subject}`, {
-    heading: "Customer closed a ticket",
-    intro: `${userName ?? "A customer"} closed ticket "${subject}".`,
-    cta: { label: "View Ticket", url: appUrl(`/admin/tickets/${ticketId}`) },
+  const t = await resolveTemplate("admin.ticket_closed", {
+    userName: userName ?? "A customer",
+    ticketSubject: subject,
+  })
+  if (!t) return
+  await notifyAdmin(t.subject, {
+    heading: t.heading,
+    intro: t.intro,
+    cta: { label: t.ctaLabel ?? "View Ticket", url: appUrl(`/admin/tickets/${ticketId}`) },
   })
 }
 
 export async function emailAdminNewFormation(orgId: string, companyName: string, country: string) {
-  await notifyAdmin(`New formation: ${companyName}`, {
-    heading: "New company formation",
-    intro: "A new company formation has been submitted.",
+  const t = await resolveTemplate("admin.formation_created", {
+    companyName,
+    country: country.toUpperCase(),
+  })
+  if (!t) return
+  await notifyAdmin(t.subject, {
+    heading: t.heading,
+    intro: t.intro,
     details: [
       { label: "Company", value: companyName },
       { label: "Country", value: country.toUpperCase() },
     ],
-    cta: { label: "Review Formation", url: appUrl(`/admin/formations/${orgId}`) },
+    cta: { label: t.ctaLabel ?? "Review Formation", url: appUrl(`/admin/formations/${orgId}`) },
   })
 }
 
 export async function emailAdminNewOrder(serviceTitle: string, orgName: string) {
-  await notifyAdmin(`New service order: ${serviceTitle}`, {
-    heading: "New service order",
-    intro: "A customer has purchased a service.",
+  const t = await resolveTemplate("admin.order_placed", {
+    serviceTitle,
+    companyName: orgName,
+  })
+  if (!t) return
+  await notifyAdmin(t.subject, {
+    heading: t.heading,
+    intro: t.intro,
     details: [
       { label: "Service", value: serviceTitle },
       { label: "Company", value: orgName },
     ],
-    cta: { label: "View Orders", url: appUrl("/admin/orders") },
+    cta: { label: t.ctaLabel ?? "View Orders", url: appUrl("/admin/orders") },
   })
 }
 
@@ -331,48 +436,70 @@ export async function emailAdminPaymentSubmitted(
   method: string,
   transactionId: string,
 ) {
-  await notifyAdmin("Payment submitted — needs verification", {
-    heading: "A payment needs verification",
-    intro: "A customer submitted a payment awaiting your confirmation.",
+  const t = await resolveTemplate("admin.payment_submitted", {
+    companyName: orgName,
+    amount: String(amount),
+    method,
+    transactionId,
+  })
+  if (!t) return
+  await notifyAdmin(t.subject, {
+    heading: t.heading,
+    intro: t.intro,
     details: [
       { label: "Company", value: orgName },
       { label: "Amount", value: `$${amount}` },
       { label: "Method", value: method },
       { label: "Transaction ID", value: transactionId },
     ],
-    cta: { label: "Review Invoices", url: appUrl("/admin/invoices") },
+    cta: { label: t.ctaLabel ?? "Review Invoices", url: appUrl("/admin/invoices") },
   })
 }
 
 export async function emailAdminInvoicePaid(orgName: string, amount: number) {
-  await notifyAdmin("Invoice paid", {
-    heading: "An invoice was marked paid",
-    intro: "A payment has been confirmed.",
+  const t = await resolveTemplate("admin.invoice_paid", {
+    companyName: orgName,
+    amount: String(amount),
+  })
+  if (!t) return
+  await notifyAdmin(t.subject, {
+    heading: t.heading,
+    intro: t.intro,
     details: [
       { label: "Company", value: orgName },
       { label: "Amount", value: `$${amount}` },
     ],
-    cta: { label: "View Invoices", url: appUrl("/admin/invoices") },
+    cta: { label: t.ctaLabel ?? "View Invoices", url: appUrl("/admin/invoices") },
   })
 }
 
 export async function emailAdminDocumentResubmitted(orgId: string, docName: string, orgName: string) {
-  await notifyAdmin("Document uploaded — needs review", {
-    heading: "A document was uploaded",
-    intro: "A customer uploaded a document that needs review.",
+  const t = await resolveTemplate("admin.document_submitted", {
+    companyName: orgName,
+    documentName: docName,
+  })
+  if (!t) return
+  await notifyAdmin(t.subject, {
+    heading: t.heading,
+    intro: t.intro,
     details: [
       { label: "Company", value: orgName },
       { label: "Document", value: docName },
     ],
-    cta: { label: "Review Formation", url: appUrl(`/admin/formations/${orgId}`) },
+    cta: { label: t.ctaLabel ?? "Review Formation", url: appUrl(`/admin/formations/${orgId}`) },
   })
 }
 
 export async function emailAdminNewUser(userName: string | null, userEmail: string) {
-  await notifyAdmin("New user signed up", {
-    heading: "New user registration",
-    intro: "A new user just created an account.",
+  const t = await resolveTemplate("admin.user_signup", {
+    userName: userName ?? "—",
+    userEmail,
+  })
+  if (!t) return
+  await notifyAdmin(t.subject, {
+    heading: t.heading,
+    intro: t.intro,
     details: [{ label: "User", value: `${userName ?? "—"} (${userEmail})` }],
-    cta: { label: "View Users", url: appUrl("/admin/users") },
+    cta: { label: t.ctaLabel ?? "View Users", url: appUrl("/admin/users") },
   })
 }

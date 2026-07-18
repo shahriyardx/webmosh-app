@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeftIcon, DownloadIcon } from "lucide-react"
+import { ArrowLeftIcon, DownloadIcon, WalletIcon } from "lucide-react"
 import Link from "next/link"
+import { toast } from "sonner"
 import { formatInvoiceNumber } from "@/lib/invoice-number"
 
 const QR_CONTENT =
@@ -46,6 +47,18 @@ export default function InvoiceDetailPage({
       utils.invoices.getById.invalidate({ id: invoiceId })
       setTransactionId("")
     },
+  })
+
+  const { data: walletBalance } = trpc.wallet.myBalance.useQuery()
+  const payWithWallet = trpc.wallet.payInvoice.useMutation({
+    onSuccess: () => {
+      utils.invoices.list.invalidate({ organizationId: companyId })
+      utils.invoices.getById.invalidate({ id: invoiceId })
+      utils.wallet.myBalance.invalidate()
+      utils.wallet.myTransactions.invalidate()
+      toast.success("Invoice paid from your wallet balance")
+    },
+    onError: (e) => toast.error(e.message),
   })
 
   if (isLoading) {
@@ -142,6 +155,40 @@ export default function InvoiceDetailPage({
           )}
         </div>
       </div>
+
+      {canPay && (
+        <div className="rounded-xl border border-sky-500/30 bg-sky-500/5">
+          <div className="flex flex-col justify-between gap-3 px-5 py-4 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
+                <WalletIcon className="size-5 text-sky-500" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Pay with wallet balance</p>
+                <p className="text-xs text-muted-foreground">
+                  Available: ${(walletBalance?.available ?? 0).toFixed(2)}
+                  {(walletBalance?.available ?? 0) < invoice.amount &&
+                    " — not enough for this invoice"}
+                </p>
+              </div>
+            </div>
+            {(walletBalance?.available ?? 0) >= invoice.amount ? (
+              <Button
+                disabled={payWithWallet.isPending}
+                onClick={() => payWithWallet.mutate({ invoiceId })}
+              >
+                {payWithWallet.isPending
+                  ? "Paying…"
+                  : `Pay $${invoice.amount} now`}
+              </Button>
+            ) : (
+              <Button variant="outline" asChild>
+                <Link href="/account/wallet">Add money</Link>
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       {canPay && (
         <div className="rounded-xl border border-border">

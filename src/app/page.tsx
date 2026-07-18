@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,17 +20,35 @@ export default function LoginPage() {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
   const [signingIn, setSigningIn] = useState(false);
+  const claimInvite = trpc.freelancers.claimMyInvite.useMutation();
+  const claimedRef = useRef(false);
 
   useEffect(() => {
-    if (!isPending && session) {
-      const role = session.user?.role;
-      if (role === "admin") {
-        router.push("/admin");
-      } else {
-        router.push("/dashboard");
-      }
+    if (isPending || !session) return;
+    const role = session.user?.role;
+    if (role === "admin") {
+      router.push("/admin");
+      return;
     }
-  }, [session, isPending, router]);
+    if (role === "freelancer") {
+      router.push("/freelancer");
+      return;
+    }
+    if (claimedRef.current) return;
+    claimedRef.current = true;
+    // Existing user signing in for the first time after being invited —
+    // upgrade their role, then route based on what came back.
+    claimInvite.mutate(undefined, {
+      onSuccess: (result) => {
+        if (result.role === "freelancer") {
+          router.push("/freelancer");
+        } else {
+          router.push("/dashboard");
+        }
+      },
+      onError: () => router.push("/dashboard"),
+    });
+  }, [session, isPending, router, claimInvite]);
 
   const handleGoogleSignIn = async () => {
     setSigningIn(true);
@@ -146,7 +165,7 @@ export default function LoginPage() {
                 className="flex w-full items-center justify-center gap-3"
               >
                 <svg className="size-5 shrink-0" viewBox="0 0 24 24">
-                  <title>IDK</title>
+                  <title>Google</title>
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"

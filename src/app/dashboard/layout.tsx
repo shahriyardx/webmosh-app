@@ -36,6 +36,10 @@ export default function DashboardLayout({
       router.push("/")
       return
     }
+    if (!authPending && session?.user?.role === "freelancer") {
+      router.replace("/freelancer")
+      return
+    }
     if (
       !authPending &&
       session &&
@@ -57,6 +61,7 @@ export default function DashboardLayout({
   }
 
   if (!session) return null
+  if (session.user?.role === "freelancer") return null
   // Freshly-onboarding users have no org yet — hide chrome while we redirect.
   if (!isAdmin && companies && companies.length === 0) return null
 

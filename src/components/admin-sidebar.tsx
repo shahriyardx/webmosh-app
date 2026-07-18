@@ -26,6 +26,11 @@ import {
   ShoppingCartIcon,
   UsersIcon,
   LifeBuoyIcon,
+  PaletteIcon,
+  UserCogIcon,
+  WalletIcon,
+  MailIcon,
+  CreditCardIcon,
   Settings,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
@@ -49,6 +54,11 @@ const links = [
     icon: ConciergeBellIcon,
   },
   {
+    title: "Wordpress",
+    href: "/admin/wordpress-demo",
+    icon: PaletteIcon,
+  },
+  {
     title: "Orders",
     href: "/admin/orders",
     icon: ShoppingCartIcon,
@@ -64,9 +74,29 @@ const links = [
     icon: UsersIcon,
   },
   {
+    title: "Freelancers",
+    href: "/admin/freelancers",
+    icon: UserCogIcon,
+  },
+  {
+    title: "Payouts",
+    href: "/admin/payouts",
+    icon: WalletIcon,
+  },
+  {
     title: "Invoices",
     href: "/admin/invoices",
     icon: ReceiptIcon,
+  },
+  {
+    title: "Wallet",
+    href: "/admin/wallet",
+    icon: CreditCardIcon,
+  },
+  {
+    title: "Emails",
+    href: "/admin/emails",
+    icon: MailIcon,
   },
   {
     title: "Settings",

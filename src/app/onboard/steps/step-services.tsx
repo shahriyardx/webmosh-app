@@ -23,7 +23,9 @@ export function StepServices({ country, onNext, initialValue }: StepServicesProp
 
   const { data: services, isLoading } = trpc.services.list.useQuery()
 
-  const filtered = (services ?? []).filter((s) => s.country === country)
+  const filtered = (services ?? []).filter(
+    (s) => s.type === "wordpress" || s.country === country,
+  )
 
   const toggleService = (id: string) => {
     setSelectedIds((prev) =>

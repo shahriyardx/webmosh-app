@@ -54,6 +54,10 @@ export default function CompaniesLayout({
       router.push("/")
       return
     }
+    if (!authPending && session?.user?.role === "freelancer") {
+      router.replace("/freelancer")
+      return
+    }
     if (
       !authPending &&
       session &&
@@ -75,6 +79,7 @@ export default function CompaniesLayout({
   }
 
   if (!session) return null
+  if (session.user?.role === "freelancer") return null
   if (!isAdmin && companies && companies.length === 0) return null
 
   const handleSignOut = async () => {

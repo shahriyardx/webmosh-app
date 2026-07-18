@@ -65,3 +65,37 @@ const enforceUserIsAdmin = t.middleware(({ ctx, next }) => {
 })
 
 export const adminProcedure = t.procedure.use(enforceUserIsAdmin)
+
+const enforceUserIsFreelancer = t.middleware(({ ctx, next }) => {
+  if (!ctx.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED" })
+  }
+  if (ctx.user.role !== "freelancer") {
+    throw new TRPCError({ code: "FORBIDDEN" })
+  }
+  return next({
+    ctx: {
+      user: ctx.user,
+    },
+  })
+})
+
+export const freelancerProcedure = t.procedure.use(enforceUserIsFreelancer)
+
+const enforceAdminOrFreelancer = t.middleware(({ ctx, next }) => {
+  if (!ctx.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED" })
+  }
+  if (ctx.user.role !== "admin" && ctx.user.role !== "freelancer") {
+    throw new TRPCError({ code: "FORBIDDEN" })
+  }
+  return next({
+    ctx: {
+      user: ctx.user,
+    },
+  })
+})
+
+export const adminOrFreelancerProcedure = t.procedure.use(
+  enforceAdminOrFreelancer,
+)

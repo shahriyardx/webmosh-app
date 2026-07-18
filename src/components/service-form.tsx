@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useForm, useFieldArray, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -19,7 +20,7 @@ import {
   FieldError,
   FieldLabel,
 } from "@/components/ui/field"
-import { PlusIcon, XIcon } from "lucide-react"
+import { PlusIcon, XIcon, PaletteIcon } from "lucide-react"
 
 const schema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -29,6 +30,7 @@ const schema = z.object({
     .min(1, "At least one feature required"),
   price: z.string().min(1, "Price is required"),
   country: z.enum(["us", "uk"]),
+  type: z.enum(["general", "wordpress"]),
 })
 
 type Schema = z.infer<typeof schema>
@@ -39,6 +41,7 @@ const defaultValues: Schema = {
   features: [{ value: "" }],
   price: "",
   country: "us",
+  type: "general",
 }
 
 function parseForm(data: Schema) {
@@ -47,7 +50,8 @@ function parseForm(data: Schema) {
     description: data.description,
     features: data.features.map((f) => f.value),
     price: parseFloat(data.price),
-    country: data.country,
+    country: data.type === "wordpress" ? null : data.country,
+    type: data.type,
   }
 }
 
@@ -74,6 +78,9 @@ export function ServiceForm({
     name: "features",
   })
 
+  const serviceType = form.watch("type")
+  const isWordpress = serviceType === "wordpress"
+
   return (
     <form
       onSubmit={form.handleSubmit((data) => onSubmit(parseForm(data)))}
@@ -92,27 +99,79 @@ export function ServiceForm({
           </Field>
         )}
       />
+      {!isWordpress && (
+        <Controller
+          control={form.control}
+          name="country"
+          render={({ field, fieldState }) => (
+            <Field>
+              <FieldLabel>Country</FieldLabel>
+              <FieldContent>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="us">United States</SelectItem>
+                    <SelectItem value="uk">United Kingdom</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FieldError errors={[fieldState.error]} />
+              </FieldContent>
+            </Field>
+          )}
+        />
+      )}
       <Controller
         control={form.control}
-        name="country"
+        name="type"
         render={({ field, fieldState }) => (
           <Field>
-            <FieldLabel>Country</FieldLabel>
+            <FieldLabel>Service type</FieldLabel>
             <FieldContent>
               <Select onValueChange={field.onChange} value={field.value}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="us">United States</SelectItem>
-                  <SelectItem value="uk">United Kingdom</SelectItem>
+                  <SelectItem value="general">General</SelectItem>
+                  <SelectItem value="wordpress">WordPress development</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                WordPress services will ask the customer for cPanel / WP-admin
+                access and a theme (demo or custom).
+              </p>
               <FieldError errors={[fieldState.error]} />
             </FieldContent>
           </Field>
         )}
       />
+      {isWordpress && (
+        <div className="rounded-lg border border-dashed border-sky-500/40 bg-sky-500/5 p-3">
+          <div className="flex items-start gap-3">
+            <PaletteIcon className="mt-0.5 size-4 shrink-0 text-sky-500" />
+            <div className="flex-1 space-y-2">
+              <div>
+                <p className="text-sm font-medium">Demo themes are shared</p>
+                <p className="text-xs text-muted-foreground">
+                  WordPress services are available to all customers regardless
+                  of country. Demo themes are managed centrally — every
+                  WordPress service offers the same catalog.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                asChild
+              >
+                <Link href="/admin/wordpress-demo">Manage demo themes</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <Controller
         control={form.control}
         name="description"

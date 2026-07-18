@@ -26,6 +26,7 @@ function getBreadcrumb(pathname: string) {
   if (pathname.startsWith("/account/orders/")) return "Order"
   if (pathname === "/account/invoices") return "Payments"
   if (pathname.startsWith("/account/invoices/")) return "Payment"
+  if (pathname === "/account/wallet") return "Wallet"
   if (pathname === "/account/mail") return "Mail"
   if (pathname === "/account/tickets") return "Support"
   if (pathname.startsWith("/account/tickets/")) return "Ticket"
@@ -45,6 +46,10 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (!authPending && !session) {
       router.push("/")
+      return
+    }
+    if (!authPending && session?.user?.role === "freelancer") {
+      router.replace("/freelancer")
       return
     }
     if (
@@ -68,6 +73,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   }
 
   if (!session) return null
+  if (session.user?.role === "freelancer") return null
   if (!isAdmin && companies && companies.length === 0) return null
 
   const handleSignOut = async () => {

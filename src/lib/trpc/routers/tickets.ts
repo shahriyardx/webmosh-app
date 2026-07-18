@@ -9,6 +9,7 @@ import {
   emailUserTicketReply,
   emailUserTicketStatus,
 } from "@/lib/notify"
+import { createAdminNotification } from "@/lib/notifications"
 
 export const ticketsRouter = router({
   create: protectedProcedure
@@ -45,6 +46,12 @@ export const ticketsRouter = router({
         ticket.id,
         input.subject,
       ).catch(() => {})
+      await createAdminNotification({
+        kind: "ticket.created",
+        title: `New ticket: ${input.subject}`,
+        body: `From ${ctx.user.name ?? ctx.user.email}.`,
+        link: `/admin/tickets/${ticket.id}`,
+      })
       return ticket
     }),
 

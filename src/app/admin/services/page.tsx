@@ -73,6 +73,7 @@ export default function AdminServicesPage() {
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead>Title</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Country</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead className="w-24">Actions</TableHead>
@@ -82,7 +83,22 @@ export default function AdminServicesPage() {
               {services?.map((svc) => (
                 <TableRow key={svc.id}>
                   <TableCell className="font-medium">{svc.title}</TableCell>
-                  <TableCell>{svc.country === "uk" ? "UK" : "US"}</TableCell>
+                  <TableCell>
+                    {svc.type === "wordpress" ? (
+                      <span className="inline-flex items-center rounded-md bg-sky-500/15 px-2 py-0.5 text-xs font-semibold text-sky-500 ring-1 ring-inset ring-sky-500/25">
+                        WordPress
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">General</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {svc.country === "uk"
+                      ? "UK"
+                      : svc.country === "us"
+                      ? "US"
+                      : "Any"}
+                  </TableCell>
                   <TableCell>${svc.price}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">

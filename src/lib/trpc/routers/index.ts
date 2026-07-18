@@ -7,6 +7,13 @@ import { settingsRouter } from "./settings"
 import { serviceOrdersRouter } from "./service-orders"
 import { mailsRouter } from "./mails"
 import { ticketsRouter } from "./tickets"
+import { themesRouter } from "./themes"
+import { freelancersRouter } from "./freelancers"
+import { tasksRouter } from "./tasks"
+import { payoutsRouter } from "./payouts"
+import { notificationsRouter } from "./notifications"
+import { emailsRouter } from "./emails"
+import { walletRouter } from "./wallet"
 import { adminRouter } from "./admin"
 
 export const appRouter = router({
@@ -18,6 +25,13 @@ export const appRouter = router({
   serviceOrders: serviceOrdersRouter,
   mails: mailsRouter,
   tickets: ticketsRouter,
+  themes: themesRouter,
+  freelancers: freelancersRouter,
+  tasks: tasksRouter,
+  payouts: payoutsRouter,
+  notifications: notificationsRouter,
+  emails: emailsRouter,
+  wallet: walletRouter,
   admin: adminRouter,
 })
 

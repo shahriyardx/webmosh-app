@@ -209,20 +209,20 @@ export const adminRouter = router({
     return sorted.slice(0, 4)
   }),
 
-  /** Recent filings — most-recent document uploads across all clients. */
-  recentFilings: adminProcedure.query(async () => {
-    const docs = await prisma.document.findMany({
+  /** Recent orders — most-recent service orders across all clients. */
+  recentOrders: adminProcedure.query(async () => {
+    const orders = await prisma.serviceOrder.findMany({
       orderBy: { createdAt: "desc" },
       take: 4,
       select: {
         id: true,
-        name: true,
         status: true,
         createdAt: true,
+        service: { select: { title: true } },
         organization: { select: { id: true, name: true } },
       },
     })
-    return docs
+    return orders
   }),
 
   /** Recent tickets across all clients with derived priority. */

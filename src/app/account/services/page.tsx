@@ -30,6 +30,10 @@ import {
   MultiSelectItem,
 } from "@/components/ui/multi-select"
 import { ConciergeBellIcon, Loader2Icon, CheckIcon } from "lucide-react"
+import {
+  WordpressCheckoutDialog,
+  type WordpressPurchasePayload,
+} from "@/components/wordpress-checkout-dialog"
 
 type Service = {
   id: string
@@ -37,7 +41,8 @@ type Service = {
   description: string
   features: string[]
   price: number
-  country: string
+  country: string | null
+  type: "general" | "wordpress"
 }
 
 export default function AccountServicesPage() {
@@ -47,22 +52,54 @@ export default function AccountServicesPage() {
 
   const [picking, setPicking] = useState<Service | null>(null)
   const [orgId, setOrgId] = useState<string>("")
+  const [wpFor, setWpFor] = useState<Service | null>(null)
 
   const purchase = trpc.serviceOrders.purchase.useMutation({
     onSuccess: (order) => {
+      setWpFor(null)
+      setPicking(null)
+      if (!order.invoice) {
+        toast.success(
+          "Submitted for quote — we'll review your design and send an invoice.",
+        )
+      }
       router.push(`/account/orders/${order.id}`)
     },
     onError: (e) => toast.error(e.message),
   })
 
+  const purchaseAsPersonal =
+    trpc.serviceOrders.purchaseAsPersonal.useMutation({
+      onSuccess: (order) => {
+        setWpFor(null)
+        setPicking(null)
+        if (!order.invoice) {
+          toast.success(
+            "Submitted for quote — we'll review your design and send an invoice.",
+          )
+        }
+        router.push(`/account/orders/${order.id}`)
+      },
+      onError: (e) => toast.error(e.message),
+    })
+
   const eligibleCompanies = picking
     ? (companies ?? []).filter(
-        (c) => c.type !== "personal" && c.country === picking.country,
+        (c) =>
+          c.type !== "personal" &&
+          (picking.type === "wordpress" || c.country === picking.country),
       )
     : []
 
-  const usServices = (allServices ?? []).filter((s) => s.country === "us")
-  const ukServices = (allServices ?? []).filter((s) => s.country === "uk")
+  const wordpressServices = (allServices ?? []).filter(
+    (s) => s.type === "wordpress",
+  )
+  const usServices = (allServices ?? []).filter(
+    (s) => s.type !== "wordpress" && s.country === "us",
+  )
+  const ukServices = (allServices ?? []).filter(
+    (s) => s.type !== "wordpress" && s.country === "uk",
+  )
 
   if (isLoading) {
     return (
@@ -73,6 +110,10 @@ export default function AccountServicesPage() {
   }
 
   const startPurchase = (svc: Service) => {
+    if (svc.type === "wordpress") {
+      setWpFor(svc)
+      return
+    }
     setOrgId("")
     setPicking(svc)
   }
@@ -80,6 +121,22 @@ export default function AccountServicesPage() {
   const confirmPurchase = () => {
     if (!picking || !orgId) return
     purchase.mutate({ organizationId: orgId, serviceId: picking.id })
+  }
+
+  const submitWordpress = (payload: WordpressPurchasePayload) => {
+    if (!wpFor) return
+    if (payload.organizationId) {
+      purchase.mutate({
+        organizationId: payload.organizationId,
+        serviceId: wpFor.id,
+        wordpress: payload.wordpress,
+      })
+    } else {
+      purchaseAsPersonal.mutate({
+        serviceId: wpFor.id,
+        wordpress: payload.wordpress,
+      })
+    }
   }
 
   return (
@@ -90,6 +147,15 @@ export default function AccountServicesPage() {
           Browse services and purchase for any of your companies.
         </p>
       </div>
+
+      {wordpressServices.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium text-muted-foreground">
+            Web development
+          </h2>
+          <ServiceGrid services={wordpressServices} onPurchase={startPurchase} />
+        </section>
+      )}
 
       {ukServices.length > 0 && (
         <section className="space-y-3">
@@ -109,16 +175,18 @@ export default function AccountServicesPage() {
         </section>
       )}
 
-      {ukServices.length === 0 && usServices.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-16">
-            <ConciergeBellIcon className="size-10 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">
-              No services available yet.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      {ukServices.length === 0 &&
+        usServices.length === 0 &&
+        wordpressServices.length === 0 && (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-3 py-16">
+              <ConciergeBellIcon className="size-10 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">
+                No services available yet.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
       <Dialog
         open={!!picking}
@@ -130,17 +198,25 @@ export default function AccountServicesPage() {
           <DialogHeader>
             <DialogTitle>Purchase for which company?</DialogTitle>
             <DialogDescription>
-              {picking?.title} —{" "}
-              {picking?.country === "uk" ? "United Kingdom" : "United States"}
+              {picking?.title}
+              {picking?.type === "wordpress"
+                ? " — available for any of your companies"
+                : ` — ${
+                    picking?.country === "uk"
+                      ? "United Kingdom"
+                      : "United States"
+                  }`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label>Company</Label>
             {eligibleCompanies.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                You have no{" "}
-                {picking?.country === "uk" ? "UK" : "US"} companies. Create one
-                first.
+                {picking?.type === "wordpress"
+                  ? "You have no companies yet. Create one first."
+                  : `You have no ${
+                      picking?.country === "uk" ? "UK" : "US"
+                    } companies. Create one first.`}
               </p>
             ) : (
               <MultiSelect
@@ -171,6 +247,8 @@ export default function AccountServicesPage() {
                   <Loader2Icon className="mr-1 size-3 animate-spin" />
                   Processing…
                 </>
+              ) : picking?.type === "wordpress" ? (
+                "Continue"
               ) : (
                 "Purchase"
               )}
@@ -178,6 +256,20 @@ export default function AccountServicesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {wpFor && (
+        <WordpressCheckoutDialog
+          open={!!wpFor}
+          onOpenChange={(open) => !open && setWpFor(null)}
+          serviceTitle={wpFor.title}
+          servicePrice={wpFor.price}
+          loading={purchase.isPending || purchaseAsPersonal.isPending}
+          companies={(companies ?? [])
+            .filter((c) => c.type !== "personal")
+            .map((c) => ({ id: c.id, name: c.name }))}
+          onSubmit={submitWordpress}
+        />
+      )}
     </div>
   )
 }

@@ -27,6 +27,8 @@ import {
   MailIcon,
   LifeBuoyIcon,
   UserXIcon,
+  WalletIcon,
+  PlusIcon,
 } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 import { trpc } from "@/lib/trpc/client"
@@ -39,6 +41,7 @@ const links = [
   { title: "Services", href: "/account/services", icon: ConciergeBellIcon },
   { title: "Orders", href: "/account/orders", icon: ShoppingCartIcon },
   { title: "Payments", href: "/account/invoices", icon: ReceiptIcon },
+  { title: "Wallet", href: "/account/wallet", icon: WalletIcon },
   { title: "Mail", href: "/account/mail", icon: MailIcon },
   { title: "Support", href: "/account/tickets", icon: LifeBuoyIcon },
 ]
@@ -64,6 +67,7 @@ export function UserSidebar({
     trpc.companies.pendingDocCountForUser.useQuery()
   const { data: unreadMailCount } = trpc.mails.unreadCountForUser.useQuery()
   const { data: pendingTicketCount } = trpc.tickets.pendingCount.useQuery()
+  const { data: walletBalance } = trpc.wallet.myBalance.useQuery()
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -150,6 +154,11 @@ export function UserSidebar({
                           {pendingTicketCount}
                         </Badge>
                       )}
+                    {link.title === "Wallet" && (
+                      <span className="ml-auto text-xs font-semibold tabular-nums text-sky-600 dark:text-sky-400">
+                        ${(walletBalance?.available ?? 0).toFixed(2)}
+                      </span>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -158,6 +167,34 @@ export function UserSidebar({
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
+        <Link
+          href="/account/wallet"
+          className="group/wallet block group-data-[collapsible=icon]:hidden"
+        >
+          <div className="relative mx-1 overflow-hidden rounded-xl border border-sky-500/25 bg-gradient-to-br from-sky-500/15 via-sky-500/5 to-transparent p-3 transition-colors group-hover/wallet:border-sky-500/40 group-hover/wallet:bg-sky-500/10">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <WalletIcon className="size-3.5 text-sky-500" />
+                Wallet balance
+              </span>
+              <span className="flex size-5 items-center justify-center rounded-md bg-sky-500/15 text-sky-500 transition-colors group-hover/wallet:bg-sky-500 group-hover/wallet:text-white">
+                <PlusIcon className="size-3" />
+              </span>
+            </div>
+            <p className="mt-1.5 text-xl font-bold tabular-nums text-foreground">
+              ${(walletBalance?.available ?? 0).toFixed(2)}
+            </p>
+            {(walletBalance?.pendingTopup ?? 0) > 0 ? (
+              <p className="mt-0.5 text-[11px] text-amber-500">
+                ${walletBalance!.pendingTopup.toFixed(2)} pending verification
+              </p>
+            ) : (
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                Tap to add money or withdraw
+              </p>
+            )}
+          </div>
+        </Link>
         {isImpersonating && (
           <Button
             variant="destructive"

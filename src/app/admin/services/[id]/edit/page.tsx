@@ -64,7 +64,8 @@ export default function EditServicePage({
           description: svc.description,
           features: svc.features.map((f) => ({ value: f })),
           price: String(svc.price),
-          country: svc.country as "us" | "uk",
+          country: (svc.country as "us" | "uk" | null) ?? "us",
+          type: (svc.type as "general" | "wordpress") ?? "general",
         }}
         loading={updateSvc.isPending}
         onSubmit={(data) => updateSvc.mutate({ id, ...data })}

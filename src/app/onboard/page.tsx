@@ -12,6 +12,10 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import { formatInvoiceNumber } from "@/lib/invoice-number"
 import { authClient } from "@/lib/auth-client"
+import {
+  WordpressCheckoutDialog,
+  type WordpressPurchasePayload,
+} from "@/components/wordpress-checkout-dialog"
 import { StepCountry } from "./steps/step-country"
 import { StepName } from "./steps/step-name"
 import { StepSic } from "./steps/step-sic"
@@ -157,6 +161,29 @@ export default function OnboardPage() {
     onError: (e) => toast.error(e.message),
   })
 
+  const [wpTarget, setWpTarget] = useState<{
+    id: string
+    title: string
+    price: number
+  } | null>(null)
+
+  const purchaseAsPersonal = trpc.serviceOrders.purchaseAsPersonal.useMutation({
+    onSuccess: async (order) => {
+      await utils.companies.myCompanies.invalidate()
+      await utils.companies.hasPersonalCompany.invalidate()
+      setWpTarget(null)
+      if (order.invoice) {
+        router.push(`/account/invoices/${order.invoice.id}`)
+      } else {
+        toast.success(
+          "Submitted for quote — we'll review your design and send an invoice.",
+        )
+        router.push(`/account/orders/${order.id}`)
+      }
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
   const submitPersonalPayment = trpc.invoices.submitTransaction.useMutation({
     onSuccess: () => {
       setPersonalCheckout((c) => (c ? { ...c, paid: true } : c))
@@ -195,6 +222,11 @@ export default function OnboardPage() {
 
   if (!session) {
     router.push("/")
+    return null
+  }
+
+  if (session.user?.role === "freelancer") {
+    router.push("/freelancer")
     return null
   }
 
@@ -498,71 +530,169 @@ export default function OnboardPage() {
                 No services are available right now.
               </div>
             ) : (
-              <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {services.map((svc) => {
-                  const isSelected = personalServiceIds.includes(svc.id)
-                  return (
-                    <Card
-                      key={svc.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => togglePersonalService(svc.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault()
-                          togglePersonalService(svc.id)
-                        }
-                      }}
-                      className={`relative flex cursor-pointer flex-col transition-all ${
-                        isSelected
-                          ? "ring-2 ring-sky-500"
-                          : "hover:ring-foreground/20"
-                      }`}
-                    >
-                      {isSelected && (
-                        <div className="absolute right-3 top-3 flex size-5 items-center justify-center rounded-full bg-sky-500 text-white">
-                          <CheckIcon className="size-3" />
+              (() => {
+                const wpServices = services.filter((s) => s.type === "wordpress")
+                const generalServices = services.filter(
+                  (s) => s.type !== "wordpress",
+                )
+                return (
+                  <div className="mt-8 space-y-8">
+                    {wpServices.length > 0 && (
+                      <div>
+                        <h2 className="text-sm font-medium text-muted-foreground">
+                          Web development
+                        </h2>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Ordered individually with theme + hosting details.
+                        </p>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          {wpServices.map((svc) => (
+                            <Card
+                              key={svc.id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() =>
+                                setWpTarget({
+                                  id: svc.id,
+                                  title: svc.title,
+                                  price: svc.price,
+                                })
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault()
+                                  setWpTarget({
+                                    id: svc.id,
+                                    title: svc.title,
+                                    price: svc.price,
+                                  })
+                                }
+                              }}
+                              className="relative flex cursor-pointer flex-col transition-all hover:ring-2 hover:ring-sky-500"
+                            >
+                              <CardContent className="flex flex-1 flex-col gap-3 py-6">
+                                <div>
+                                  <div className="flex items-baseline gap-2">
+                                    <h3 className="font-semibold text-foreground">
+                                      {svc.title}
+                                    </h3>
+                                    <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-sky-500">
+                                      WordPress
+                                    </span>
+                                  </div>
+                                  {svc.description && (
+                                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                                      {svc.description}
+                                    </p>
+                                  )}
+                                </div>
+                                {svc.features.length > 0 && (
+                                  <ul className="space-y-1">
+                                    {svc.features.slice(0, 3).map((f, i) => (
+                                      <li
+                                        key={i}
+                                        className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                                      >
+                                        <CheckIcon className="size-3 shrink-0 text-emerald-500" />
+                                        {f}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                <div className="mt-auto flex items-baseline justify-between pt-3">
+                                  <span className="text-base font-bold text-foreground">
+                                    From ${svc.price}
+                                  </span>
+                                  <span className="text-xs text-sky-500">
+                                    Configure →
+                                  </span>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
                         </div>
-                      )}
-                      <CardContent className="flex flex-1 flex-col gap-3 py-6">
-                        <div>
-                          <div className="flex items-baseline gap-2">
-                            <h3 className="font-semibold text-foreground">
-                              {svc.title}
-                            </h3>
-                            <span className="text-xs uppercase text-muted-foreground">
-                              {svc.country}
-                            </span>
-                          </div>
-                          {svc.description && (
-                            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                              {svc.description}
-                            </p>
-                          )}
-                        </div>
-                        {svc.features.length > 0 && (
-                          <ul className="space-y-1">
-                            {svc.features.slice(0, 3).map((f, i) => (
-                              <li
-                                key={i}
-                                className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                      </div>
+                    )}
+
+                    {generalServices.length > 0 && (
+                      <div>
+                        <h2 className="text-sm font-medium text-muted-foreground">
+                          Other services
+                        </h2>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          {generalServices.map((svc) => {
+                            const isSelected = personalServiceIds.includes(
+                              svc.id,
+                            )
+                            return (
+                              <Card
+                                key={svc.id}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => togglePersonalService(svc.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault()
+                                    togglePersonalService(svc.id)
+                                  }
+                                }}
+                                className={`relative flex cursor-pointer flex-col transition-all ${
+                                  isSelected
+                                    ? "ring-2 ring-sky-500"
+                                    : "hover:ring-foreground/20"
+                                }`}
                               >
-                                <CheckIcon className="size-3 shrink-0 text-emerald-500" />
-                                {f}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        <div className="mt-auto flex items-baseline justify-between pt-3">
-                          <span className="text-base font-bold text-foreground">
-                            ${svc.price}
-                          </span>
+                                {isSelected && (
+                                  <div className="absolute right-3 top-3 flex size-5 items-center justify-center rounded-full bg-sky-500 text-white">
+                                    <CheckIcon className="size-3" />
+                                  </div>
+                                )}
+                                <CardContent className="flex flex-1 flex-col gap-3 py-6">
+                                  <div>
+                                    <div className="flex items-baseline gap-2">
+                                      <h3 className="font-semibold text-foreground">
+                                        {svc.title}
+                                      </h3>
+                                      {svc.country && (
+                                        <span className="text-xs uppercase text-muted-foreground">
+                                          {svc.country}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {svc.description && (
+                                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                                        {svc.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                  {svc.features.length > 0 && (
+                                    <ul className="space-y-1">
+                                      {svc.features.slice(0, 3).map((f, i) => (
+                                        <li
+                                          key={i}
+                                          className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                                        >
+                                          <CheckIcon className="size-3 shrink-0 text-emerald-500" />
+                                          {f}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                  <div className="mt-auto flex items-baseline justify-between pt-3">
+                                    <span className="text-base font-bold text-foreground">
+                                      ${svc.price}
+                                    </span>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            )
+                          })}
                         </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()
             )}
 
             {/* Footer with total + continue */}
@@ -757,6 +887,22 @@ export default function OnboardPage() {
         </>
         )}
       </main>
+
+      {wpTarget && (
+        <WordpressCheckoutDialog
+          open={!!wpTarget}
+          onOpenChange={(open) => !open && setWpTarget(null)}
+          serviceTitle={wpTarget.title}
+          servicePrice={wpTarget.price}
+          loading={purchaseAsPersonal.isPending}
+          onSubmit={(payload: WordpressPurchasePayload) =>
+            purchaseAsPersonal.mutate({
+              serviceId: wpTarget.id,
+              wordpress: payload.wordpress,
+            })
+          }
+        />
+      )}
     </div>
   )
 }

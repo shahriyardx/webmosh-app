@@ -12,6 +12,7 @@ import {
   emailUserStatusUpdate,
   emailUserCompanyCompleted,
 } from "@/lib/notify"
+import { createAdminNotification } from "@/lib/notifications"
 import { getCompaniesHouseProfile, getCompaniesHouseDates } from "@/lib/companies-house"
 
 const directorInput = z.object({
@@ -44,6 +45,14 @@ function slugify(text: string): string {
 }
 
 export const companiesRouter = router({
+  /** Minimal profile lookup used for form auto-fill. */
+  myProfile: protectedProcedure.query(({ ctx }) =>
+    prisma.user.findUnique({
+      where: { id: ctx.user.id },
+      select: { name: true, email: true, phone: true, address: true },
+    }),
+  ),
+
   checkName: protectedProcedure
     .input(
       z.object({
@@ -220,6 +229,12 @@ export const companiesRouter = router({
       })
 
       await emailAdminNewFormation(org.id, companyName, country).catch(() => {})
+      await createAdminNotification({
+        kind: "formation.created",
+        title: `New formation: ${companyName}`,
+        body: `${country.toUpperCase()} company registration requested.`,
+        link: `/admin/formations/${org.id}`,
+      })
 
       return org
     }),
@@ -254,6 +269,13 @@ export const companiesRouter = router({
           sicCode: profile.sicCodes[0] ?? null,
           status: CompanyStatus.completed,
         },
+      })
+
+      await createAdminNotification({
+        kind: "formation.imported",
+        title: `Company imported: ${profile.name}`,
+        body: `UK company ${input.companyId.trim()} linked by client.`,
+        link: `/admin/formations/${org.id}`,
       })
 
       return org
@@ -321,6 +343,12 @@ export const companiesRouter = router({
         select: { name: true },
       })
       await emailAdminDocumentResubmitted(input.organizationId, updated.name, org?.name ?? "a company").catch(() => {})
+      await createAdminNotification({
+        kind: "document.submitted",
+        title: `Document uploaded: ${updated.name}`,
+        body: `${org?.name ?? "A customer"} submitted a document for review.`,
+        link: `/admin/formations/${input.organizationId}`,
+      })
 
       return updated
     }),

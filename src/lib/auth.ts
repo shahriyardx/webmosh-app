@@ -25,6 +25,10 @@ const roles = {
     user: ["get", "update"],
     session: [],
   }),
+  freelancer: ac.newRole({
+    user: ["get", "update"],
+    session: [],
+  }),
   admin: ac.newRole({
     user: [
       "create",
@@ -57,9 +61,22 @@ export const auth = betterAuth({
           if (count === 0) {
             return { data: { ...user, role: "admin" } };
           }
+          const invite = await prisma.freelancerInvite.findFirst({
+            where: { email: user.email, acceptedAt: null },
+            select: { id: true },
+          });
+          if (invite) {
+            return { data: { ...user, role: "freelancer" } };
+          }
         },
         after: async (user) => {
           const { emailUserWelcome, emailAdminNewUser } = await import("./notify");
+          if (user.role === "freelancer") {
+            await prisma.freelancerInvite.updateMany({
+              where: { email: user.email, acceptedAt: null },
+              data: { acceptedAt: new Date() },
+            }).catch(() => {});
+          }
           await emailUserWelcome(user.email, user.name).catch(() => {});
           await emailAdminNewUser(user.name, user.email).catch(() => {});
         },

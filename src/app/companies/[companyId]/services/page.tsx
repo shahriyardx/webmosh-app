@@ -1,6 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import { useRouter, useParams } from "next/navigation"
+import { toast } from "sonner"
 import { trpc } from "@/lib/trpc/client"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,6 +18,12 @@ import {
   Loader2Icon,
   CheckIcon,
 } from "lucide-react"
+import {
+  WordpressCheckoutDialog,
+  type WordpressPurchasePayload,
+} from "@/components/wordpress-checkout-dialog"
+
+type WordpressTarget = { id: string; title: string; price: number }
 
 export default function DashboardServicesPage() {
   const router = useRouter()
@@ -29,16 +37,42 @@ export default function DashboardServicesPage() {
 
   const { data: allServices, isLoading: svcLoading } = trpc.services.list.useQuery()
 
+  const [wpTarget, setWpTarget] = useState<WordpressTarget | null>(null)
+
   const purchase = trpc.serviceOrders.purchase.useMutation({
     onSuccess: (order) => {
-      router.push(`/companies/${companyId}/orders/${order.id}`)
+      setWpTarget(null)
+      if (order.invoice) {
+        router.push(`/companies/${companyId}/orders/${order.id}`)
+      } else {
+        toast.success("Submitted for quote — we'll review your design and send an invoice.")
+        router.push(`/companies/${companyId}/orders/${order.id}`)
+      }
     },
+    onError: (err) => toast.error(err.message),
   })
+
+  const buyService = (svc: { id: string; title: string; price: number; type: string }) => {
+    if (svc.type === "wordpress") {
+      setWpTarget({ id: svc.id, title: svc.title, price: svc.price })
+      return
+    }
+    purchase.mutate({ organizationId: companyId, serviceId: svc.id })
+  }
+
+  const submitWordpress = (payload: WordpressPurchasePayload) => {
+    if (!wpTarget) return
+    purchase.mutate({
+      organizationId: payload.organizationId ?? companyId,
+      serviceId: wpTarget.id,
+      wordpress: payload.wordpress,
+    })
+  }
 
   const country = overview?.country
 
   const filtered = (allServices ?? []).filter(
-    (s) => s.country === country,
+    (s) => s.type === "wordpress" || s.country === country,
   )
 
   if (svcLoading) {
@@ -110,7 +144,7 @@ export default function DashboardServicesPage() {
                   <span className="text-lg font-bold text-foreground">${svc.price}</span>
                   <Button
                     size="sm"
-                    onClick={() => purchase.mutate({ organizationId: companyId, serviceId: svc.id })}
+                    onClick={() => buyService(svc)}
                     disabled={loading}
                   >
                     {loading ? (
@@ -118,6 +152,8 @@ export default function DashboardServicesPage() {
                         <Loader2Icon className="mr-1 size-3 animate-spin" />
                         Processing…
                       </>
+                    ) : svc.type === "wordpress" ? (
+                      "Configure"
                     ) : (
                       "Purchase"
                     )}
@@ -127,6 +163,17 @@ export default function DashboardServicesPage() {
             )
           })}
         </div>
+      )}
+
+      {wpTarget && (
+        <WordpressCheckoutDialog
+          open={!!wpTarget}
+          onOpenChange={(open) => !open && setWpTarget(null)}
+          serviceTitle={wpTarget.title}
+          servicePrice={wpTarget.price}
+          loading={purchase.isPending}
+          onSubmit={submitWordpress}
+        />
       )}
     </div>
   )

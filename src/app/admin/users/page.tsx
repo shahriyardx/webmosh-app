@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { authClient } from "@/lib/auth-client"
+import { trpc } from "@/lib/trpc/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -57,11 +58,24 @@ export default function AdminUsersPage() {
     },
   })
 
-  const handleRoleChange = async (userId: string, role: "user" | "admin") => {
+  const promoteFreelancer = trpc.freelancers.promote.useMutation()
+  const demoteFreelancer = trpc.freelancers.demote.useMutation()
+
+  const handleRoleChange = async (
+    userId: string,
+    role: "user" | "admin" | "freelancer",
+    currentRole: string,
+  ) => {
     setSavingId(userId)
     try {
-      const res = await authClient.admin.setRole({ userId, role })
-      if (res.error) throw new Error(res.error.message)
+      if (role === "freelancer") {
+        await promoteFreelancer.mutateAsync({ userId })
+      } else if (currentRole === "freelancer" && role === "user") {
+        await demoteFreelancer.mutateAsync({ userId })
+      } else {
+        const res = await authClient.admin.setRole({ userId, role })
+        if (res.error) throw new Error(res.error.message)
+      }
       await refetch()
       toast.success(`Role updated to ${role}`)
     } catch (e) {
@@ -143,7 +157,11 @@ export default function AdminUsersPage() {
                             onValuesChange={(vals) => {
                               const next = vals[0]
                               if (next && next !== role) {
-                                handleRoleChange(u.id, next as "user" | "admin")
+                                handleRoleChange(
+                                  u.id,
+                                  next as "user" | "admin" | "freelancer",
+                                  role,
+                                )
                               }
                             }}
                           >
@@ -155,6 +173,9 @@ export default function AdminUsersPage() {
                             </MultiSelectTrigger>
                             <MultiSelectContent>
                               <MultiSelectItem value="user">User</MultiSelectItem>
+                              <MultiSelectItem value="freelancer">
+                                Freelancer
+                              </MultiSelectItem>
                               <MultiSelectItem value="admin">Admin</MultiSelectItem>
                             </MultiSelectContent>
                           </MultiSelect>

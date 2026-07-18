@@ -6,7 +6,7 @@ import { useParams } from "next/navigation"
 import { trpc } from "@/lib/trpc/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeftIcon, ShoppingCartIcon, CheckIcon } from "lucide-react"
+import { ArrowLeftIcon, ShoppingCartIcon, CheckIcon, ExternalLinkIcon, ClockIcon } from "lucide-react"
 
 const invStatusLabel: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
   unpaid: { label: "Unpaid", variant: "outline" },
@@ -19,6 +19,7 @@ const orderStatusLabel: Record<string, { label: string; variant: "outline" | "se
   pending: { label: "Pending", variant: "outline" },
   processing: { label: "Processing", variant: "secondary" },
   completed: { label: "Completed", variant: "default" },
+  awaiting_quote: { label: "Awaiting quote", variant: "destructive" },
 }
 
 export default function OrderDetailPage({
@@ -85,6 +86,50 @@ export default function OrderDetailPage({
         </div>
       </div>
 
+      {svc?.type === "wordpress" && (
+        <div className="rounded-xl border border-border">
+          <div className="border-b border-border px-5 py-3.5">
+            <span className="text-sm font-semibold">WordPress details</span>
+          </div>
+          <div className="space-y-3 px-5 py-4">
+            {order.customDesignUrl ? (
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Custom design
+                </p>
+                <a
+                  href={order.customDesignUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 inline-flex items-center gap-1 text-sm text-sky-500 hover:underline"
+                >
+                  {order.customDesignUrl}
+                  <ExternalLinkIcon className="size-3" />
+                </a>
+              </div>
+            ) : order.theme ? (
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Selected theme
+                </p>
+                <p className="mt-1 text-sm font-medium">{order.theme.title}</p>
+                {order.theme.demoUrl && (
+                  <a
+                    href={order.theme.demoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-sky-500 hover:underline"
+                  >
+                    View demo
+                    <ExternalLinkIcon className="size-3" />
+                  </a>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+
       <div className="rounded-xl border border-border">
         <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
           <span className="text-sm font-semibold">Payment</span>
@@ -98,6 +143,17 @@ export default function OrderDetailPage({
                 {inv.id}
               </p>
             </>
+          ) : order.status === "awaiting_quote" ? (
+            <div className="flex items-start gap-3">
+              <ClockIcon className="mt-0.5 size-5 shrink-0 text-amber-500" />
+              <div>
+                <p className="text-sm font-medium">Awaiting quote</p>
+                <p className="text-sm text-muted-foreground">
+                  Our team is reviewing your design. You'll receive an invoice
+                  by email once we've prepared your custom quote.
+                </p>
+              </div>
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">Payment not available</p>
           )}

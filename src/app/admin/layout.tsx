@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { authClient } from "@/lib/auth-client"
 import { AdminSidebar } from "@/components/admin-sidebar"
+import { NotificationBell } from "@/components/notification-bell"
 import {
   SidebarProvider,
   SidebarInset,
@@ -25,6 +26,8 @@ const breadcrumbTitles: Record<string, string> = {
   "/admin/formations": "Formations",
   "/admin/documents": "Documents",
   "/admin/tickets": "Tickets",
+  "/admin/emails": "Emails",
+  "/admin/wallet": "Wallet",
   "/admin/settings": "Settings",
 }
 
@@ -40,6 +43,10 @@ export default function AdminLayout({
   useEffect(() => {
     if (!isPending && !session) {
       router.push("/")
+      return
+    }
+    if (!isPending && session?.user?.role === "freelancer") {
+      router.push("/freelancer")
       return
     }
     if (!isPending && session?.user?.role !== "admin") {
@@ -85,6 +92,9 @@ export default function AdminLayout({
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
+          </div>
+          <div className="flex items-center gap-1 px-3">
+            <NotificationBell />
           </div>
         </header>
         <main className="flex flex-1 flex-col p-6">{children}</main>

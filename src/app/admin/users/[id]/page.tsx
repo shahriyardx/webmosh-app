@@ -36,6 +36,7 @@ import {
   CheckCircleIcon,
   Trash2Icon,
   ArrowRightIcon,
+  UserCogIcon,
 } from "lucide-react"
 
 type Tab = "companies" | "documents" | "payments" | "orders" | "tickets"
@@ -117,6 +118,14 @@ export default function AdminClientProfilePage({
       setSuspendOpen(false)
       setSuspendReason("")
       toast.success(r.banned ? "Client suspended" : "Client reinstated")
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  const promoteFreelancer = trpc.freelancers.promote.useMutation({
+    onSuccess: () => {
+      toast.success("Turned into a freelancer")
+      router.push(`/admin/freelancers/${userId}`)
     },
     onError: (e) => toast.error(e.message),
   })
@@ -237,6 +246,17 @@ export default function AdminClientProfilePage({
                 <PencilIcon className="size-4" />
                 Edit
               </Button>
+              {user.role !== "admin" && user.role !== "freelancer" && (
+                <Button
+                  variant="outline"
+                  className="text-sky-500 hover:text-sky-500"
+                  onClick={() => promoteFreelancer.mutate({ userId })}
+                  disabled={promoteFreelancer.isPending}
+                >
+                  <UserCogIcon className="size-4" />
+                  Make freelancer
+                </Button>
+              )}
               {user.banned ? (
                 <Button
                   variant="outline"

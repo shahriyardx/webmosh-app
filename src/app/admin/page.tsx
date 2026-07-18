@@ -36,6 +36,7 @@ import {
   CheckIcon,
   XIcon,
   ExternalLinkIcon,
+  ShoppingCartIcon,
 } from "lucide-react"
 
 const filingStatusStyles: Record<string, string> = {
@@ -45,6 +46,8 @@ const filingStatusStyles: Record<string, string> = {
   rejected: "bg-red-500/15 text-red-500 ring-red-500/25",
   open: "bg-sky-500/15 text-sky-500 ring-sky-500/25",
   pending: "bg-amber-500/15 text-amber-500 ring-amber-500/25",
+  processing: "bg-sky-500/15 text-sky-500 ring-sky-500/25",
+  completed: "bg-emerald-500/15 text-emerald-500 ring-emerald-500/25",
   closed: "bg-muted text-muted-foreground ring-border",
 }
 
@@ -98,7 +101,7 @@ export default function AdminDashboardPage() {
     trpc.admin.docsToReview.useQuery()
   const { data: invoicesToReview, refetch: refetchInvoices } =
     trpc.admin.invoicesToReview.useQuery()
-  const { data: recentFilings } = trpc.admin.recentFilings.useQuery()
+  const { data: recentOrders } = trpc.admin.recentOrders.useQuery()
   const { data: recentTickets } = trpc.admin.recentTickets.useQuery()
 
   const [bucket, setBucket] = useState<"overdue" | "d30" | "d60" | "d90">(
@@ -433,16 +436,16 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Recent filings (replaces Unpaid invoices) */}
+          {/* Recent orders */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between text-lg">
                 <div className="flex items-center gap-2">
-                  <FileTextIcon className="size-4 text-sky-500" />
-                  Recent filings
+                  <ShoppingCartIcon className="size-4 text-sky-500" />
+                  Recent orders
                 </div>
                 <Link
-                  href="/admin/formations"
+                  href="/admin/orders"
                   className="flex items-center gap-1 text-sm font-normal text-muted-foreground hover:text-foreground"
                 >
                   View all
@@ -451,35 +454,31 @@ export default function AdminDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {!recentFilings?.length ? (
+              {!recentOrders?.length ? (
                 <p className="py-6 text-center text-base text-muted-foreground">
-                  No filings yet.
+                  No orders yet.
                 </p>
               ) : (
                 <div className="divide-y divide-border">
-                  {recentFilings.map((f) => (
+                  {recentOrders.map((o) => (
                     <Link
-                      key={f.id}
-                      href={
-                        f.organization
-                          ? `/admin/formations/${f.organization.id}`
-                          : "/admin/formations"
-                      }
+                      key={o.id}
+                      href="/admin/orders"
                       className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:opacity-80"
                     >
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-base font-medium">
-                          {f.name}
+                          {o.service?.title ?? "Service"}
                         </p>
                         <p className="truncate text-sm text-muted-foreground">
                           <span className="uppercase">
-                            {f.organization?.name ?? "—"}
+                            {o.organization?.name ?? "—"}
                           </span>{" "}
-                          · {new Date(f.createdAt).toLocaleDateString()}
+                          · {new Date(o.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-3">
-                        <FilingStatusPill status={f.status} />
+                        <FilingStatusPill status={o.status} />
                         <ArrowRightIcon className="size-4 text-muted-foreground" />
                       </div>
                     </Link>
