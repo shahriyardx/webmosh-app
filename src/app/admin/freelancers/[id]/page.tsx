@@ -51,6 +51,7 @@ const priorityStyles: Record<TaskPriority, string> = {
 const statusStyles: Record<TaskStatus, string> = {
   todo: "bg-muted text-muted-foreground ring-border",
   in_progress: "bg-sky-500/15 text-sky-500 ring-sky-500/25",
+  in_review: "bg-amber-500/15 text-amber-500 ring-amber-500/25",
   blocked: "bg-red-500/15 text-red-500 ring-red-500/25",
   done: "bg-emerald-500/15 text-emerald-500 ring-emerald-500/25",
 }
@@ -58,8 +59,9 @@ const statusStyles: Record<TaskStatus, string> = {
 const statusLabels: Record<TaskStatus, string> = {
   todo: "To do",
   in_progress: "In progress",
+  in_review: "Pending approval",
   blocked: "Blocked",
-  done: "Done",
+  done: "Approved",
 }
 
 function Pill({ className, children }: { className: string; children: React.ReactNode }) {

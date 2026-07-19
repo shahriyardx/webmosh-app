@@ -191,7 +191,7 @@ export default function AdminDashboardPage() {
     (invoicesToReview?.filter((i) => i.status === "processing").length ?? 0)
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8">
+    <div className="w-full space-y-8">
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>

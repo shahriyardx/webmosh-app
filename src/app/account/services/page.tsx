@@ -139,7 +139,7 @@ export default function AccountServicesPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8">
+    <div className="w-full space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">
           Services

@@ -125,6 +125,10 @@ export function AdminSidebar({
     undefined,
     { refetchInterval: 30_000, refetchOnWindowFocus: true },
   )
+  const { data: pendingApprovals } = trpc.tasks.pendingApprovalCount.useQuery(
+    undefined,
+    { refetchInterval: 30_000, refetchOnWindowFocus: true },
+  )
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -178,6 +182,13 @@ export function AdminSidebar({
                       unreadDiscussions > 0 && (
                         <Badge className="ml-auto size-5 rounded-full p-0 text-[10px]">
                           {unreadDiscussions}
+                        </Badge>
+                      )}
+                    {link.title === "Freelancers" &&
+                      pendingApprovals !== undefined &&
+                      pendingApprovals > 0 && (
+                        <Badge className="ml-auto size-5 rounded-full bg-amber-500 p-0 text-[10px] text-white hover:bg-amber-500">
+                          {pendingApprovals}
                         </Badge>
                       )}
                   </Link>

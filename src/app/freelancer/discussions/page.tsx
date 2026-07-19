@@ -22,6 +22,7 @@ import {
 const STATUS_DOT: Record<string, string> = {
   todo: "bg-muted-foreground/40",
   in_progress: "bg-sky-500",
+  in_review: "bg-amber-500",
   blocked: "bg-red-500",
   done: "bg-emerald-500",
 }

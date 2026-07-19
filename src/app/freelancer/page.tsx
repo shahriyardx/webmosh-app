@@ -25,6 +25,8 @@ const statusStyles: Record<TaskStatus, string> = {
   todo: "bg-muted text-muted-foreground ring-border",
   in_progress:
     "bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20",
+  in_review:
+    "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
   blocked: "bg-red-500/10 text-red-600 dark:text-red-400 ring-red-500/20",
   done: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
 }
@@ -32,8 +34,9 @@ const statusStyles: Record<TaskStatus, string> = {
 const statusLabels: Record<TaskStatus, string> = {
   todo: "To do",
   in_progress: "In progress",
+  in_review: "Pending approval",
   blocked: "Blocked",
-  done: "Done",
+  done: "Approved",
 }
 
 function initials(name?: string | null) {
@@ -95,7 +98,7 @@ export default function FreelancerDashboardPage() {
   ]
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8">
+    <div className="w-full space-y-8">
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>

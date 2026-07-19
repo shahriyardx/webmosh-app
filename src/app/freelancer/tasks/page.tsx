@@ -23,6 +23,7 @@ const priorityStyles: Record<TaskPriority, string> = {
 const statusStyles: Record<TaskStatus, string> = {
   todo: "bg-muted text-muted-foreground ring-border",
   in_progress: "bg-sky-500/15 text-sky-500 ring-sky-500/25",
+  in_review: "bg-amber-500/15 text-amber-500 ring-amber-500/25",
   blocked: "bg-red-500/15 text-red-500 ring-red-500/25",
   done: "bg-emerald-500/15 text-emerald-500 ring-emerald-500/25",
 }
@@ -30,8 +31,9 @@ const statusStyles: Record<TaskStatus, string> = {
 const statusLabels: Record<TaskStatus, string> = {
   todo: "To do",
   in_progress: "In progress",
+  in_review: "Pending approval",
   blocked: "Blocked",
-  done: "Done",
+  done: "Approved",
 }
 
 export default function FreelancerTasksPage() {
@@ -98,13 +100,20 @@ export default function FreelancerTasksPage() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <span
-                      className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold capitalize ring-1 ring-inset ${
-                        statusStyles[t.status]
-                      }`}
-                    >
-                      {statusLabels[t.status]}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold capitalize ring-1 ring-inset ${
+                          statusStyles[t.status]
+                        }`}
+                      >
+                        {statusLabels[t.status]}
+                      </span>
+                      {t.revisionNote && t.status !== "done" && (
+                        <span className="inline-flex items-center rounded-md bg-orange-500/15 px-2 py-0.5 text-xs font-semibold text-orange-500 ring-1 ring-inset ring-orange-500/25">
+                          Revision
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {t.deadline

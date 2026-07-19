@@ -7,6 +7,7 @@ import {
   router,
 } from "../server"
 import { prisma } from "@/lib/prisma"
+import { createAdminNotification } from "@/lib/notifications"
 import { PayoutStatus, TaskPriority, TaskStatus } from "@/generated/prisma/enums"
 
 const priorityEnum = z.nativeEnum(TaskPriority)
@@ -55,6 +56,8 @@ const taskSelect = {
   createdById: true,
   organizationId: true,
   orderId: true,
+  revisionNote: true,
+  submittedAt: true,
   createdAt: true,
   updatedAt: true,
   assignedTo: {
@@ -214,10 +217,13 @@ export const tasksRouter = router({
       where: { assignedToId: ctx.user.id },
       _count: { _all: true },
     })
-    const counts = { todo: 0, in_progress: 0, blocked: 0, done: 0 } as Record<
-      TaskStatus,
-      number
-    >
+    const counts = {
+      todo: 0,
+      in_progress: 0,
+      in_review: 0,
+      blocked: 0,
+      done: 0,
+    } as Record<TaskStatus, number>
     for (const row of rows) {
       counts[row.status] = row._count._all
     }
@@ -293,7 +299,12 @@ export const tasksRouter = router({
       })
     }),
 
-  /** Admin: change any task's status. Freelancer: change status on their own tasks only. */
+  /**
+   * Admin: change any task's status directly.
+   * Freelancer: only move between working states (todo / in_progress /
+   * blocked) on their own tasks. To finish a task they submit it for
+   * approval (`submitForReview`) — they can't set `done` themselves.
+   */
   updateStatus: adminOrFreelancerProcedure
     .input(z.object({ id: z.string(), status: statusEnum }))
     .mutation(async ({ input, ctx }) => {
@@ -304,12 +315,134 @@ export const tasksRouter = router({
       if (!task) {
         throw new TRPCError({ code: "NOT_FOUND" })
       }
-      if (ctx.user.role === "freelancer" && task.assignedToId !== ctx.user.id) {
-        throw new TRPCError({ code: "FORBIDDEN" })
+      if (ctx.user.role === "freelancer") {
+        if (task.assignedToId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN" })
+        }
+        const allowed: TaskStatus[] = [
+          TaskStatus.todo,
+          TaskStatus.in_progress,
+          TaskStatus.blocked,
+        ]
+        if (!allowed.includes(input.status)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Submit the task for approval to mark it done.",
+          })
+        }
       }
       return prisma.task.update({
         where: { id: input.id },
         data: { status: input.status },
+        select: taskSelect,
+      })
+    }),
+
+  /**
+   * Freelancer: submit their task for admin approval. Moves it to
+   * `in_review` and notifies the admin. Payment is only credited once the
+   * admin approves.
+   */
+  submitForReview: freelancerProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const task = await prisma.task.findUnique({
+        where: { id: input.id },
+        select: { assignedToId: true, status: true, title: true },
+      })
+      if (!task || task.assignedToId !== ctx.user.id) {
+        throw new TRPCError({ code: "NOT_FOUND" })
+      }
+      if (task.status === TaskStatus.done) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This task is already approved.",
+        })
+      }
+      if (task.status === TaskStatus.in_review) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This task is already awaiting approval.",
+        })
+      }
+      const updated = await prisma.task.update({
+        where: { id: input.id },
+        data: { status: TaskStatus.in_review, submittedAt: new Date() },
+        select: taskSelect,
+      })
+      await createAdminNotification({
+        kind: "task.submitted",
+        title: `Task ready for review: ${task.title}`,
+        body: `${ctx.user.name ?? ctx.user.email} submitted a task for approval.`,
+        link: "/admin/freelancers",
+      })
+      return updated
+    }),
+
+  /** Admin: every task awaiting approval (freelancer submitted). */
+  pendingApprovals: adminProcedure.query(() =>
+    prisma.task.findMany({
+      where: { status: TaskStatus.in_review },
+      orderBy: { submittedAt: "asc" },
+      select: taskSelect,
+    }),
+  ),
+
+  /** Admin: count of tasks awaiting approval (sidebar badge). */
+  pendingApprovalCount: adminProcedure.query(() =>
+    prisma.task.count({ where: { status: TaskStatus.in_review } }),
+  ),
+
+  /**
+   * Admin: approve a submitted task. Moves it to `done`, which credits the
+   * freelancer's balance (balance counts done tasks), and clears any prior
+   * revision note.
+   */
+  approveTask: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      const task = await prisma.task.findUnique({
+        where: { id: input.id },
+        select: { status: true },
+      })
+      if (!task) throw new TRPCError({ code: "NOT_FOUND" })
+      if (task.status !== TaskStatus.in_review) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Only tasks awaiting approval can be approved.",
+        })
+      }
+      return prisma.task.update({
+        where: { id: input.id },
+        data: { status: TaskStatus.done, revisionNote: null },
+        select: taskSelect,
+      })
+    }),
+
+  /**
+   * Admin: send a submitted task back for revision with a note. Moves it to
+   * `in_progress` so the freelancer can fix and resubmit.
+   */
+  requestRevision: adminProcedure
+    .input(z.object({ id: z.string(), note: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const task = await prisma.task.findUnique({
+        where: { id: input.id },
+        select: { status: true },
+      })
+      if (!task) throw new TRPCError({ code: "NOT_FOUND" })
+      if (task.status !== TaskStatus.in_review) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Only tasks awaiting approval can be sent for revision.",
+        })
+      }
+      return prisma.task.update({
+        where: { id: input.id },
+        data: {
+          status: TaskStatus.in_progress,
+          revisionNote: input.note.trim(),
+        },
         select: taskSelect,
       })
     }),

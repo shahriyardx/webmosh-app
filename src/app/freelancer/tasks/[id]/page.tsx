@@ -29,6 +29,9 @@ import {
   AlertOctagonIcon,
   CheckCircle2Icon,
   MessagesSquareIcon,
+  HourglassIcon,
+  SendIcon,
+  RotateCcwIcon,
 } from "lucide-react"
 
 const priorityStyles: Record<TaskPriority, string> = {
@@ -54,13 +57,18 @@ const statusMeta: Record<TaskStatus, StatusMeta> = {
     icon: Loader2Icon,
     activeClass: "bg-sky-500/15 text-sky-500 ring-sky-500/25",
   },
+  in_review: {
+    label: "Pending approval",
+    icon: HourglassIcon,
+    activeClass: "bg-amber-500/15 text-amber-500 ring-amber-500/25",
+  },
   blocked: {
     label: "Blocked",
     icon: AlertOctagonIcon,
     activeClass: "bg-red-500/15 text-red-500 ring-red-500/25",
   },
   done: {
-    label: "Done",
+    label: "Approved",
     icon: CheckCircle2Icon,
     activeClass: "bg-emerald-500/15 text-emerald-500 ring-emerald-500/25",
   },
@@ -111,14 +119,26 @@ export default function FreelancerTaskDetailPage({
   const utils = trpc.useUtils()
   const { data: task, isLoading } = trpc.tasks.getById.useQuery({ id })
 
+  const invalidateTask = () => {
+    utils.tasks.getById.invalidate({ id })
+    utils.tasks.listMine.invalidate()
+    utils.tasks.myStats.invalidate()
+    utils.tasks.myBalance.invalidate()
+    utils.payouts.myBalance.invalidate()
+  }
+
   const updateStatus = trpc.tasks.updateStatus.useMutation({
     onSuccess: () => {
-      utils.tasks.getById.invalidate({ id })
-      utils.tasks.listMine.invalidate()
-      utils.tasks.myStats.invalidate()
-      utils.tasks.myBalance.invalidate()
-      utils.payouts.myBalance.invalidate()
+      invalidateTask()
       toast.success("Status updated")
+    },
+    onError: (err) => toast.error(err.message),
+  })
+
+  const submitForReview = trpc.tasks.submitForReview.useMutation({
+    onSuccess: () => {
+      invalidateTask()
+      toast.success("Submitted for approval")
     },
     onError: (err) => toast.error(err.message),
   })
@@ -144,7 +164,7 @@ export default function FreelancerTaskDetailPage({
   const currentStatus = statusMeta[task.status]
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="w-full space-y-6">
       {/* Back link */}
       <Link
         href="/freelancer/tasks"
@@ -228,6 +248,35 @@ export default function FreelancerTaskDetailPage({
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main column */}
         <div className="space-y-6 lg:col-span-2">
+          {/* Revision requested */}
+          {task.revisionNote && task.status !== "done" && (
+            <Card className="border-orange-500/40 bg-orange-500/5">
+              <CardContent className="flex items-start gap-3 p-5">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-orange-500/15">
+                  <RotateCcwIcon className="size-5 text-orange-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-orange-500">
+                    Revision requested by admin
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">
+                    {task.revisionNote}
+                  </p>
+                  {task.status === "in_review" ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      You&apos;ve resubmitted — awaiting the admin&apos;s
+                      re-review.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Make the changes, then resubmit for approval.
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Description */}
           <Card>
             <CardContent className="space-y-3 p-6">
@@ -309,40 +358,93 @@ export default function FreelancerTaskDetailPage({
           <Card>
             <CardContent className="space-y-3 p-6">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Update status
+                {task.status === "done"
+                  ? "Task status"
+                  : task.status === "in_review"
+                  ? "Awaiting approval"
+                  : "Update status"}
               </h2>
-              <div className="grid grid-cols-2 gap-2">
-                {(Object.keys(statusMeta) as TaskStatus[]).map((key) => {
-                  const meta = statusMeta[key]
-                  const isActive = task.status === key
-                  const disabled = updateStatus.isPending
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() =>
-                        !isActive &&
-                        updateStatus.mutate({ id: task.id, status: key })
-                      }
-                      disabled={disabled}
-                      className={`flex items-center gap-2 rounded-lg border p-2.5 text-left text-sm font-medium transition-colors ${
-                        isActive
-                          ? `border-transparent ${meta.activeClass} ring-1 ring-inset`
-                          : "border-border hover:bg-muted/60"
-                      } ${disabled ? "cursor-not-allowed opacity-70" : ""}`}
-                    >
-                      <meta.icon
-                        className={`size-4 shrink-0 ${
-                          key === "in_progress" && isActive
-                            ? "animate-spin"
-                            : ""
-                        }`}
-                      />
-                      <span className="truncate">{meta.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
+
+              {task.status === "done" ? (
+                <div className="flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                  <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-emerald-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-500">
+                      Approved by admin
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {task.payoutAmount != null
+                        ? `$${task.payoutAmount.toFixed(2)} has been added to your balance.`
+                        : "This task is complete."}
+                    </p>
+                  </div>
+                </div>
+              ) : task.status === "in_review" ? (
+                <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                  <HourglassIcon className="mt-0.5 size-5 shrink-0 text-amber-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-500">
+                      Waiting for admin approval
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      You&apos;ll be notified here if a revision is requested or
+                      once it&apos;s approved and paid.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["todo", "in_progress", "blocked"] as TaskStatus[]).map(
+                      (key) => {
+                        const meta = statusMeta[key]
+                        const isActive = task.status === key
+                        const disabled = updateStatus.isPending
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() =>
+                              !isActive &&
+                              updateStatus.mutate({ id: task.id, status: key })
+                            }
+                            disabled={disabled}
+                            className={`flex flex-col items-center gap-1.5 rounded-lg border p-2.5 text-center text-xs font-medium transition-colors ${
+                              isActive
+                                ? `border-transparent ${meta.activeClass} ring-1 ring-inset`
+                                : "border-border hover:bg-muted/60"
+                            } ${disabled ? "cursor-not-allowed opacity-70" : ""}`}
+                          >
+                            <meta.icon
+                              className={`size-4 shrink-0 ${
+                                key === "in_progress" && isActive
+                                  ? "animate-spin"
+                                  : ""
+                              }`}
+                            />
+                            <span className="truncate">{meta.label}</span>
+                          </button>
+                        )
+                      },
+                    )}
+                  </div>
+                  <Button
+                    className="w-full"
+                    disabled={submitForReview.isPending}
+                    onClick={() => submitForReview.mutate({ id: task.id })}
+                  >
+                    <SendIcon className="size-4" />
+                    {submitForReview.isPending
+                      ? "Submitting…"
+                      : task.revisionNote
+                      ? "Resubmit for approval"
+                      : "Submit for approval"}
+                  </Button>
+                  <p className="text-center text-xs text-muted-foreground">
+                    Sends the task to admin. Payment is credited once approved.
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
 

@@ -40,6 +40,9 @@ import {
   Trash2Icon,
   XIcon,
   Code2Icon,
+  ClipboardCheckIcon,
+  CheckIcon,
+  RotateCcwIcon,
 } from "lucide-react"
 import { TaskPriority } from "@/generated/prisma/enums"
 
@@ -60,6 +63,37 @@ export default function AdminFreelancersPage() {
   const { data: freelancers, isLoading } = trpc.freelancers.list.useQuery()
   const { data: invites } = trpc.freelancers.listInvites.useQuery()
   const { data: wpQueue } = trpc.tasks.wordpressOrdersQueue.useQuery()
+  const { data: pendingApprovals } = trpc.tasks.pendingApprovals.useQuery()
+
+  const [revisionTarget, setRevisionTarget] = useState<{
+    id: string
+    title: string
+  } | null>(null)
+  const [revisionNote, setRevisionNote] = useState("")
+
+  const invalidateApprovals = () => {
+    utils.tasks.pendingApprovals.invalidate()
+    utils.tasks.listAll.invalidate()
+    utils.freelancers.list.invalidate()
+  }
+
+  const approveTask = trpc.tasks.approveTask.useMutation({
+    onSuccess: () => {
+      invalidateApprovals()
+      toast.success("Task approved — payment added to the freelancer")
+    },
+    onError: (err) => toast.error(err.message),
+  })
+
+  const requestRevision = trpc.tasks.requestRevision.useMutation({
+    onSuccess: () => {
+      invalidateApprovals()
+      setRevisionTarget(null)
+      setRevisionNote("")
+      toast.success("Sent back for revision")
+    },
+    onError: (err) => toast.error(err.message),
+  })
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
@@ -328,6 +362,87 @@ export default function AdminFreelancersPage() {
         </div>
       )}
 
+      {pendingApprovals && pendingApprovals.length > 0 && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5">
+          <div className="flex items-center gap-2 border-b border-amber-500/20 px-4 py-3">
+            <ClipboardCheckIcon className="size-4 text-amber-500" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold">Awaiting your approval</p>
+              <p className="text-xs text-muted-foreground">
+                Freelancers marked these tasks done. Review and approve to
+                release payment, or send back for revision.
+              </p>
+            </div>
+            <span className="inline-flex items-center rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-500">
+              {pendingApprovals.length} pending
+            </span>
+          </div>
+          <Table>
+            <TableHeader className="bg-muted/40">
+              <TableRow>
+                <TableHead>Task</TableHead>
+                <TableHead>Freelancer</TableHead>
+                <TableHead>Payment</TableHead>
+                <TableHead>Submitted</TableHead>
+                <TableHead className="w-56 text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pendingApprovals.map((t) => (
+                <TableRow key={t.id}>
+                  <TableCell>
+                    <p className="font-medium">{t.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t.organization?.name ??
+                        t.order?.service?.title ??
+                        "Standalone task"}
+                      {t.revisionNote ? " · resubmitted" : ""}
+                    </p>
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {t.assignedTo?.name ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-sm font-medium">
+                    {t.payoutAmount != null
+                      ? `$${t.payoutAmount.toFixed(2)}`
+                      : "—"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {t.submittedAt
+                      ? new Date(t.submittedAt).toLocaleDateString()
+                      : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-orange-500 hover:text-orange-500"
+                        onClick={() =>
+                          setRevisionTarget({ id: t.id, title: t.title })
+                        }
+                      >
+                        <RotateCcwIcon className="size-3.5" />
+                        Revision
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-600/90"
+                        disabled={approveTask.isPending}
+                        onClick={() => approveTask.mutate({ id: t.id })}
+                      >
+                        <CheckIcon className="size-3.5" />
+                        Approve
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
       {!freelancers?.length ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16">
@@ -578,6 +693,57 @@ export default function AdminFreelancersPage() {
               disabled={assignTask.isPending || !assignForm.freelancerId}
             >
               {assignTask.isPending ? "Assigning…" : "Assign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!revisionTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRevisionTarget(null)
+            setRevisionNote("")
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request revision</DialogTitle>
+            <DialogDescription>
+              Tell the freelancer what needs fixing on &quot;
+              {revisionTarget?.title}&quot;. The task goes back to them to
+              update and resubmit.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            className="min-h-28"
+            placeholder="What needs to change…"
+            value={revisionNote}
+            onChange={(e) => setRevisionNote(e.target.value)}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRevisionTarget(null)
+                setRevisionNote("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={!revisionNote.trim() || requestRevision.isPending}
+              onClick={() =>
+                revisionTarget &&
+                requestRevision.mutate({
+                  id: revisionTarget.id,
+                  note: revisionNote.trim(),
+                })
+              }
+            >
+              {requestRevision.isPending ? "Sending…" : "Send for revision"}
             </Button>
           </DialogFooter>
         </DialogContent>

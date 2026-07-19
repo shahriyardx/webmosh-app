@@ -406,6 +406,7 @@ enum TaskPriority {
 enum TaskStatus {
   todo
   in_progress
+  in_review
   blocked
   done
 }
@@ -426,6 +427,8 @@ model Task {
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   orderId        String?       @map("order_id")
   order          ServiceOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  revisionNote   String?       @map("revision_note")
+  submittedAt    DateTime?     @map("submitted_at")
   messages       TaskMessage[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
