@@ -41,6 +41,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  BankDetailsPicker,
+  emptyBankForm,
+  resolveBankForm,
+  validateBankForm,
+  type BankFormValue,
+} from "@/components/bank-details-picker"
+import {
   WalletIcon,
   PlusIcon,
   ArrowUpRightIcon,
@@ -83,15 +90,10 @@ export default function WalletPage() {
 
   const [payoutOpen, setPayoutOpen] = useState(false)
   const [payoutAmount, setPayoutAmount] = useState("")
-  const [payoutMethod, setPayoutMethod] = useState("bank")
-  const [bank, setBank] = useState({
-    accountName: "",
-    accountNumber: "",
-    bankName: "",
-    branch: "",
-    routingNumber: "",
-  })
   const [payoutNote, setPayoutNote] = useState("")
+  const [bankForm, setBankForm] = useState<BankFormValue>(() =>
+    emptyBankForm("bank"),
+  )
 
   const invalidate = () => {
     utils.wallet.myBalance.invalidate()
@@ -112,6 +114,7 @@ export default function WalletPage() {
   const requestPayout = trpc.wallet.requestPayout.useMutation({
     onSuccess: () => {
       invalidate()
+      utils.bankAccounts.list.invalidate()
       toast.success("Payout requested — we'll process it shortly")
       setPayoutOpen(false)
       setPayoutAmount("")
@@ -119,6 +122,13 @@ export default function WalletPage() {
     },
     onError: (e) => toast.error(e.message),
   })
+
+  const openPayout = () => {
+    setPayoutAmount("")
+    setPayoutNote("")
+    setBankForm(emptyBankForm("bank"))
+    setPayoutOpen(true)
+  }
 
   const cancel = trpc.wallet.cancel.useMutation({
     onSuccess: () => {
@@ -137,15 +147,15 @@ export default function WalletPage() {
       toast.error("Enter a valid amount.")
       return
     }
-    if (!bank.accountName || !bank.accountNumber || !bank.bankName) {
-      toast.error("Account name, account number and bank name are required.")
+    const err = validateBankForm(bankForm)
+    if (err) {
+      toast.error(err)
       return
     }
     requestPayout.mutate({
       amount,
-      method: payoutMethod,
-      bankDetails: bank,
       note: payoutNote || undefined,
+      ...resolveBankForm(bankForm),
     })
   }
 
@@ -159,7 +169,7 @@ export default function WalletPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setPayoutOpen(true)}>
+          <Button variant="outline" onClick={openPayout}>
             <ArrowUpRightIcon className="size-4" />
             Request payout
           </Button>
@@ -391,7 +401,7 @@ export default function WalletPage() {
 
       {/* Request payout */}
       <Dialog open={payoutOpen} onOpenChange={setPayoutOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Request payout</DialogTitle>
             <DialogDescription>
@@ -401,74 +411,28 @@ export default function WalletPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="po-amount">Amount (USD)</Label>
-                <Input
-                  id="po-amount"
-                  type="number"
-                  min="1"
-                  step="0.01"
-                  max={balance?.available}
-                  value={payoutAmount}
-                  onChange={(e) => setPayoutAmount(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Method</Label>
-                <Select value={payoutMethod} onValueChange={setPayoutMethod}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bank">Bank transfer</SelectItem>
-                    <SelectItem value="bkash">bKash</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
             <div className="space-y-2">
-              <Label htmlFor="po-acc-name">Account holder name</Label>
+              <Label htmlFor="po-amount">Amount (USD)</Label>
               <Input
-                id="po-acc-name"
-                value={bank.accountName}
-                onChange={(e) => setBank({ ...bank, accountName: e.target.value })}
+                id="po-amount"
+                type="number"
+                min="1"
+                step="0.01"
+                max={balance?.available}
+                value={payoutAmount}
+                onChange={(e) => setPayoutAmount(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="po-acc-no">Account number</Label>
-              <Input
-                id="po-acc-no"
-                value={bank.accountNumber}
-                onChange={(e) => setBank({ ...bank, accountNumber: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="po-bank">Bank name</Label>
-                <Input
-                  id="po-bank"
-                  value={bank.bankName}
-                  onChange={(e) => setBank({ ...bank, bankName: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="po-branch">Branch</Label>
-                <Input
-                  id="po-branch"
-                  value={bank.branch}
-                  onChange={(e) => setBank({ ...bank, branch: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="po-routing">Routing number (optional)</Label>
-              <Input
-                id="po-routing"
-                value={bank.routingNumber}
-                onChange={(e) => setBank({ ...bank, routingNumber: e.target.value })}
-              />
-            </div>
+
+            <BankDetailsPicker
+              value={bankForm}
+              onChange={setBankForm}
+              methods={[
+                { value: "bank", label: "Bank" },
+                { value: "bkash", label: "bKash" },
+              ]}
+            />
+
             <div className="space-y-2">
               <Label htmlFor="po-note">Note (optional)</Label>
               <Textarea

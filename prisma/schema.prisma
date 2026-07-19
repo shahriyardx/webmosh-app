@@ -40,9 +40,30 @@ model User {
   walletTransactions WalletTransaction[] @relation("WalletUser")
   decidedWalletTxs   WalletTransaction[] @relation("WalletDecidedBy")
   taskMessages  TaskMessage[] @relation("TaskMessageSender")
+  bankAccounts  BankAccount[]
 
   @@unique([email])
   @@map("user")
+}
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label         String?
+  method        String
+  accountName   String   @map("account_name")
+  accountNumber String   @map("account_number")
+  bankName      String?  @map("bank_name")
+  branch        String?
+  routingNumber String?  @map("routing_number")
+  swift         String?
+  iban          String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@map("bank_account")
 }
 
 model FreelancerInvite {

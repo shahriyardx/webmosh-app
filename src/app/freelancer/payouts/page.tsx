@@ -18,13 +18,6 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldContent, FieldLabel } from "@/components/ui/field"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Table,
   TableBody,
   TableCell,
@@ -32,6 +25,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  BankDetailsPicker,
+  emptyBankForm,
+  resolveBankForm,
+  validateBankForm,
+  type BankFormValue,
+} from "@/components/bank-details-picker"
 import {
   WalletIcon,
   BanknoteIcon,
@@ -64,31 +64,10 @@ const statusMeta: Record<
   },
 }
 
-type FormState = {
-  amount: string
-  method: string
-  accountName: string
-  accountNumber: string
-  bankName: string
-  branch: string
-  routingNumber: string
-  swift: string
-  iban: string
-  note: string
-}
-
-const EMPTY_FORM: FormState = {
-  amount: "",
-  method: "Bank transfer",
-  accountName: "",
-  accountNumber: "",
-  bankName: "",
-  branch: "",
-  routingNumber: "",
-  swift: "",
-  iban: "",
-  note: "",
-}
+const METHODS = [
+  { value: "bank", label: "Bank" },
+  { value: "bkash", label: "bKash" },
+]
 
 export default function FreelancerPayoutsPage() {
   const utils = trpc.useUtils()
@@ -96,16 +75,20 @@ export default function FreelancerPayoutsPage() {
   const { data: payouts, isLoading } = trpc.payouts.myList.useQuery()
 
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [amount, setAmount] = useState("")
+  const [note, setNote] = useState("")
+  const [bankForm, setBankForm] = useState<BankFormValue>(() =>
+    emptyBankForm("bank"),
+  )
 
   const request = trpc.payouts.request.useMutation({
     onSuccess: () => {
       utils.payouts.myBalance.invalidate()
       utils.payouts.myList.invalidate()
       utils.tasks.myBalance.invalidate()
+      utils.bankAccounts.list.invalidate()
       toast.success("Payout request submitted")
       setOpen(false)
-      setForm(EMPTY_FORM)
     },
     onError: (err) => toast.error(err.message),
   })
@@ -120,33 +103,28 @@ export default function FreelancerPayoutsPage() {
     onError: (err) => toast.error(err.message),
   })
 
+  const openDialog = () => {
+    setAmount((balance?.available ?? 0).toFixed(2))
+    setNote("")
+    setBankForm(emptyBankForm("bank"))
+    setOpen(true)
+  }
+
   const submit = () => {
-    const amount = parseFloat(form.amount)
-    if (!amount || amount <= 0) {
+    const amt = parseFloat(amount)
+    if (!amt || amt <= 0) {
       toast.error("Enter a valid amount")
       return
     }
-    if (
-      !form.accountName.trim() ||
-      !form.accountNumber.trim() ||
-      !form.bankName.trim()
-    ) {
-      toast.error("Account name, number and bank are required")
+    const err = validateBankForm(bankForm)
+    if (err) {
+      toast.error(err)
       return
     }
     request.mutate({
-      amount,
-      method: form.method,
-      note: form.note.trim() || undefined,
-      bankDetails: {
-        accountName: form.accountName.trim(),
-        accountNumber: form.accountNumber.trim(),
-        bankName: form.bankName.trim(),
-        branch: form.branch.trim() || undefined,
-        routingNumber: form.routingNumber.trim() || undefined,
-        swift: form.swift.trim() || undefined,
-        iban: form.iban.trim() || undefined,
-      },
+      amount: amt,
+      note: note.trim() || undefined,
+      ...resolveBankForm(bankForm),
     })
   }
 
@@ -161,16 +139,7 @@ export default function FreelancerPayoutsPage() {
             Withdraw your earned balance to your bank account.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setForm({
-              ...EMPTY_FORM,
-              amount: (balance?.available ?? 0).toFixed(2),
-            })
-            setOpen(true)
-          }}
-          disabled={!canRequest}
-        >
+        <Button onClick={openDialog} disabled={!canRequest}>
           <PlusIcon className="mr-1.5 size-4" />
           Request payout
         </Button>
@@ -299,140 +268,25 @@ export default function FreelancerPayoutsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-5">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field>
-                <FieldLabel>Amount (USD)</FieldLabel>
-                <FieldContent>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={form.amount}
-                    onChange={(e) =>
-                      setForm({ ...form, amount: e.target.value })
-                    }
-                    placeholder="e.g. 250.00"
-                  />
-                </FieldContent>
-              </Field>
-              <Field>
-                <FieldLabel>Method</FieldLabel>
-                <FieldContent>
-                  <Select
-                    value={form.method}
-                    onValueChange={(v) => setForm({ ...form, method: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Bank transfer">
-                        Bank transfer
-                      </SelectItem>
-                      <SelectItem value="Wire transfer">
-                        Wire transfer
-                      </SelectItem>
-                      <SelectItem value="Mobile banking">
-                        Mobile banking
-                      </SelectItem>
-                      <SelectItem value="PayPal">PayPal</SelectItem>
-                      <SelectItem value="Wise">Wise</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FieldContent>
-              </Field>
-            </div>
+            <Field>
+              <FieldLabel>Amount (USD)</FieldLabel>
+              <FieldContent>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="e.g. 250.00"
+                />
+              </FieldContent>
+            </Field>
 
-            <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
-              <p className="text-sm font-semibold">Bank / payout details</p>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field>
-                  <FieldLabel>Account name</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      value={form.accountName}
-                      onChange={(e) =>
-                        setForm({ ...form, accountName: e.target.value })
-                      }
-                      placeholder="Priya Sharma"
-                    />
-                  </FieldContent>
-                </Field>
-                <Field>
-                  <FieldLabel>Account number / handle</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      value={form.accountNumber}
-                      onChange={(e) =>
-                        setForm({ ...form, accountNumber: e.target.value })
-                      }
-                      placeholder="1234567890 or you@paypal.com"
-                    />
-                  </FieldContent>
-                </Field>
-                <Field>
-                  <FieldLabel>Bank name</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      value={form.bankName}
-                      onChange={(e) =>
-                        setForm({ ...form, bankName: e.target.value })
-                      }
-                      placeholder="City Bank"
-                    />
-                  </FieldContent>
-                </Field>
-                <Field>
-                  <FieldLabel>Branch (optional)</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      value={form.branch}
-                      onChange={(e) =>
-                        setForm({ ...form, branch: e.target.value })
-                      }
-                      placeholder="Dhaka main branch"
-                    />
-                  </FieldContent>
-                </Field>
-                <Field>
-                  <FieldLabel>Routing number (US)</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      value={form.routingNumber}
-                      onChange={(e) =>
-                        setForm({ ...form, routingNumber: e.target.value })
-                      }
-                      placeholder="Optional"
-                    />
-                  </FieldContent>
-                </Field>
-                <Field>
-                  <FieldLabel>SWIFT / BIC</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      value={form.swift}
-                      onChange={(e) =>
-                        setForm({ ...form, swift: e.target.value })
-                      }
-                      placeholder="Optional"
-                    />
-                  </FieldContent>
-                </Field>
-                <Field>
-                  <FieldLabel>IBAN</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      value={form.iban}
-                      onChange={(e) =>
-                        setForm({ ...form, iban: e.target.value })
-                      }
-                      placeholder="Optional"
-                    />
-                  </FieldContent>
-                </Field>
-              </div>
-            </div>
+            <BankDetailsPicker
+              value={bankForm}
+              onChange={setBankForm}
+              methods={METHODS}
+            />
 
             <Field>
               <FieldLabel>Note (optional)</FieldLabel>
@@ -440,8 +294,8 @@ export default function FreelancerPayoutsPage() {
                 <Textarea
                   className="min-h-20"
                   placeholder="Anything the admin should know…"
-                  value={form.note}
-                  onChange={(e) => setForm({ ...form, note: e.target.value })}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
                 />
               </FieldContent>
             </Field>

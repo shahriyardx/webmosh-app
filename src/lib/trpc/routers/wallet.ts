@@ -8,6 +8,7 @@ import {
 } from "../server"
 import { prisma } from "@/lib/prisma"
 import { createAdminNotification } from "@/lib/notifications"
+import { saveBankAccountForUser } from "./bank-accounts"
 import { emailAdminInvoicePaid, emailUserPayment } from "@/lib/notify"
 import {
   PaymentStatus,
@@ -18,7 +19,7 @@ import {
 const bankDetailsSchema = z.object({
   accountName: z.string().min(1),
   accountNumber: z.string().min(1),
-  bankName: z.string().min(1),
+  bankName: z.string().optional(),
   routingNumber: z.string().optional(),
   swift: z.string().optional(),
   iban: z.string().optional(),
@@ -113,6 +114,7 @@ export const walletRouter = router({
         method: z.string().min(1),
         bankDetails: bankDetailsSchema,
         note: z.string().optional(),
+        saveBankAccount: z.boolean().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -121,6 +123,12 @@ export const walletRouter = router({
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Requested amount exceeds your available balance ($${balance.available.toFixed(2)}).`,
+        })
+      }
+      if (input.saveBankAccount) {
+        await saveBankAccountForUser(ctx.user.id, {
+          method: input.method,
+          ...input.bankDetails,
         })
       }
       const tx = await prisma.walletTransaction.create({
