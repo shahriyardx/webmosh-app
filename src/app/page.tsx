@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/lib/trpc/client";
@@ -13,7 +14,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Building2, FileCheck, Sparkles, Code2 } from "lucide-react";
 
 export default function LoginPage() {
@@ -71,13 +71,14 @@ export default function LoginPage() {
       <div className="hidden lg:relative lg:flex lg:flex-1 lg:flex-col lg:justify-center lg:overflow-hidden lg:bg-muted lg:px-16 xl:px-24">
         {/* Brand */}
         <div className="animate-fade-in max-w-xl space-y-2">
-          <Badge
-            variant="outline"
-            className="border-sky-500/30 bg-sky-500/10 text-sky-500"
-          >
-            <Building2 className="mr-1 size-3" />
-            Webmosh
-          </Badge>
+          <Image
+            src="/logo.png"
+            alt="Webmosh"
+            width={56}
+            height={56}
+            className="mb-5 size-14 object-contain"
+            priority
+          />
           <h1 className="text-4xl font-semibold leading-[1.1] tracking-tight text-foreground sm:text-5xl xl:text-6xl">
             Build, launch &amp; grow
             <br />
@@ -138,16 +139,25 @@ export default function LoginPage() {
       </div>
 
       {/* Right — Sign-in card */}
-      <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 lg:px-16 xl:px-24">
-        {/* Mobile brand badge */}
-        <div className="mb-8 lg:hidden">
-          <Badge
-            variant="outline"
-            className="border-sky-500/30 bg-sky-500/10 text-sky-500"
-          >
-            <Building2 className="mr-1 size-3" />
-            Webmosh
-          </Badge>
+      <div className="flex flex-1 flex-col items-center justify-center px-5 py-10 sm:px-6 sm:py-16 lg:px-16 xl:px-24">
+        {/* Mobile brand hero */}
+        <div className="mb-8 flex flex-col items-center text-center lg:hidden">
+          <Image
+            src="/logo.png"
+            alt="Webmosh"
+            width={56}
+            height={56}
+            className="size-14 object-contain"
+            priority
+          />
+          <h1 className="mt-4 text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl">
+            Build, launch &amp; grow{" "}
+            <span className="text-sky-500">with confidence</span>
+          </h1>
+          <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
+            US &amp; UK formation, website development, brand &amp; SEO, and
+            compliance — all in one place.
+          </p>
         </div>
         <div className="w-full max-w-sm">
           <Card className="animate-fade-in border-border/60 bg-card/30 backdrop-blur-sm">
@@ -210,6 +220,14 @@ export default function LoginPage() {
               </p>
             </CardFooter>
           </Card>
+
+          {/* Mobile trust line */}
+          <p className="mt-6 text-center text-xs text-muted-foreground/60 lg:hidden">
+            Trusted by founders —{" "}
+            <span className="text-muted-foreground">
+              400+ companies formed
+            </span>
+          </p>
         </div>
       </div>
 

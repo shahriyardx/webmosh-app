@@ -21,6 +21,7 @@ function getBreadcrumb(pathname: string) {
   if (pathname === "/freelancer") return "Dashboard"
   if (pathname === "/freelancer/tasks") return "My Tasks"
   if (pathname.startsWith("/freelancer/tasks/")) return "Task"
+  if (pathname === "/freelancer/discussions") return "Discussions"
   if (pathname === "/freelancer/payouts") return "Payouts"
   if (pathname === "/freelancer/profile") return "Profile"
   return "Freelancer"

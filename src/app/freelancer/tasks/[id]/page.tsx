@@ -28,6 +28,7 @@ import {
   Loader2Icon,
   AlertOctagonIcon,
   CheckCircle2Icon,
+  MessagesSquareIcon,
 } from "lucide-react"
 
 const priorityStyles: Record<TaskPriority, string> = {
@@ -214,6 +215,12 @@ export default function FreelancerTaskDetailPage({
               )}
             </div>
           </div>
+          <Button asChild variant="outline" className="shrink-0">
+            <Link href={`/freelancer/discussions?task=${task.id}`}>
+              <MessagesSquareIcon className="size-4" />
+              Discuss with admin
+            </Link>
+          </Button>
         </div>
       </div>
 

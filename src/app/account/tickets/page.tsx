@@ -5,20 +5,10 @@ import { useRouter } from "next/navigation"
 import { trpc } from "@/lib/trpc/client"
 import { uploadFiles } from "@/lib/upload"
 import { toast } from "sonner"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent } from "@/components/ui/card"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import {
   Dialog,
   DialogContent,
@@ -34,12 +24,29 @@ import {
   MultiSelectContent,
   MultiSelectItem,
 } from "@/components/ui/multi-select"
-import { LifeBuoyIcon, PlusIcon, PaperclipIcon, XIcon } from "lucide-react"
+import {
+  LifeBuoyIcon,
+  PlusIcon,
+  PaperclipIcon,
+  XIcon,
+  ArrowRightIcon,
+} from "lucide-react"
 
-const statusBadge: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
-  open: { label: "Open", variant: "default" },
-  pending: { label: "Awaiting reply", variant: "secondary" },
-  closed: { label: "Closed", variant: "outline" },
+const STATUS_STYLES: Record<string, { label: string; className: string }> = {
+  open: {
+    label: "Open",
+    className:
+      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
+  },
+  pending: {
+    label: "Awaiting reply",
+    className:
+      "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
+  },
+  closed: {
+    label: "Closed",
+    className: "bg-muted text-muted-foreground ring-border",
+  },
 }
 
 const GENERAL = "__general__"
@@ -98,11 +105,13 @@ export default function AccountTicketsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between">
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Support</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            Support
+          </h1>
+          <p className="mt-1.5 text-muted-foreground">
             All support tickets across your companies.
           </p>
         </div>
@@ -217,47 +226,66 @@ export default function AccountTicketsPage() {
       </div>
 
       {!tickets || tickets.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-16">
-            <LifeBuoyIcon className="size-10 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">No tickets yet.</p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border py-20 text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-muted/40">
+            <LifeBuoyIcon className="size-6 text-muted-foreground/60" />
+          </div>
+          <p className="text-sm font-medium text-foreground">No tickets yet.</p>
+          <p className="max-w-xs text-xs text-muted-foreground">
+            Need a hand? Open a ticket and our team will get back to you.
+          </p>
+        </div>
       ) : (
-        <div className="rounded-lg border border-border">
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead>Subject</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Updated</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tickets.map((t) => {
-                const sb = statusBadge[t.status] ?? statusBadge.open
-                return (
-                  <TableRow
-                    key={t.id}
-                    className="cursor-pointer"
-                    onClick={() => router.push(`/account/tickets/${t.id}`)}
+        <div className="grid gap-3">
+          {tickets.map((t) => {
+            const st = STATUS_STYLES[t.status] ?? STATUS_STYLES.open
+            const isClosed = t.status === "closed"
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => router.push(`/account/tickets/${t.id}`)}
+                className={`group flex w-full items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-sky-500/40 hover:bg-muted/30 ${
+                  isClosed ? "opacity-70" : ""
+                }`}
+              >
+                <div className="flex min-w-0 items-center gap-4">
+                  <div
+                    className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${
+                      isClosed
+                        ? "border border-border bg-muted/40"
+                        : "bg-sky-500/10"
+                    }`}
                   >
-                    <TableCell className="font-medium">{t.subject}</TableCell>
-                    <TableCell className="uppercase text-muted-foreground">
-                      {t.organization?.name ?? "General"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={sb.variant}>{sb.label}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground">
-                      {new Date(t.updatedAt).toLocaleDateString()}
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+                    <LifeBuoyIcon
+                      className={`size-5 ${
+                        isClosed ? "text-muted-foreground" : "text-sky-500"
+                      }`}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground transition-colors group-hover:text-sky-600 dark:group-hover:text-sky-400">
+                      {t.subject}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      <span className="uppercase tracking-wide">
+                        {t.organization?.name ?? "General"}
+                      </span>{" "}
+                      · Updated {new Date(t.updatedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${st.className}`}
+                  >
+                    {st.label}
+                  </span>
+                  <ArrowRightIcon className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-sky-500" />
+                </div>
+              </button>
+            )
+          })}
         </div>
       )}
     </div>

@@ -6,14 +6,6 @@ import { trpc } from "@/lib/trpc/client"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardFooter,
-} from "@/components/ui/card"
-import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -29,7 +21,14 @@ import {
   MultiSelectContent,
   MultiSelectItem,
 } from "@/components/ui/multi-select"
-import { ConciergeBellIcon, Loader2Icon, CheckIcon } from "lucide-react"
+import {
+  ConciergeBellIcon,
+  Loader2Icon,
+  CheckIcon,
+  GlobeIcon,
+  PaletteIcon,
+  type LucideIcon,
+} from "lucide-react"
 import {
   WordpressCheckoutDialog,
   type WordpressPurchasePayload,
@@ -140,37 +139,45 @@ export default function AccountServicesPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto w-full max-w-7xl space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Services</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          Services
+        </h1>
+        <p className="mt-1.5 text-muted-foreground">
           Browse services and purchase for any of your companies.
         </p>
       </div>
 
       {wordpressServices.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground">
-            Web development
-          </h2>
+        <section className="space-y-4">
+          <SectionHeading
+            icon={PaletteIcon}
+            title="Web development"
+            subtitle="Available worldwide — no company required"
+          />
           <ServiceGrid services={wordpressServices} onPurchase={startPurchase} />
         </section>
       )}
 
       {ukServices.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground">
-            United Kingdom
-          </h2>
+        <section className="space-y-4">
+          <SectionHeading
+            icon={GlobeIcon}
+            title="United Kingdom"
+            subtitle="For your UK companies"
+          />
           <ServiceGrid services={ukServices} onPurchase={startPurchase} />
         </section>
       )}
 
       {usServices.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground">
-            United States
-          </h2>
+        <section className="space-y-4">
+          <SectionHeading
+            icon={GlobeIcon}
+            title="United States"
+            subtitle="For your US companies"
+          />
           <ServiceGrid services={usServices} onPurchase={startPurchase} />
         </section>
       )}
@@ -178,14 +185,14 @@ export default function AccountServicesPage() {
       {ukServices.length === 0 &&
         usServices.length === 0 &&
         wordpressServices.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center gap-3 py-16">
-              <ConciergeBellIcon className="size-10 text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">
-                No services available yet.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border py-20 text-center">
+            <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-muted/40">
+              <ConciergeBellIcon className="size-6 text-muted-foreground/60" />
+            </div>
+            <p className="text-sm font-medium text-foreground">
+              No services available yet.
+            </p>
+          </div>
         )}
 
       <Dialog
@@ -274,6 +281,30 @@ export default function AccountServicesPage() {
   )
 }
 
+function SectionHeading({
+  icon: Icon,
+  title,
+  subtitle,
+}: {
+  icon: LucideIcon
+  title: string
+  subtitle?: string
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex size-9 items-center justify-center rounded-xl border border-border bg-muted/40">
+        <Icon className="size-4 text-muted-foreground" />
+      </div>
+      <div>
+        <h2 className="text-base font-semibold text-foreground">{title}</h2>
+        {subtitle && (
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ServiceGrid({
   services,
   onPurchase,
@@ -284,42 +315,51 @@ function ServiceGrid({
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {services.map((svc) => (
-        <Card key={svc.id} className="flex flex-col">
-          <CardHeader>
-            <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-sky-500/10">
+        <div
+          key={svc.id}
+          className="group flex flex-col rounded-2xl border border-border bg-card p-5 transition-all hover:border-sky-500/40 hover:shadow-sm"
+        >
+          <div className="flex items-start justify-between">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-sky-500/10">
               <ConciergeBellIcon className="size-5 text-sky-500" />
             </div>
-            <CardTitle>{svc.title}</CardTitle>
-            {svc.description && (
-              <CardDescription className="line-clamp-2">
-                {svc.description}
-              </CardDescription>
-            )}
-          </CardHeader>
-          {svc.features.length > 0 && (
-            <CardContent className="flex-1">
-              <ul className="space-y-1">
-                {svc.features.map((f, i) => (
-                  <li
-                    key={i}
-                    className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                  >
-                    <CheckIcon className="size-3 shrink-0 text-green-600" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          )}
-          <CardFooter className="mt-auto justify-between">
-            <span className="text-lg font-bold text-foreground">
-              ${svc.price}
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {svc.type === "wordpress" ? "Global" : svc.country ?? "Global"}
             </span>
+          </div>
+          <p className="mt-3.5 text-base font-semibold text-foreground transition-colors group-hover:text-sky-600 dark:group-hover:text-sky-400">
+            {svc.title}
+          </p>
+          {svc.description && (
+            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+              {svc.description}
+            </p>
+          )}
+          {svc.features.length > 0 && (
+            <ul className="mt-3.5 flex-1 space-y-1.5">
+              {svc.features.map((f, i) => (
+                <li
+                  key={i}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                >
+                  <CheckIcon className="size-3 shrink-0 text-emerald-500" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+            <div>
+              <span className="text-xl font-bold text-foreground">
+                ${svc.price}
+              </span>
+              <span className="ml-1 text-xs text-muted-foreground">USD</span>
+            </div>
             <Button size="sm" onClick={() => onPurchase(svc)}>
               Purchase
             </Button>
-          </CardFooter>
-        </Card>
+          </div>
+        </div>
       ))}
     </div>
   )

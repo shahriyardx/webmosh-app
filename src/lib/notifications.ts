@@ -13,6 +13,7 @@ export type NotificationKind =
   | "user.signup"
   | "wallet.topup_submitted"
   | "wallet.payout_requested"
+  | "discussion.message"
 
 /**
  * Create a single global admin notification. Never throws — logs and swallows.

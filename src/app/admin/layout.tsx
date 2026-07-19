@@ -28,6 +28,7 @@ const breadcrumbTitles: Record<string, string> = {
   "/admin/tickets": "Tickets",
   "/admin/emails": "Emails",
   "/admin/wallet": "Wallet",
+  "/admin/discussions": "Discussions",
   "/admin/settings": "Settings",
 }
 

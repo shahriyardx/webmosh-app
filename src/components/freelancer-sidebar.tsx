@@ -22,11 +22,19 @@ import {
   ClipboardListIcon,
   UserIcon,
   WalletIcon,
+  MessagesSquareIcon,
 } from "lucide-react"
+import { trpc } from "@/lib/trpc/client"
+import { Badge } from "@/components/ui/badge"
 
 const links = [
   { title: "Dashboard", href: "/freelancer", icon: LayoutDashboardIcon },
   { title: "My Tasks", href: "/freelancer/tasks", icon: ClipboardListIcon },
+  {
+    title: "Discussions",
+    href: "/freelancer/discussions",
+    icon: MessagesSquareIcon,
+  },
   { title: "Payouts", href: "/freelancer/payouts", icon: WalletIcon },
   { title: "Profile", href: "/freelancer/profile", icon: UserIcon },
 ]
@@ -40,6 +48,10 @@ export function FreelancerSidebar({
   onSignOut?: () => void
 }) {
   const pathname = usePathname()
+  const { data: unreadDiscussions } = trpc.discussions.unreadCount.useQuery(
+    undefined,
+    { refetchInterval: 30_000, refetchOnWindowFocus: true },
+  )
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -85,6 +97,13 @@ export function FreelancerSidebar({
                   <Link href={link.href}>
                     <link.icon />
                     <span>{link.title}</span>
+                    {link.title === "Discussions" &&
+                      unreadDiscussions !== undefined &&
+                      unreadDiscussions > 0 && (
+                        <Badge className="ml-auto size-5 rounded-full p-0 text-[10px]">
+                          {unreadDiscussions}
+                        </Badge>
+                      )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

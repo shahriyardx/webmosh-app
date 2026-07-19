@@ -40,14 +40,16 @@ import {
 } from "lucide-react"
 
 const filingStatusStyles: Record<string, string> = {
-  requested: "bg-amber-500/15 text-amber-500 ring-amber-500/25",
-  submitted: "bg-sky-500/15 text-sky-500 ring-sky-500/25",
-  approved: "bg-emerald-500/15 text-emerald-500 ring-emerald-500/25",
-  rejected: "bg-red-500/15 text-red-500 ring-red-500/25",
-  open: "bg-sky-500/15 text-sky-500 ring-sky-500/25",
-  pending: "bg-amber-500/15 text-amber-500 ring-amber-500/25",
-  processing: "bg-sky-500/15 text-sky-500 ring-sky-500/25",
-  completed: "bg-emerald-500/15 text-emerald-500 ring-emerald-500/25",
+  requested: "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
+  submitted: "bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20",
+  approved:
+    "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
+  rejected: "bg-red-500/10 text-red-600 dark:text-red-400 ring-red-500/20",
+  open: "bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20",
+  pending: "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
+  processing: "bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20",
+  completed:
+    "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
   closed: "bg-muted text-muted-foreground ring-border",
 }
 
@@ -56,7 +58,7 @@ function FilingStatusPill({ status }: { status: string }) {
     filingStatusStyles[status] ?? "bg-muted text-muted-foreground ring-border"
   return (
     <span
-      className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold capitalize ring-1 ring-inset ${cls}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ring-1 ring-inset ${cls}`}
     >
       {status}
     </span>
@@ -64,15 +66,15 @@ function FilingStatusPill({ status }: { status: string }) {
 }
 
 const priorityStyles: Record<"high" | "medium" | "low", string> = {
-  high: "bg-red-500/15 text-red-500 ring-red-500/25",
-  medium: "bg-amber-500/15 text-amber-500 ring-amber-500/25",
-  low: "bg-emerald-500/15 text-emerald-500 ring-emerald-500/25",
+  high: "bg-red-500/10 text-red-600 dark:text-red-400 ring-red-500/20",
+  medium: "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
+  low: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
 }
 
 function PriorityPill({ priority }: { priority: "high" | "medium" | "low" }) {
   return (
     <span
-      className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold uppercase tracking-wider ring-1 ring-inset ${priorityStyles[priority]}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1 ring-inset ${priorityStyles[priority]}`}
     >
       {priority}
     </span>
@@ -86,10 +88,30 @@ const bucketLabels: Record<"overdue" | "d30" | "d60" | "d90", string> = {
   d90: "61–90 days",
 }
 const bucketStyles: Record<"overdue" | "d30" | "d60" | "d90", string> = {
-  overdue: "bg-red-500/15 text-red-500 ring-red-500/25",
-  d30: "bg-amber-500/15 text-amber-500 ring-amber-500/25",
-  d60: "bg-sky-500/15 text-sky-500 ring-sky-500/25",
+  overdue: "bg-red-500/10 text-red-600 dark:text-red-400 ring-red-500/20",
+  d30: "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
+  d60: "bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20",
   d90: "bg-muted text-muted-foreground ring-border",
+}
+
+/** Neutral bordered icon-chip section header, matching the other dashboards. */
+function SectionTitle({
+  icon: Icon,
+  iconClass = "text-muted-foreground",
+  children,
+}: {
+  icon: typeof Building2Icon
+  iconClass?: string
+  children: React.ReactNode
+}) {
+  return (
+    <span className="flex items-center gap-2.5">
+      <span className="flex size-8 items-center justify-center rounded-lg border border-border bg-muted/40">
+        <Icon className={`size-4 ${iconClass}`} />
+      </span>
+      {children}
+    </span>
+  )
 }
 
 export default function AdminDashboardPage() {
@@ -154,89 +176,120 @@ export default function AdminDashboardPage() {
     )
   }
 
-  const statCards = [
-    {
-      title: "Formations",
-      icon: Building2Icon,
-      value: stats.totalFormations,
-      sub: `${stats.pendingFormations} pending · ${stats.processingFormations} processing`,
-      href: "/admin/formations",
-    },
-    {
-      title: "Revenue",
-      icon: DollarSignIcon,
-      value: `$${stats.revenue.toLocaleString()}`,
-      sub: "From paid invoices",
-      href: "/admin/invoices",
-    },
-    {
-      title: "Users",
-      icon: UsersIcon,
-      value: stats.totalUsers,
-      sub: "Registered users",
-      href: "/admin/users",
-    },
-    {
-      title: "Completed",
-      icon: Building2Icon,
-      value: stats.completedFormations,
-      sub: "Finished formations",
-      href: "/admin/formations",
-    },
-  ]
-
   const bucketItems =
     compliance?.items.filter((i) => i.bucket === bucket) ?? []
 
+  const today = new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
+
+  const attentionCount =
+    (docsToReview?.length ?? 0) +
+    (invoicesToReview?.filter((i) => i.status === "processing").length ?? 0)
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">
-          Admin Dashboard
-        </h1>
-        <p className="mt-1 text-base text-muted-foreground">
-          Overview of formations, revenue, and items needing attention.
-        </p>
+    <div className="mx-auto w-full max-w-7xl space-y-8">
+      {/* Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-sky-600 dark:text-sky-400">
+            {today}
+          </p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-foreground">
+            Admin Dashboard
+          </h1>
+          <p className="mt-1.5 text-muted-foreground">
+            Overview of formations, revenue, and items needing attention.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/admin/formations">
+              <Building2Icon className="size-4" />
+              Formations
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/admin/invoices">
+              <ReceiptIcon className="size-4" />
+              Invoices
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {/* Top stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((card) => (
-          <Link key={card.title} href={card.href}>
-            <Card className="transition-colors hover:bg-muted/40">
-              <CardHeader className="flex flex-row items-start justify-between pb-2">
-                <CardTitle className="text-base font-medium text-muted-foreground">
-                  {card.title}
-                </CardTitle>
-                <div className="flex size-8 items-center justify-center rounded-lg bg-sky-500/10">
-                  <card.icon className="size-4 text-sky-500" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-semibold text-foreground">
-                  {card.value}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">{card.sub}</p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+      {/* Revenue hero */}
+      <div className="relative overflow-hidden rounded-3xl bg-slate-950 p-6 text-white sm:p-8">
+        <div className="pointer-events-none absolute -right-24 -top-32 size-80 rounded-full bg-sky-500/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 left-1/4 size-72 rounded-full bg-emerald-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-inset ring-white/10" />
+        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="flex items-center gap-2 text-sm font-medium text-slate-400">
+              <DollarSignIcon className="size-4" />
+              Total revenue
+            </p>
+            <p className="mt-2 text-5xl font-bold tracking-tight">
+              ${stats.revenue.toLocaleString()}
+              <span className="ml-2 align-middle text-base font-medium text-slate-400">
+                USD
+              </span>
+            </p>
+            <p className="mt-2 text-sm text-slate-400">
+              From paid invoices ·{" "}
+              {attentionCount > 0 ? (
+                <span className="text-amber-300">
+                  {attentionCount} item{attentionCount === 1 ? "" : "s"} need
+                  attention
+                </span>
+              ) : (
+                <span className="text-emerald-300">All caught up</span>
+              )}
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-px overflow-hidden rounded-2xl bg-white/10 ring-1 ring-inset ring-white/10">
+            <HeroStat
+              icon={Building2Icon}
+              label="Formations"
+              value={stats.totalFormations}
+              hint={`${stats.pendingFormations} pending`}
+              href="/admin/formations"
+            />
+            <HeroStat
+              icon={UsersIcon}
+              label="Users"
+              value={stats.totalUsers}
+              hint="Registered"
+              href="/admin/users"
+            />
+            <HeroStat
+              icon={CheckIcon}
+              label="Completed"
+              value={stats.completedFormations}
+              hint="Finished"
+              href="/admin/formations"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Needs attention: 4 expanded widgets */}
       <div>
-        <h2 className="mb-3 text-base font-semibold text-foreground">
-          Needs attention
-        </h2>
+        <div className="mb-3 flex items-center gap-2">
+          <AlertTriangleIcon className="size-4 text-amber-500" />
+          <h2 className="text-base font-semibold text-foreground">
+            Needs attention
+          </h2>
+        </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {/* Documents to review */}
-          <Card>
+          <Card className="rounded-2xl shadow-none">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between text-lg">
-                <div className="flex items-center gap-2">
-                  <FileTextIcon className="size-4 text-sky-500" />
-                  Documents to review
-                </div>
+              <CardTitle className="flex items-center justify-between text-base font-semibold">
+                <SectionTitle icon={FileTextIcon}>Documents</SectionTitle>
                 <Badge variant={docsToReview?.length ? "default" : "outline"}>
                   {docsToReview?.length ?? 0}
                 </Badge>
@@ -322,16 +375,13 @@ export default function AdminDashboardPage() {
           </Card>
 
           {/* Invoices to review */}
-          <Card>
+          <Card className="rounded-2xl shadow-none">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between text-lg">
-                <div className="flex items-center gap-2">
-                  <ReceiptIcon className="size-4 text-sky-500" />
-                  Invoices
-                </div>
+              <CardTitle className="flex items-center justify-between text-base font-semibold">
+                <SectionTitle icon={ReceiptIcon}>Invoices</SectionTitle>
                 <Link
                   href="/admin/invoices"
-                  className="flex items-center gap-1 text-sm font-normal text-muted-foreground hover:text-foreground"
+                  className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-sky-500"
                 >
                   View all
                   <ArrowRightIcon className="size-3" />
@@ -437,16 +487,13 @@ export default function AdminDashboardPage() {
           </Card>
 
           {/* Recent orders */}
-          <Card>
+          <Card className="rounded-2xl shadow-none">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between text-lg">
-                <div className="flex items-center gap-2">
-                  <ShoppingCartIcon className="size-4 text-sky-500" />
-                  Recent orders
-                </div>
+              <CardTitle className="flex items-center justify-between text-base font-semibold">
+                <SectionTitle icon={ShoppingCartIcon}>Orders</SectionTitle>
                 <Link
                   href="/admin/orders"
-                  className="flex items-center gap-1 text-sm font-normal text-muted-foreground hover:text-foreground"
+                  className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-sky-500"
                 >
                   View all
                   <ArrowRightIcon className="size-3" />
@@ -489,16 +536,13 @@ export default function AdminDashboardPage() {
           </Card>
 
           {/* Recent tickets (replaces Pending orders) */}
-          <Card>
+          <Card className="rounded-2xl shadow-none">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between text-lg">
-                <div className="flex items-center gap-2">
-                  <LifeBuoyIcon className="size-4 text-sky-500" />
-                  Recent tickets
-                </div>
+              <CardTitle className="flex items-center justify-between text-base font-semibold">
+                <SectionTitle icon={LifeBuoyIcon}>Tickets</SectionTitle>
                 <Link
                   href="/admin/tickets"
-                  className="flex items-center gap-1 text-sm font-normal text-muted-foreground hover:text-foreground"
+                  className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-sky-500"
                 >
                   View all
                   <ArrowRightIcon className="size-3" />
@@ -549,20 +593,19 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* 1. Compliance deadline tracker */}
-      <Card>
+      <Card className="rounded-2xl shadow-none">
         <CardHeader>
-          <CardTitle className="flex items-center justify-between text-lg">
-            <div className="flex items-center gap-2">
-              <AlertTriangleIcon className="size-4 text-red-500" />
+          <CardTitle className="flex flex-wrap items-center justify-between gap-3 text-base font-semibold">
+            <SectionTitle icon={AlertTriangleIcon} iconClass="text-red-500">
               Compliance deadlines
-            </div>
+            </SectionTitle>
             <div className="flex flex-wrap gap-1">
               {(["overdue", "d30", "d60", "d90"] as const).map((b) => (
                 <button
                   key={b}
                   type="button"
                   onClick={() => setBucket(b)}
-                  className={`rounded-md px-2 py-1 text-sm font-medium ring-1 ring-inset transition-colors ${
+                  className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition-colors ${
                     bucket === b
                       ? bucketStyles[b]
                       : "bg-transparent text-muted-foreground ring-border hover:bg-muted/40"
@@ -631,15 +674,14 @@ export default function AdminDashboardPage() {
         </CardContent>
       </Card>
 
+      {/* Task manager + Recent activity side by side */}
+      <div className="grid gap-4 lg:grid-cols-2">
       {/* 6. Task manager */}
-      <Card>
+      <Card className="rounded-2xl shadow-none">
         <CardHeader>
-          <CardTitle className="flex items-center justify-between text-lg">
-            <div className="flex items-center gap-2">
-              <ClipboardListIcon className="size-4 text-sky-500" />
-              Task manager
-            </div>
-            <span className="text-sm font-normal text-muted-foreground">
+          <CardTitle className="flex items-center justify-between text-base font-semibold">
+            <SectionTitle icon={ClipboardListIcon}>Task manager</SectionTitle>
+            <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
               {tasks?.length ?? 0} open
             </span>
           </CardTitle>
@@ -651,7 +693,7 @@ export default function AdminDashboardPage() {
             </p>
           ) : (
             <div className="divide-y divide-border">
-              {tasks.map((t) => (
+              {tasks.slice(0, 5).map((t) => (
                 <Link
                   key={t.id}
                   href={t.href}
@@ -678,11 +720,10 @@ export default function AdminDashboardPage() {
       </Card>
 
       {/* 5. Recent activity */}
-      <Card>
+      <Card className="rounded-2xl shadow-none">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <CalendarIcon className="size-4 text-sky-500" />
-            Recent activity
+          <CardTitle className="text-base font-semibold">
+            <SectionTitle icon={CalendarIcon}>Recent activity</SectionTitle>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -692,7 +733,7 @@ export default function AdminDashboardPage() {
             </p>
           ) : (
             <div className="divide-y divide-border">
-              {activity.map((a) => (
+              {activity.slice(0, 5).map((a) => (
                 <Link
                   key={a.id}
                   href={a.href}
@@ -719,6 +760,7 @@ export default function AdminDashboardPage() {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* Reject document dialog */}
       <Dialog
@@ -823,5 +865,35 @@ export default function AdminDashboardPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+function HeroStat({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  href,
+}: {
+  icon: typeof Building2Icon
+  label: string
+  value: number | string
+  hint: string
+  href: string
+}) {
+  return (
+    <Link
+      href={href}
+      className="group bg-slate-950 px-4 py-3.5 transition-colors hover:bg-slate-900 sm:px-5"
+    >
+      <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-slate-400">
+        <Icon className="size-3.5" />
+        {label}
+      </div>
+      <p className="mt-1.5 text-xl font-bold tabular-nums text-white">{value}</p>
+      <p className="mt-0.5 text-[11px] text-slate-500 transition-colors group-hover:text-sky-400">
+        {hint}
+      </p>
+    </Link>
   )
 }

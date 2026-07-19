@@ -39,6 +39,7 @@ model User {
   decidedPayouts Payout[] @relation("PayoutDecidedBy")
   walletTransactions WalletTransaction[] @relation("WalletUser")
   decidedWalletTxs   WalletTransaction[] @relation("WalletDecidedBy")
+  taskMessages  TaskMessage[] @relation("TaskMessageSender")
 
   @@unique([email])
   @@map("user")
@@ -425,12 +426,30 @@ model Task {
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   orderId        String?       @map("order_id")
   order          ServiceOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  messages       TaskMessage[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   @@index([assignedToId])
   @@index([status])
   @@map("task")
+}
+
+model TaskMessage {
+  id               String   @id @default(cuid())
+  taskId           String   @map("task_id")
+  task             Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  senderId         String   @map("sender_id")
+  sender           User     @relation("TaskMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  fromAdmin        Boolean  @default(false) @map("from_admin")
+  body             String
+  attachments      String[]
+  readByAdmin      Boolean  @default(false) @map("read_by_admin")
+  readByFreelancer Boolean  @default(false) @map("read_by_freelancer")
+  createdAt        DateTime @default(now())
+
+  @@index([taskId])
+  @@map("task_message")
 }
 
 enum PayoutStatus {

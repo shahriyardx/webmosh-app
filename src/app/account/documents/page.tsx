@@ -2,8 +2,6 @@
 
 import { useRef, useState } from "react"
 import { trpc } from "@/lib/trpc/client"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   FileTextIcon,
@@ -16,21 +14,41 @@ import {
 } from "lucide-react"
 
 const statusConfig = {
-  requested: { label: "Requested", icon: ClockIcon, variant: "secondary" as const },
-  submitted: { label: "Submitted", icon: ClockIcon, variant: "outline" as const },
-  approved: { label: "Approved", icon: CheckCircle2Icon, variant: "default" as const },
-  rejected: { label: "Rejected", icon: XCircleIcon, variant: "destructive" as const },
+  requested: {
+    label: "Requested",
+    icon: ClockIcon,
+    className:
+      "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
+  },
+  submitted: {
+    label: "In review",
+    icon: ClockIcon,
+    className: "bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20",
+  },
+  approved: {
+    label: "Approved",
+    icon: CheckCircle2Icon,
+    className:
+      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
+  },
+  rejected: {
+    label: "Rejected",
+    icon: XCircleIcon,
+    className: "bg-red-500/10 text-red-600 dark:text-red-400 ring-red-500/20",
+  },
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusPill({ status }: { status: string }) {
   const config =
     statusConfig[status as keyof typeof statusConfig] ?? statusConfig.submitted
   const Icon = config.icon
   return (
-    <Badge variant={config.variant}>
-      <Icon />
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${config.className}`}
+    >
+      <Icon className="size-3" />
       {config.label}
-    </Badge>
+    </span>
   )
 }
 
@@ -80,6 +98,10 @@ export default function AccountDocumentsPage() {
     }
   }
 
+  const needsActionCount = (docs ?? []).filter(
+    (d) => d.status === "requested" || d.status === "rejected",
+  ).length
+
   if (isLoading) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
@@ -89,23 +111,34 @@ export default function AccountDocumentsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Documents</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          All documents across your companies.
-        </p>
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            Documents
+          </h1>
+          <p className="mt-1.5 text-muted-foreground">
+            All documents across your companies.
+          </p>
+        </div>
+        {needsActionCount > 0 && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-600 ring-1 ring-inset ring-amber-500/20 dark:text-amber-400">
+            <AlertCircleIcon className="size-3.5" />
+            {needsActionCount} need{needsActionCount === 1 ? "s" : ""} your
+            attention
+          </span>
+        )}
       </div>
 
       {!docs || docs.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-16">
-            <FileTextIcon className="size-10 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">No documents yet.</p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border py-20 text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-muted/40">
+            <FileTextIcon className="size-6 text-muted-foreground/60" />
+          </div>
+          <p className="text-sm font-medium text-foreground">No documents yet.</p>
+        </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-3">
           {docs.map((doc) => (
             <DocumentCard
               key={doc.id}
@@ -150,7 +183,8 @@ function DocumentCard({
         onChange={handleFilePick}
       />
       <Button
-        variant="outline"
+        variant={needsAction ? "default" : "outline"}
+        size="sm"
         disabled={uploading}
         onClick={() => fileInputRef.current?.click()}
       >
@@ -170,62 +204,87 @@ function DocumentCard({
   )
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-4 pb-2">
-        <div className="flex items-start gap-3 pt-1">
-          <FileTextIcon className="size-5 shrink-0 text-sky-500" />
-          <div>
-            <CardTitle className="text-base">{doc.name}</CardTitle>
-            {doc.organization?.name && (
-              <p className="mt-0.5 text-xs uppercase text-muted-foreground">
-                {doc.organization.name}
-              </p>
-            )}
+    <div
+      className={`rounded-2xl border bg-card p-5 transition-colors ${
+        needsAction
+          ? doc.status === "rejected"
+            ? "border-red-500/30"
+            : "border-amber-500/30"
+          : "border-border"
+      }`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3.5">
+          <div
+            className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${
+              needsAction
+                ? doc.status === "rejected"
+                  ? "bg-red-500/10"
+                  : "bg-amber-500/10"
+                : "border border-border bg-muted/40"
+            }`}
+          >
+            <FileTextIcon
+              className={`size-5 ${
+                needsAction
+                  ? doc.status === "rejected"
+                    ? "text-red-500"
+                    : "text-amber-500"
+                  : "text-muted-foreground"
+              }`}
+            />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-foreground">
+              {doc.name}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {doc.organization?.name && (
+                <span className="uppercase tracking-wide">
+                  {doc.organization.name}
+                </span>
+              )}
+              {doc.organization?.name && " · "}
+              {new Date(doc.createdAt).toLocaleDateString()}
+            </p>
           </div>
         </div>
-        <StatusBadge status={doc.status} />
-      </CardHeader>
-      <CardContent>
-        {doc.status === "rejected" && doc.rejectReason && (
-          <p className="flex items-center gap-1.5 text-xs text-red-500">
-            <AlertCircleIcon className="size-3" />
-            {doc.rejectReason}
-          </p>
-        )}
-        {doc.status === "submitted" && (
-          <p className="text-xs text-muted-foreground">
-            Document pending review by admin.
-          </p>
-        )}
-        {doc.status === "requested" && (
-          <p className="text-xs text-muted-foreground">
+        <StatusPill status={doc.status} />
+      </div>
+
+      {doc.status === "rejected" && doc.rejectReason && (
+        <div className="mt-3.5 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 px-3.5 py-2.5 text-xs text-red-600 dark:text-red-400">
+          <AlertCircleIcon className="mt-0.5 size-3.5 shrink-0" />
+          <span>{doc.rejectReason}</span>
+        </div>
+      )}
+      {doc.status === "requested" && (
+        <div className="mt-3.5 flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3.5 py-2.5 text-xs text-amber-600 dark:text-amber-400">
+          <AlertCircleIcon className="mt-0.5 size-3.5 shrink-0" />
+          <span>
             {doc.requestReason ??
               "This document has been requested. Please upload it below."}
-          </p>
+          </span>
+        </div>
+      )}
+      {doc.status === "submitted" && (
+        <p className="mt-3.5 text-xs text-muted-foreground">
+          Document pending review by our team.
+        </p>
+      )}
+
+      <div className="mt-4 flex items-center justify-end gap-2 border-t border-border pt-4">
+        {doc.value && (
+          <Button variant="outline" size="sm" asChild>
+            <a href={doc.value} target="_blank" rel="noopener noreferrer">
+              <ExternalLinkIcon className="size-3" />
+              View file
+            </a>
+          </Button>
         )}
-      </CardContent>
-      <CardFooter className="flex items-center justify-between border-t border-border pt-4">
-        {doc.status === "requested" && !doc.value ? (
-          uploadButton
-        ) : (
-          <>
-            <div className="text-xs text-muted-foreground">
-              Uploaded {new Date(doc.createdAt).toLocaleDateString()}
-            </div>
-            <div className="flex items-center gap-2">
-              {doc.value && (
-                <Button variant="outline" asChild>
-                  <a href={doc.value} target="_blank" rel="noopener noreferrer">
-                    <ExternalLinkIcon className="size-3" />
-                    View file
-                  </a>
-                </Button>
-              )}
-              {needsAction && uploadButton}
-            </div>
-          </>
-        )}
-      </CardFooter>
-    </Card>
+        {(needsAction || (!doc.value && doc.status === "requested")) &&
+          uploadButton}
+      </div>
+    </div>
   )
 }

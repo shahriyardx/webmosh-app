@@ -2,16 +2,7 @@
 
 import { useState } from "react"
 import { trpc } from "@/lib/trpc/client"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import {
   Sheet,
   SheetContent,
@@ -19,7 +10,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet"
-import { MailIcon, DownloadIcon } from "lucide-react"
+import { MailIcon, MailOpenIcon, DownloadIcon, PaperclipIcon } from "lucide-react"
 import type { inferRouterOutputs } from "@trpc/server"
 import type { AppRouter } from "@/lib/trpc/routers"
 
@@ -60,6 +51,8 @@ export default function AccountMailPage() {
     if (!m.read) markRead.mutate({ id: m.id })
   }
 
+  const unreadCount = (mails ?? []).filter((m) => !m.read).length
+
   if (isLoading) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
@@ -69,60 +62,93 @@ export default function AccountMailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Mail</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          All mail across your companies.
-        </p>
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            Mail
+          </h1>
+          <p className="mt-1.5 text-muted-foreground">
+            All mail across your companies.
+          </p>
+        </div>
+        {unreadCount > 0 && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-600 ring-1 ring-inset ring-sky-500/20 dark:text-sky-400">
+            <MailIcon className="size-3.5" />
+            {unreadCount} unread
+          </span>
+        )}
       </div>
 
       {!mails || mails.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-16">
-            <MailIcon className="size-10 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">No mail yet.</p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border py-20 text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-muted/40">
+            <MailIcon className="size-6 text-muted-foreground/60" />
+          </div>
+          <p className="text-sm font-medium text-foreground">No mail yet.</p>
+          <p className="max-w-xs text-xs text-muted-foreground">
+            We&apos;ll notify you when you receive new messages.
+          </p>
+        </div>
       ) : (
-        <div className="rounded-lg border border-border">
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead>Subject</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>From</TableHead>
-                <TableHead>Attachments</TableHead>
-                <TableHead className="text-right">Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mails.map((m) => (
-                <TableRow
-                  key={m.id}
-                  className="cursor-pointer"
-                  onClick={() => handleOpen(m)}
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="divide-y divide-border">
+            {mails.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => handleOpen(m)}
+                className={`group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-muted/40 ${
+                  m.read ? "" : "bg-sky-500/[0.04]"
+                }`}
+              >
+                <div
+                  className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
+                    m.read
+                      ? "border border-border bg-muted/40"
+                      : "bg-sky-500/10"
+                  }`}
                 >
-                  <TableCell className={m.read ? "" : "font-semibold"}>
-                    <span className="flex items-center gap-2">
-                      {!m.read && <span className="size-2 shrink-0 rounded-full bg-sky-500" />}
+                  {m.read ? (
+                    <MailOpenIcon className="size-4 text-muted-foreground" />
+                  ) : (
+                    <MailIcon className="size-4 text-sky-500" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    {!m.read && (
+                      <span className="size-2 shrink-0 rounded-full bg-sky-500" />
+                    )}
+                    <p
+                      className={`truncate text-sm transition-colors group-hover:text-sky-600 dark:group-hover:text-sky-400 ${
+                        m.read ? "font-medium" : "font-semibold"
+                      }`}
+                    >
                       {m.subject}
+                    </p>
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    <span className="uppercase tracking-wide">
+                      {m.organization?.name ?? "—"}
+                    </span>{" "}
+                    · {m.from}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  {m.attachments.length > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                      <PaperclipIcon className="size-3" />
+                      {m.attachments.length}
                     </span>
-                  </TableCell>
-                  <TableCell className="uppercase text-muted-foreground">
-                    {m.organization?.name ?? "—"}
-                  </TableCell>
-                  <TableCell className={m.read ? "text-muted-foreground" : "font-medium"}>{m.from}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {m.attachments.length || "—"}
-                  </TableCell>
-                  <TableCell className="text-right text-xs text-muted-foreground">
+                  )}
+                  <span className="text-xs tabular-nums text-muted-foreground">
                     {new Date(m.createdAt).toLocaleDateString()}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

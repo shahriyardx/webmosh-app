@@ -21,6 +21,7 @@ import {
   UserPlusIcon,
   InboxIcon,
   CheckCheckIcon,
+  MessagesSquareIcon,
 } from "lucide-react"
 
 const kindIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -36,6 +37,7 @@ const kindIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   "user.signup": UserPlusIcon,
   "wallet.topup_submitted": WalletIcon,
   "wallet.payout_requested": WalletIcon,
+  "discussion.message": MessagesSquareIcon,
 }
 
 const kindColors: Record<string, string> = {
@@ -51,6 +53,7 @@ const kindColors: Record<string, string> = {
   "user.signup": "bg-muted text-muted-foreground",
   "wallet.topup_submitted": "bg-amber-500/15 text-amber-500",
   "wallet.payout_requested": "bg-purple-500/15 text-purple-500",
+  "discussion.message": "bg-sky-500/15 text-sky-500",
 }
 
 function timeAgo(date: Date) {

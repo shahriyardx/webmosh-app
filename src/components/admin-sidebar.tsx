@@ -31,6 +31,7 @@ import {
   WalletIcon,
   MailIcon,
   CreditCardIcon,
+  MessagesSquareIcon,
   Settings,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
@@ -79,6 +80,11 @@ const links = [
     icon: UserCogIcon,
   },
   {
+    title: "Discussions",
+    href: "/admin/discussions",
+    icon: MessagesSquareIcon,
+  },
+  {
     title: "Payouts",
     href: "/admin/payouts",
     icon: WalletIcon,
@@ -115,6 +121,10 @@ export function AdminSidebar({
 }) {
   const pathname = usePathname()
   const { data: openTickets } = trpc.tickets.adminOpenCount.useQuery()
+  const { data: unreadDiscussions } = trpc.discussions.unreadCount.useQuery(
+    undefined,
+    { refetchInterval: 30_000, refetchOnWindowFocus: true },
+  )
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -161,6 +171,13 @@ export function AdminSidebar({
                       openTickets > 0 && (
                         <Badge className="ml-auto size-5 rounded-full p-0 text-[10px]">
                           {openTickets}
+                        </Badge>
+                      )}
+                    {link.title === "Discussions" &&
+                      unreadDiscussions !== undefined &&
+                      unreadDiscussions > 0 && (
+                        <Badge className="ml-auto size-5 rounded-full p-0 text-[10px]">
+                          {unreadDiscussions}
                         </Badge>
                       )}
                   </Link>
