@@ -26,7 +26,7 @@ export function InvoiceCoupon({
 }) {
   const [code, setCode] = useState("")
 
-  const apply = trpc.coupons.apply.useMutation({
+  const apply = trpc.coupons.applyCode.useMutation({
     onSuccess: (res) => {
       toast.success(`Coupon applied — you saved $${res.discount.toFixed(2)}`)
       setCode("")

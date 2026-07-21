@@ -276,7 +276,7 @@ export const couponsRouter = router({
 
   // ---------- CLIENT ----------
   /** Apply a coupon code to an unpaid invoice, discounting the amount due. */
-  apply: protectedProcedure
+  applyCode: protectedProcedure
     .input(z.object({ invoiceId: z.string(), code: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
       const invoice = await prisma.invoice.findUnique({
