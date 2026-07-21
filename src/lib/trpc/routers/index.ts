@@ -16,6 +16,7 @@ import { emailsRouter } from "./emails"
 import { walletRouter } from "./wallet"
 import { discussionsRouter } from "./discussions"
 import { bankAccountsRouter } from "./bank-accounts"
+import { couponsRouter } from "./coupons"
 import { adminRouter } from "./admin"
 
 export const appRouter = router({
@@ -36,6 +37,7 @@ export const appRouter = router({
   wallet: walletRouter,
   discussions: discussionsRouter,
   bankAccounts: bankAccountsRouter,
+  coupons: couponsRouter,
   admin: adminRouter,
 })
 

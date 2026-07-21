@@ -11,6 +11,7 @@ import { ArrowLeftIcon, DownloadIcon, WalletIcon } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { formatInvoiceNumber } from "@/lib/invoice-number"
+import { InvoiceCoupon } from "@/components/invoice-coupon"
 
 const QR_CONTENT =
   "00020101021126540013com.pathaopay01020302041008031991008200186593649045204739953030505802BD5907WEBMOSH60045460625002110186593649003085594973007082f9893880807PAYMENT63049E3F"
@@ -105,7 +106,20 @@ export default function AccountInvoiceDetailPage({
         </div>
         <div className="space-y-4 px-5 py-4">
           <div>
-            <p className="text-3xl font-bold">${invoice.amount}</p>
+            <div className="flex items-baseline gap-2">
+              <p className="text-3xl font-bold">${invoice.amount}</p>
+              {invoice.originalAmount != null && (
+                <p className="text-lg font-medium text-muted-foreground line-through">
+                  ${invoice.originalAmount}
+                </p>
+              )}
+            </div>
+            {invoice.couponCode && (
+              <p className="mt-1 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                Coupon {invoice.couponCode} — saved $
+                {(invoice.discountAmount ?? 0).toFixed(2)}
+              </p>
+            )}
             {bdtAmount && (
               <p className="mt-1 text-sm text-muted-foreground">৳{bdtAmount} BDT</p>
             )}
@@ -148,6 +162,19 @@ export default function AccountInvoiceDetailPage({
             )}
         </div>
       </div>
+
+      {canPay && (
+        <InvoiceCoupon
+          invoiceId={invoiceId}
+          couponCode={invoice.couponCode}
+          discountAmount={invoice.discountAmount}
+          originalAmount={invoice.originalAmount}
+          onChanged={() => {
+            utils.invoices.getById.invalidate({ id: invoiceId })
+            utils.invoices.listForUser.invalidate()
+          }}
+        />
+      )}
 
       {canPay && (
         <div className="rounded-xl border border-sky-500/30 bg-sky-500/5">
