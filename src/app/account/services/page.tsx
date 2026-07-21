@@ -313,54 +313,85 @@ function ServiceGrid({
   onPurchase: (svc: Service) => void
 }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {services.map((svc) => (
-        <div
-          key={svc.id}
-          className="group flex flex-col rounded-2xl border border-border bg-card p-5 transition-all hover:border-sky-500/40 hover:shadow-sm"
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-sky-500/10">
-              <ConciergeBellIcon className="size-5 text-sky-500" />
-            </div>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {svc.type === "wordpress" ? "Global" : svc.country ?? "Global"}
-            </span>
-          </div>
-          <p className="mt-3.5 text-base font-semibold text-foreground transition-colors group-hover:text-sky-600 dark:group-hover:text-sky-400">
-            {svc.title}
-          </p>
-          {svc.description && (
-            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-              {svc.description}
-            </p>
-          )}
-          {svc.features.length > 0 && (
-            <ul className="mt-3.5 flex-1 space-y-1.5">
-              {svc.features.map((f, i) => (
-                <li
-                  key={i}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                >
-                  <CheckIcon className="size-3 shrink-0 text-emerald-500" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
-            <div>
-              <span className="text-xl font-bold text-foreground">
-                ${svc.price}
+    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {services.map((svc) => {
+        const isWp = svc.type === "wordpress"
+        const region = isWp
+          ? "Global"
+          : svc.country === "uk"
+            ? "United Kingdom"
+            : svc.country === "us"
+              ? "United States"
+              : "Global"
+        return (
+          <div
+            key={svc.id}
+            className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all hover:-translate-y-0.5 hover:border-sky-500/40 hover:shadow-lg hover:shadow-sky-500/5"
+          >
+            {/* Header */}
+            <div className="flex flex-wrap items-center justify-end gap-1.5 p-5 pb-0">
+              <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-sky-600 ring-1 ring-inset ring-sky-500/20 dark:text-sky-400">
+                {isWp ? "WordPress" : "Service"}
               </span>
-              <span className="ml-1 text-xs text-muted-foreground">USD</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <GlobeIcon className="size-2.5" />
+                {region}
+              </span>
             </div>
-            <Button size="sm" onClick={() => onPurchase(svc)}>
-              Purchase
-            </Button>
+
+            {/* Body */}
+            <div className="flex flex-1 flex-col p-5 pt-3">
+              <p className="text-lg font-semibold text-foreground transition-colors group-hover:text-sky-600 dark:group-hover:text-sky-400">
+                {svc.title}
+              </p>
+              {svc.description && (
+                <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+                  {svc.description}
+                </p>
+              )}
+
+              {svc.features.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                    What&apos;s included
+                  </p>
+                  <ul className="mt-2 space-y-1.5">
+                    {svc.features.map((f, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-2 text-sm text-foreground/90"
+                      >
+                        <CheckIcon className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="mt-auto flex items-center justify-between gap-3 border-t border-border bg-muted/20 p-5">
+              <div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-bold tracking-tight text-foreground">
+                    ${svc.price}
+                  </span>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    USD
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {isWp ? "one-time project" : "one-time payment"}
+                </p>
+              </div>
+              <Button onClick={() => onPurchase(svc)}>
+                {isWp ? "Order Now" : "Purchase"}
+              </Button>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

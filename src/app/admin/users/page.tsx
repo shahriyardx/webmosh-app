@@ -31,12 +31,21 @@ export default function AdminUsersPage() {
   const [savingId, setSavingId] = useState<string | null>(null)
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null)
 
-  const handleImpersonate = async (userId: string) => {
+  const handleImpersonate = async (
+    userId: string,
+    role?: string | null,
+  ) => {
     setImpersonatingId(userId)
     try {
       const res = await authClient.admin.impersonateUser({ userId })
       if (res.error) throw new Error(res.error.message)
-      router.push("/dashboard")
+      const dest =
+        role === "freelancer"
+          ? "/freelancer"
+          : role === "admin"
+            ? "/admin"
+            : "/dashboard"
+      window.location.href = dest
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to impersonate")
       setImpersonatingId(null)
@@ -191,7 +200,7 @@ export default function AdminUsersPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleImpersonate(u.id)}
+                            onClick={() => handleImpersonate(u.id, u.role)}
                             disabled={impersonatingId === u.id}
                           >
                             <LogInIcon className="size-3.5" />

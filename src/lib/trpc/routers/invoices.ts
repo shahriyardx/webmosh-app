@@ -1,7 +1,12 @@
 import { z } from "zod"
+import { TRPCError } from "@trpc/server"
 import { adminProcedure, assertOrgMember, protectedProcedure, router } from "../server"
 import { prisma } from "@/lib/prisma"
-import { PaymentStatus } from "@/generated/prisma/enums"
+import {
+  PaymentStatus,
+  WalletTxStatus,
+  WalletTxType,
+} from "@/generated/prisma/enums"
 import Stripe from "stripe"
 import {
   emailUserNewInvoice,
@@ -10,6 +15,11 @@ import {
   emailAdminInvoicePaid,
 } from "@/lib/notify"
 import { createAdminNotification } from "@/lib/notifications"
+import {
+  getPayState,
+  nextInvoiceState,
+  validatePayment,
+} from "@/lib/invoice-pay"
 
 export type EnrichedInvoice = Awaited<ReturnType<typeof prisma.invoice.findMany>>[number] & {
   item: { type: "service" | "package"; title: string } | null
@@ -140,30 +150,99 @@ export const invoicesRouter = router({
       })
     }),
 
+  /** Payment progress + history for an invoice (drives the pay panel). */
+  paymentState: protectedProcedure
+    .input(z.object({ invoiceId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const invoice = await prisma.invoice.findUnique({
+        where: { id: input.invoiceId },
+        select: {
+          id: true,
+          amount: true,
+          amountPaid: true,
+          organizationId: true,
+          deletedAt: true,
+        },
+      })
+      if (!invoice || invoice.deletedAt) {
+        throw new TRPCError({ code: "NOT_FOUND" })
+      }
+      if (ctx.user.role !== "admin") {
+        await assertOrgMember(ctx.user.id, invoice.organizationId)
+      }
+      const state = await getPayState(invoice)
+      const payments = await prisma.walletTransaction.findMany({
+        where: {
+          invoiceId: invoice.id,
+          type: {
+            in: [WalletTxType.invoice_payment, WalletTxType.external_payment],
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          amount: true,
+          method: true,
+          transactionId: true,
+          createdAt: true,
+        },
+      })
+      return { ...state, payments }
+    }),
+
+  /**
+   * Submit a Bangla QR / bKash payment (full or partial) toward an invoice.
+   * Recorded as a pending external wallet transaction that the admin verifies
+   * on the Wallet page; the invoice is credited on approval.
+   */
   submitTransaction: protectedProcedure
     .input(
       z.object({
         invoiceId: z.string(),
         paymentMethod: z.enum(["bkash", "BanglaQR"]),
         transactionId: z.string().min(1, "Transaction ID is required"),
+        amount: z.number().positive().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
       const invoice = await prisma.invoice.findUnique({
         where: { id: input.invoiceId },
       })
-      if (!invoice) throw new Error("Invoice not found")
+      if (!invoice || invoice.deletedAt) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Invoice not found" })
+      }
       await assertOrgMember(ctx.user.id, invoice.organizationId)
-      if (invoice.status !== PaymentStatus.unpaid) {
-        throw new Error("Invoice is not in unpaid status")
+      if (invoice.status === PaymentStatus.paid) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This invoice is already fully paid.",
+        })
       }
 
-      const updated = await prisma.invoice.update({
-        where: { id: input.invoiceId },
+      const state = await getPayState(invoice)
+      const amount = input.amount ?? state.payableNow
+      const err = validatePayment(amount, state)
+      if (err) throw new TRPCError({ code: "BAD_REQUEST", message: err })
+
+      const tx = await prisma.walletTransaction.create({
+        data: {
+          userId: ctx.user.id,
+          type: WalletTxType.external_payment,
+          status: WalletTxStatus.pending,
+          amount,
+          method: input.paymentMethod,
+          transactionId: input.transactionId.trim(),
+          invoiceId: invoice.id,
+        },
+      })
+      // Keep the invoice's latest method/txn for display, without changing status.
+      await prisma.invoice.update({
+        where: { id: invoice.id },
         data: {
           paymentMethod: input.paymentMethod,
-          transactionId: input.transactionId,
-          status: PaymentStatus.processing,
+          transactionId: input.transactionId.trim(),
         },
       })
 
@@ -173,18 +252,18 @@ export const invoicesRouter = router({
       })
       await emailAdminPaymentSubmitted(
         org?.name ?? "a company",
-        invoice.amount,
+        amount,
         input.paymentMethod,
         input.transactionId,
       ).catch(() => {})
       await createAdminNotification({
         kind: "invoice.payment_submitted",
-        title: `Payment submitted: $${invoice.amount.toFixed(2)}`,
-        body: `${org?.name ?? "A customer"} submitted a ${input.paymentMethod} transaction. Please verify.`,
-        link: "/admin/invoices",
+        title: `Payment submitted: $${amount.toFixed(2)}`,
+        body: `${org?.name ?? "A customer"} submitted a ${input.paymentMethod} payment of $${amount.toFixed(2)}. Please verify on the Wallet page.`,
+        link: "/admin/wallet",
       })
 
-      return updated
+      return tx
     }),
 
   createCheckoutSession: protectedProcedure
@@ -201,8 +280,12 @@ export const invoicesRouter = router({
       })
       if (!invoice) throw new Error("Invoice not found")
       await assertOrgMember(ctx.user.id, invoice.organizationId)
-      if (invoice.status !== PaymentStatus.unpaid) {
-        throw new Error("Invoice is not in unpaid status")
+      if (invoice.status === PaymentStatus.paid) {
+        throw new Error("Invoice is already fully paid")
+      }
+      const payState = await getPayState(invoice)
+      if (payState.payableNow <= 0) {
+        throw new Error("Nothing left to pay on this invoice")
       }
 
       const settings = await prisma.setting.findMany({
@@ -246,7 +329,7 @@ export const invoicesRouter = router({
             price_data: {
               currency: "usd",
               product_data: { name: productName },
-              unit_amount: Math.round(invoice.amount * 100),
+              unit_amount: Math.round(payState.payableNow * 100),
             },
           },
         ],
@@ -292,21 +375,52 @@ export const invoicesRouter = router({
       if (!invoice) throw new Error("Invoice not found")
       await assertOrgMember(ctx.user.id, invoice.organizationId)
 
-      const updated = await prisma.invoice.update({
-        where: { id: invoiceId },
-        data: {
-          paymentMethod: "stripe",
-          transactionId: paymentIntentId,
-          status: PaymentStatus.paid,
-        },
+      // Idempotency: if we already recorded this payment intent, don't re-credit.
+      const already = await prisma.walletTransaction.findFirst({
+        where: { invoiceId, transactionId: paymentIntentId },
+        select: { id: true },
+      })
+      if (already) {
+        return prisma.invoice.findUnique({ where: { id: invoiceId } })
+      }
+
+      const paidAmount = checkout.amount_total
+        ? checkout.amount_total / 100
+        : (await getPayState(invoice)).payableNow
+      const next = nextInvoiceState(invoice.amount, invoice.amountPaid, paidAmount)
+
+      const updated = await prisma.$transaction(async (db) => {
+        await db.walletTransaction.create({
+          data: {
+            userId: ctx.user.id,
+            type: WalletTxType.external_payment,
+            status: WalletTxStatus.approved,
+            amount: paidAmount,
+            method: "stripe",
+            transactionId: paymentIntentId,
+            invoiceId,
+            decidedAt: new Date(),
+          },
+        })
+        return db.invoice.update({
+          where: { id: invoiceId },
+          data: {
+            paymentMethod: "stripe",
+            transactionId: paymentIntentId,
+            amountPaid: next.amountPaid,
+            status: next.status,
+          },
+        })
       })
 
       const org = await prisma.organization.findUnique({
         where: { id: updated.organizationId },
         select: { name: true },
       })
-      await emailAdminInvoicePaid(org?.name ?? "a company", updated.amount).catch(() => {})
-      await emailUserPayment(updated.organizationId, true, updated.amount).catch(() => {})
+      if (next.fullyPaid) {
+        await emailAdminInvoicePaid(org?.name ?? "a company", updated.amount).catch(() => {})
+        await emailUserPayment(updated.organizationId, true, updated.amount).catch(() => {})
+      }
 
       return updated
     }),

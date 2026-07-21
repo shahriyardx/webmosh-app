@@ -147,12 +147,14 @@ export async function getCompaniesHouseProfile(
   }
 }
 
-/** Lightweight fetch of just the filing due-dates from Companies House. */
+/** Lightweight fetch of filing due-dates + basics from Companies House. */
 export async function getCompaniesHouseDates(
   number: string,
 ): Promise<{
   accountsNextDue: string | null
   confirmationNextDue: string | null
+  incorporationDate: string | null
+  status: string | null
 } | null> {
   const auth = authHeader()
   if (!auth) return null
@@ -166,5 +168,7 @@ export async function getCompaniesHouseDates(
   return {
     accountsNextDue: d.accounts?.next_due ?? null,
     confirmationNextDue: d.confirmation_statement?.next_due ?? null,
+    incorporationDate: d.date_of_creation ?? null,
+    status: d.company_status ?? null,
   }
 }

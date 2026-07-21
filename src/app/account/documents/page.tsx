@@ -98,7 +98,8 @@ export default function AccountDocumentsPage() {
     }
   }
 
-  const needsActionCount = (docs ?? []).filter(
+  const list = docs ?? []
+  const needsActionCount = list.filter(
     (d) => d.status === "requested" || d.status === "rejected",
   ).length
 
@@ -130,7 +131,7 @@ export default function AccountDocumentsPage() {
         )}
       </div>
 
-      {!docs || docs.length === 0 ? (
+      {list.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border py-20 text-center">
           <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-muted/40">
             <FileTextIcon className="size-6 text-muted-foreground/60" />
@@ -138,22 +139,35 @@ export default function AccountDocumentsPage() {
           <p className="text-sm font-medium text-foreground">No documents yet.</p>
         </div>
       ) : (
-        <div className="grid gap-3">
-          {docs.map((doc) => (
-            <DocumentCard
-              key={doc.id}
-              doc={doc as Doc}
-              uploading={uploading[doc.id] ?? false}
-              onUploadFile={(file) => handleUpload(doc as Doc, file)}
-            />
-          ))}
+        <div className="overflow-x-auto rounded-2xl border border-border">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/40 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <th className="px-4 py-3">Document</th>
+                <th className="px-4 py-3">Company</th>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((doc) => (
+                <DocumentRow
+                  key={doc.id}
+                  doc={doc as Doc}
+                  uploading={uploading[doc.id] ?? false}
+                  onUploadFile={(file) => handleUpload(doc as Doc, file)}
+                />
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   )
 }
 
-function DocumentCard({
+function DocumentRow({
   doc,
   uploading,
   onUploadFile,
@@ -173,50 +187,13 @@ function DocumentCard({
     }
   }
 
-  const uploadButton = (
-    <>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf,.png,.jpg,.jpeg"
-        className="hidden"
-        onChange={handleFilePick}
-      />
-      <Button
-        variant={needsAction ? "default" : "outline"}
-        size="sm"
-        disabled={uploading}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        {uploading ? (
-          <>
-            <span className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            Uploading…
-          </>
-        ) : (
-          <>
-            <UploadIcon className="size-3" />
-            Upload file
-          </>
-        )}
-      </Button>
-    </>
-  )
-
   return (
-    <div
-      className={`rounded-2xl border bg-card p-5 transition-colors ${
-        needsAction
-          ? doc.status === "rejected"
-            ? "border-red-500/30"
-            : "border-amber-500/30"
-          : "border-border"
-      }`}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3.5">
+    <tr className="border-b border-border last:border-0 align-middle transition-colors hover:bg-muted/30">
+      {/* Document name (+ reason note) */}
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-3">
           <div
-            className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${
+            className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${
               needsAction
                 ? doc.status === "rejected"
                   ? "bg-red-500/10"
@@ -225,7 +202,7 @@ function DocumentCard({
             }`}
           >
             <FileTextIcon
-              className={`size-5 ${
+              className={`size-4 ${
                 needsAction
                   ? doc.status === "rejected"
                     ? "text-red-500"
@@ -235,56 +212,83 @@ function DocumentCard({
             />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground">
-              {doc.name}
-            </p>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              {doc.organization?.name && (
-                <span className="uppercase tracking-wide">
-                  {doc.organization.name}
-                </span>
-              )}
-              {doc.organization?.name && " · "}
-              {new Date(doc.createdAt).toLocaleDateString()}
-            </p>
+            <p className="truncate font-medium text-foreground">{doc.name}</p>
+            {doc.status === "rejected" && doc.rejectReason && (
+              <p className="truncate text-xs text-red-600 dark:text-red-400">
+                {doc.rejectReason}
+              </p>
+            )}
+            {doc.status === "requested" && (
+              <p className="truncate text-xs text-amber-600 dark:text-amber-400">
+                {doc.requestReason ?? "Requested — please upload this document."}
+              </p>
+            )}
           </div>
         </div>
+      </td>
+
+      {/* Company */}
+      <td className="px-4 py-3">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">
+          {doc.organization?.name ?? "—"}
+        </span>
+      </td>
+
+      {/* Date */}
+      <td className="px-4 py-3 text-muted-foreground">
+        {new Date(doc.createdAt).toLocaleDateString()}
+      </td>
+
+      {/* Status */}
+      <td className="px-4 py-3">
         <StatusPill status={doc.status} />
-      </div>
+      </td>
 
-      {doc.status === "rejected" && doc.rejectReason && (
-        <div className="mt-3.5 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 px-3.5 py-2.5 text-xs text-red-600 dark:text-red-400">
-          <AlertCircleIcon className="mt-0.5 size-3.5 shrink-0" />
-          <span>{doc.rejectReason}</span>
+      {/* Action */}
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-end gap-2">
+          {doc.value && (
+            <Button variant="outline" size="sm" asChild>
+              <a href={doc.value} target="_blank" rel="noopener noreferrer">
+                <ExternalLinkIcon className="size-3" />
+                View
+              </a>
+            </Button>
+          )}
+          {(needsAction || (!doc.value && doc.status === "requested")) && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                className="hidden"
+                onChange={handleFilePick}
+              />
+              <Button
+                variant={needsAction ? "default" : "outline"}
+                size="sm"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {uploading ? (
+                  <>
+                    <span className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Uploading…
+                  </>
+                ) : (
+                  <>
+                    <UploadIcon className="size-3" />
+                    Upload
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+          {!doc.value && !needsAction && (
+            <span className="text-xs text-muted-foreground">—</span>
+          )}
         </div>
-      )}
-      {doc.status === "requested" && (
-        <div className="mt-3.5 flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3.5 py-2.5 text-xs text-amber-600 dark:text-amber-400">
-          <AlertCircleIcon className="mt-0.5 size-3.5 shrink-0" />
-          <span>
-            {doc.requestReason ??
-              "This document has been requested. Please upload it below."}
-          </span>
-        </div>
-      )}
-      {doc.status === "submitted" && (
-        <p className="mt-3.5 text-xs text-muted-foreground">
-          Document pending review by our team.
-        </p>
-      )}
-
-      <div className="mt-4 flex items-center justify-end gap-2 border-t border-border pt-4">
-        {doc.value && (
-          <Button variant="outline" size="sm" asChild>
-            <a href={doc.value} target="_blank" rel="noopener noreferrer">
-              <ExternalLinkIcon className="size-3" />
-              View file
-            </a>
-          </Button>
-        )}
-        {(needsAction || (!doc.value && doc.status === "requested")) &&
-          uploadButton}
-      </div>
-    </div>
+      </td>
+    </tr>
   )
 }

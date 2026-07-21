@@ -135,6 +135,10 @@ export function AdminSidebar({
     undefined,
     { refetchInterval: 30_000, refetchOnWindowFocus: true },
   )
+  const { data: pendingWallet } = trpc.wallet.pendingCount.useQuery(undefined, {
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  })
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -195,6 +199,13 @@ export function AdminSidebar({
                       pendingApprovals > 0 && (
                         <Badge className="ml-auto size-5 rounded-full bg-amber-500 p-0 text-[10px] text-white hover:bg-amber-500">
                           {pendingApprovals}
+                        </Badge>
+                      )}
+                    {link.title === "Wallet" &&
+                      pendingWallet !== undefined &&
+                      pendingWallet > 0 && (
+                        <Badge className="ml-auto size-5 rounded-full p-0 text-[10px]">
+                          {pendingWallet}
                         </Badge>
                       )}
                   </Link>

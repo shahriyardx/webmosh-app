@@ -11,8 +11,9 @@ import {
 export interface InvoicePdfData {
   invoiceNumber: string;
   date: string;
-  status: "paid" | "unpaid" | "processing" | "rejected";
+  status: "paid" | "unpaid" | "partially_paid" | "processing" | "rejected";
   amount: number;
+  amountPaid?: number;
   logoUrl?: string;
   billTo: {
     name: string;
@@ -52,6 +53,7 @@ const statusStyle: Record<
 > = {
   paid: { label: "PAID", color: "#15803d", bg: "#dcfce7" },
   unpaid: { label: "UNPAID", color: "#b45309", bg: "#fef3c7" },
+  partially_paid: { label: "PARTIALLY PAID", color: "#1d4ed8", bg: "#dbeafe" },
   processing: { label: "PROCESSING", color: "#1d4ed8", bg: "#dbeafe" },
   rejected: { label: "REJECTED", color: "#b91c1c", bg: "#fee2e2" },
 };
@@ -243,8 +245,10 @@ function money(n: number) {
 
 function InvoiceDocument({ data }: { data: InvoicePdfData }) {
   const paid = data.status === "paid";
-  const totalDue = paid ? 0 : data.amount;
-  const amountPaid = paid ? data.amount : 0;
+  const amountPaid = paid ? data.amount : (data.amountPaid ?? 0);
+  const totalDue = paid
+    ? 0
+    : Math.max(0, Math.round((data.amount - amountPaid) * 100) / 100);
   const st = statusStyle[data.status] ?? statusStyle.unpaid;
   const company = {
     name: data.from?.name || COMPANY_DEFAULT.name,

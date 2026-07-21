@@ -40,7 +40,7 @@ const links = [
   { title: "Documents", href: "/account/documents", icon: FileTextIcon },
   { title: "Services", href: "/account/services", icon: ConciergeBellIcon },
   { title: "Orders", href: "/account/orders", icon: ShoppingCartIcon },
-  { title: "Payments", href: "/account/invoices", icon: ReceiptIcon },
+  { title: "Invoices", href: "/account/invoices", icon: ReceiptIcon },
   { title: "Wallet", href: "/account/wallet", icon: WalletIcon },
   { title: "Mail", href: "/account/mail", icon: MailIcon },
   { title: "Support", href: "/account/tickets", icon: LifeBuoyIcon },

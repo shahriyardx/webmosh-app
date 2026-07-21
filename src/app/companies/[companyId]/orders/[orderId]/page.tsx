@@ -132,7 +132,7 @@ export default function OrderDetailPage({
 
       <div className="rounded-xl border border-border">
         <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-          <span className="text-sm font-semibold">Payment</span>
+          <span className="text-sm font-semibold">Invoice</span>
           {st && <Badge variant={st.variant}>{st.label}</Badge>}
         </div>
         <div className="space-y-4 px-5 py-4">

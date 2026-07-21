@@ -270,6 +270,26 @@ export const EMAIL_EVENTS: EmailEventDef[] = [
       ctaLabel: "Sign in with Google",
     },
   },
+  {
+    event: "freelancer.task_assigned",
+    label: "Task assigned",
+    description:
+      "Sent to a freelancer when the admin assigns a new task to them.",
+    audience: "freelancer",
+    variables: [
+      NAME,
+      v("taskTitle", "Title of the assigned task", "Build landing page"),
+      v("priority", "Task priority", "High"),
+      v("deadline", "Task deadline (or \"No deadline\")", "31 Aug 2026"),
+    ],
+    defaults: {
+      subject: "New task assigned: {{taskTitle}}",
+      heading: "You have a new task",
+      intro:
+        'A new task "{{taskTitle}}" has been assigned to you (priority: {{priority}}, due {{deadline}}). Open your workspace to view the details and get started.',
+      ctaLabel: "View Task",
+    },
+  },
 
   // ---------- ADMIN ----------
   {

@@ -1,12 +1,22 @@
 "use client"
 
-import { use, useState } from "react"
+import { use, useState, useEffect } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { trpc } from "@/lib/trpc/client"
 import { TaskPriority, TaskStatus } from "@/generated/prisma/enums"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   ArrowLeftIcon,
   ExternalLinkIcon,
@@ -32,6 +42,7 @@ import {
   HourglassIcon,
   SendIcon,
   RotateCcwIcon,
+  NotebookPenIcon,
 } from "lucide-react"
 
 const priorityStyles: Record<TaskPriority, string> = {
@@ -119,6 +130,19 @@ export default function FreelancerTaskDetailPage({
   const utils = trpc.useUtils()
   const { data: task, isLoading } = trpc.tasks.getById.useQuery({ id })
 
+  const [note, setNote] = useState("")
+  const [includeNote, setIncludeNote] = useState(false)
+  const [submitOpen, setSubmitOpen] = useState(false)
+
+  // Sync the notepad from the task once it loads (or when switching tasks).
+  useEffect(() => {
+    if (task) {
+      setNote(task.deliveryNote ?? "")
+      setIncludeNote(task.deliveryNoteIncluded)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id])
+
   const invalidateTask = () => {
     utils.tasks.getById.invalidate({ id })
     utils.tasks.listMine.invalidate()
@@ -138,7 +162,16 @@ export default function FreelancerTaskDetailPage({
   const submitForReview = trpc.tasks.submitForReview.useMutation({
     onSuccess: () => {
       invalidateTask()
+      setSubmitOpen(false)
       toast.success("Submitted for approval")
+    },
+    onError: (err) => toast.error(err.message),
+  })
+
+  const saveNote = trpc.tasks.saveDeliveryNote.useMutation({
+    onSuccess: () => {
+      utils.tasks.getById.invalidate({ id })
+      toast.success("Delivery note saved")
     },
     onError: (err) => toast.error(err.message),
   })
@@ -430,13 +463,13 @@ export default function FreelancerTaskDetailPage({
                   </div>
                   <Button
                     className="w-full"
-                    disabled={submitForReview.isPending}
-                    onClick={() => submitForReview.mutate({ id: task.id })}
+                    onClick={() => {
+                      setIncludeNote(task.deliveryNoteIncluded)
+                      setSubmitOpen(true)
+                    }}
                   >
                     <SendIcon className="size-4" />
-                    {submitForReview.isPending
-                      ? "Submitting…"
-                      : task.revisionNote
+                    {task.revisionNote
                       ? "Resubmit for approval"
                       : "Submit for approval"}
                   </Button>
@@ -447,6 +480,53 @@ export default function FreelancerTaskDetailPage({
               )}
             </CardContent>
           </Card>
+
+          {/* Delivery notepad */}
+          {task.status !== "done" ? (
+            <Card>
+              <CardContent className="space-y-3 p-6">
+                <div className="flex items-center gap-2">
+                  <NotebookPenIcon className="size-4 text-muted-foreground" />
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                    Delivery notepad
+                  </h2>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Jot down notes about your delivery — links, what you did, or
+                  anything worth flagging. You&apos;ll choose whether to share
+                  it with the admin when you submit for approval.
+                </p>
+                <Textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  rows={5}
+                  placeholder="Notes about your work, delivery links, what you completed…"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={saveNote.isPending}
+                  onClick={() => saveNote.mutate({ id: task.id, note })}
+                >
+                  {saveNote.isPending ? "Saving…" : "Save note"}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : task.deliveryNote ? (
+            <Card>
+              <CardContent className="space-y-2 p-6">
+                <div className="flex items-center gap-2">
+                  <NotebookPenIcon className="size-4 text-muted-foreground" />
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                    Delivery note
+                  </h2>
+                </div>
+                <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                  {task.deliveryNote}
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
 
           {/* Context */}
           {(task.organization || task.order) && (
@@ -533,6 +613,122 @@ export default function FreelancerTaskDetailPage({
           )}
         </div>
       </div>
+      {/* Submit for approval confirmation */}
+      <Dialog open={submitOpen} onOpenChange={setSubmitOpen}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {task.revisionNote ? "Resubmit for approval" : "Submit for approval"}
+            </DialogTitle>
+            <DialogDescription>
+              Review what you&apos;re sending to the admin. Payment is credited
+              once it&apos;s approved.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border">
+              <div className="border-b border-border px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                What you&apos;re submitting
+              </div>
+              <dl className="divide-y divide-border text-sm">
+                <SubmitRow label="Task" value={task.title} />
+                <SubmitRow
+                  label="Priority"
+                  value={
+                    task.priority.charAt(0).toUpperCase() +
+                    task.priority.slice(1)
+                  }
+                />
+                <SubmitRow
+                  label="Deadline"
+                  value={
+                    task.deadline
+                      ? new Date(task.deadline).toLocaleDateString()
+                      : "No deadline"
+                  }
+                />
+                <SubmitRow
+                  label="Payment"
+                  value={
+                    task.payoutAmount != null
+                      ? `$${task.payoutAmount.toFixed(2)}`
+                      : "Unpaid"
+                  }
+                />
+                {(task.organization || task.order?.service) && (
+                  <SubmitRow
+                    label="Linked"
+                    value={
+                      task.organization?.name ??
+                      task.order?.service?.title ??
+                      "—"
+                    }
+                  />
+                )}
+              </dl>
+            </div>
+
+            {note.trim() ? (
+              <div className="space-y-2 rounded-xl border border-border bg-muted/20 p-4">
+                <div className="flex items-center gap-2">
+                  <NotebookPenIcon className="size-4 text-muted-foreground" />
+                  <p className="text-sm font-semibold">Delivery note</p>
+                </div>
+                <p className="max-h-32 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-card p-3 text-sm text-muted-foreground">
+                  {note}
+                </p>
+                <label className="flex cursor-pointer items-center gap-2 pt-1">
+                  <Checkbox
+                    checked={includeNote}
+                    onCheckedChange={(c) => setIncludeNote(c === true)}
+                  />
+                  <span className="text-sm">
+                    Include this note with my submission
+                  </span>
+                </label>
+              </div>
+            ) : (
+              <p className="rounded-xl border border-dashed border-border px-4 py-3 text-xs text-muted-foreground">
+                No delivery note added. You can add one in the Delivery notepad
+                before submitting.
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSubmitOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={submitForReview.isPending}
+              onClick={() =>
+                submitForReview.mutate({
+                  id: task.id,
+                  includeNote: note.trim() ? includeNote : false,
+                  note,
+                })
+              }
+            >
+              <SendIcon className="size-4" />
+              {submitForReview.isPending
+                ? "Submitting…"
+                : task.revisionNote
+                  ? "Resubmit"
+                  : "Submit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function SubmitRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 px-4 py-2.5">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="text-right font-medium text-foreground">{value}</dd>
     </div>
   )
 }

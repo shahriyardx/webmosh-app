@@ -720,22 +720,30 @@ export const companiesRouter = router({
     })
     const orgs = members.map((m) => m.organization)
 
-    // Enrich UK companies with live Companies House filing dates (1h fetch cache).
-    // DB overrides win; otherwise fall back to what CH reports.
+    // Enrich UK companies with live Companies House data (1h fetch cache):
+    // incorporation date, status and filing due-dates. DB dues override CH.
     const enriched = await Promise.all(
       orgs.map(async (o) => {
-        if (o.country !== "uk" || !o.companyId) return o
-        if (o.confirmationStatementDue && o.accountsFilingDue) return o
-        const dates = await getCompaniesHouseDates(o.companyId).catch(() => null)
-        if (!dates) return o
-        return {
+        const base = {
           ...o,
+          incorporationDate: null as Date | null,
+          chStatus: null as string | null,
+        }
+        if (o.country !== "uk" || !o.companyId) return base
+        const dates = await getCompaniesHouseDates(o.companyId).catch(() => null)
+        if (!dates) return base
+        return {
+          ...base,
           confirmationStatementDue:
             o.confirmationStatementDue ??
             (dates.confirmationNextDue ? new Date(dates.confirmationNextDue) : null),
           accountsFilingDue:
             o.accountsFilingDue ??
             (dates.accountsNextDue ? new Date(dates.accountsNextDue) : null),
+          incorporationDate: dates.incorporationDate
+            ? new Date(dates.incorporationDate)
+            : null,
+          chStatus: dates.status,
         }
       }),
     )

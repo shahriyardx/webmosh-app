@@ -46,12 +46,14 @@ import { formatInvoiceNumber } from "@/lib/invoice-number"
 const tabs = [
   { label: "All", value: undefined },
   { label: "Unpaid", value: PaymentStatus.unpaid },
+  { label: "Partial", value: PaymentStatus.partially_paid },
   { label: "Processing", value: PaymentStatus.processing },
   { label: "Paid", value: PaymentStatus.paid },
 ] as const
 
 const statusBadge: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
   unpaid: { label: "Unpaid", variant: "outline" },
+  partially_paid: { label: "Partial", variant: "secondary" },
   processing: { label: "Processing", variant: "secondary" },
   paid: { label: "Paid", variant: "default" },
 }
@@ -236,6 +238,12 @@ export default function AdminInvoicesPage() {
                     </TableCell>
                     <TableCell>
                       <p>${inv.amount}</p>
+                      {inv.amountPaid > 0 && inv.status !== "paid" && (
+                        <p className="mt-0.5 text-xs font-medium text-emerald-600">
+                          ${inv.amountPaid.toFixed(2)} paid · $
+                          {(inv.amount - inv.amountPaid).toFixed(2)} due
+                        </p>
+                      )}
                       {inv.description && (
                         <p className="mt-0.5 max-w-xs text-xs text-muted-foreground">{inv.description}</p>
                       )}
@@ -272,6 +280,11 @@ export default function AdminInvoicesPage() {
                         )}
                         {inv.status === PaymentStatus.unpaid && (
                           <span className="text-xs text-muted-foreground">Awaiting payment</span>
+                        )}
+                        {inv.status === PaymentStatus.partially_paid && (
+                          <span className="text-xs text-muted-foreground">
+                            Verify on Wallet
+                          </span>
                         )}
                         {inv.status === PaymentStatus.paid && (
                           <span className="text-xs text-green-600">Completed</span>

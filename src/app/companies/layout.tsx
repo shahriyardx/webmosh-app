@@ -27,7 +27,7 @@ function sectionLabel(pathname: string, companyId: string) {
   if (rest.startsWith("/documents")) return "Documents"
   if (rest.startsWith("/services")) return "Services"
   if (rest.startsWith("/orders")) return "Orders"
-  if (rest.startsWith("/invoices")) return "Payments"
+  if (rest.startsWith("/invoices")) return "Invoices"
   if (rest.startsWith("/mail")) return "Mail"
   if (rest.startsWith("/tickets")) return "Support"
   return null

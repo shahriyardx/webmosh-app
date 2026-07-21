@@ -120,6 +120,7 @@ export async function GET(
     }),
     status: invoice.status as InvoicePdfData["status"],
     amount: invoice.amount,
+    amountPaid: invoice.amountPaid,
     logoUrl: `${env.APP_URL.replace(/\/$/, "")}/logo.png`,
     from: {
       name: settings.invoice_from_name,

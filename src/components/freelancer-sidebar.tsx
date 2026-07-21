@@ -23,9 +23,12 @@ import {
   UserIcon,
   WalletIcon,
   MessagesSquareIcon,
+  UserXIcon,
 } from "lucide-react"
+import { authClient } from "@/lib/auth-client"
 import { trpc } from "@/lib/trpc/client"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 
 const links = [
   { title: "Dashboard", href: "/freelancer", icon: LayoutDashboardIcon },
@@ -48,6 +51,14 @@ export function FreelancerSidebar({
   onSignOut?: () => void
 }) {
   const pathname = usePathname()
+  const { data: session } = authClient.useSession()
+  const isImpersonating = !!session?.session?.impersonatedBy
+
+  const handleStopImpersonating = async () => {
+    await authClient.admin.stopImpersonating()
+    window.location.href = "/admin"
+  }
+
   const { data: unreadDiscussions } = trpc.discussions.unreadCount.useQuery(
     undefined,
     { refetchInterval: 30_000, refetchOnWindowFocus: true },
@@ -112,6 +123,19 @@ export function FreelancerSidebar({
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
+        {isImpersonating && (
+          <Button
+            variant="destructive"
+            size="sm"
+            className="w-full justify-start"
+            onClick={handleStopImpersonating}
+          >
+            <UserXIcon className="size-4" />
+            <span className="group-data-[collapsible=icon]:hidden">
+              Stop impersonating
+            </span>
+          </Button>
+        )}
         <ThemeToggle />
         <NavUser user={user} onLogout={onSignOut} />
       </SidebarFooter>

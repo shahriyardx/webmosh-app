@@ -27,7 +27,7 @@ const bankDetailsSchema = z.object({
  *  minus pending payouts (locked while under review)
  */
 async function computeBalance(freelancerId: string) {
-  const [earnedAgg, approvedAgg, pendingAgg] = await Promise.all([
+  const [earnedAgg, approvedAgg, pendingAgg, adjAgg] = await Promise.all([
     prisma.task.aggregate({
       where: { assignedToId: freelancerId, status: TaskStatus.done },
       _sum: { payoutAmount: true },
@@ -40,12 +40,17 @@ async function computeBalance(freelancerId: string) {
       where: { freelancerId, status: PayoutStatus.pending },
       _sum: { amount: true },
     }),
+    prisma.freelancerAdjustment.aggregate({
+      where: { freelancerId },
+      _sum: { amount: true },
+    }),
   ])
   const earned = earnedAgg._sum.payoutAmount ?? 0
   const paidOut = approvedAgg._sum.amount ?? 0
   const requested = pendingAgg._sum.amount ?? 0
-  const available = Math.max(0, earned - paidOut - requested)
-  return { earned, paidOut, requested, available }
+  const adjustments = adjAgg._sum.amount ?? 0
+  const available = Math.max(0, earned + adjustments - paidOut - requested)
+  return { earned, paidOut, requested, adjustments, available }
 }
 
 export const payoutsRouter = router({
@@ -211,5 +216,163 @@ export const payoutsRouter = router({
           adminNote: input.adminNote?.trim() || null,
         },
       })
+    }),
+
+  // ---------- ADMIN: per-freelancer balance management ----------
+
+  /** Balance breakdown for a specific freelancer (admin view). */
+  adminBalance: adminProcedure
+    .input(z.object({ freelancerId: z.string() }))
+    .query(({ input }) => computeBalance(input.freelancerId)),
+
+  /** Full payout history for a freelancer (admin view). */
+  adminList: adminProcedure
+    .input(z.object({ freelancerId: z.string() }))
+    .query(({ input }) =>
+      prisma.payout.findMany({
+        where: { freelancerId: input.freelancerId },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          amount: true,
+          status: true,
+          method: true,
+          note: true,
+          adminNote: true,
+          decidedAt: true,
+          createdAt: true,
+        },
+      }),
+    ),
+
+  /**
+   * Unified transaction history for a freelancer: task payments (earnings on
+   * approved tasks), manual adjustments (add/remove) and payouts — sorted
+   * newest first. Amount is signed (+ credit, − debit).
+   */
+  adminTransactions: adminProcedure
+    .input(z.object({ freelancerId: z.string() }))
+    .query(async ({ input }) => {
+      const { freelancerId } = input
+      const [doneTasks, adjustments, payouts] = await Promise.all([
+        prisma.task.findMany({
+          where: {
+            assignedToId: freelancerId,
+            status: TaskStatus.done,
+            payoutAmount: { not: null },
+          },
+          select: { id: true, title: true, payoutAmount: true, updatedAt: true },
+        }),
+        prisma.freelancerAdjustment.findMany({
+          where: { freelancerId },
+          select: { id: true, amount: true, note: true, createdAt: true },
+        }),
+        prisma.payout.findMany({
+          where: {
+            freelancerId,
+            status: {
+              in: [PayoutStatus.approved, PayoutStatus.pending],
+            },
+          },
+          select: {
+            id: true,
+            amount: true,
+            status: true,
+            method: true,
+            createdAt: true,
+          },
+        }),
+      ])
+
+      const items = [
+        ...doneTasks.map((t) => ({
+          id: `task-${t.id}`,
+          kind: "task" as const,
+          label: `Task payment — ${t.title}`,
+          amount: t.payoutAmount ?? 0,
+          status: null as string | null,
+          date: t.updatedAt,
+        })),
+        ...adjustments.map((a) => ({
+          id: `adj-${a.id}`,
+          kind: "adjustment" as const,
+          label:
+            a.note ||
+            (a.amount >= 0 ? "Balance added by admin" : "Balance removed by admin"),
+          amount: a.amount,
+          status: null as string | null,
+          date: a.createdAt,
+        })),
+        ...payouts.map((p) => ({
+          id: `payout-${p.id}`,
+          kind: "payout" as const,
+          label: `Payout — ${p.method}`,
+          amount: -p.amount,
+          status: p.status as string | null,
+          date: p.createdAt,
+        })),
+      ]
+
+      items.sort((a, b) => b.date.getTime() - a.date.getTime())
+      return items
+    }),
+
+  /**
+   * Manually credit or deduct a freelancer's balance. Recorded as a signed
+   * adjustment (positive = add, negative = remove). Deductions can't exceed
+   * the current available balance.
+   */
+  adjustBalance: adminProcedure
+    .input(
+      z.object({
+        freelancerId: z.string(),
+        direction: z.enum(["add", "remove"]),
+        amount: z.number().positive(),
+        note: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const freelancer = await prisma.user.findFirst({
+        where: { id: input.freelancerId, role: "freelancer" },
+        select: { id: true },
+      })
+      if (!freelancer) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Freelancer not found.",
+        })
+      }
+      if (input.direction === "remove") {
+        const balance = await computeBalance(input.freelancerId)
+        if (input.amount > balance.available) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Can't remove more than the available balance ($${balance.available.toFixed(2)}).`,
+          })
+        }
+      }
+      return prisma.freelancerAdjustment.create({
+        data: {
+          freelancerId: input.freelancerId,
+          amount:
+            input.direction === "add" ? input.amount : -Math.abs(input.amount),
+          note: input.note?.trim() || null,
+          createdById: ctx.user.id,
+        },
+      })
+    }),
+
+  /**
+   * Reset a freelancer's payout history — deletes all their payout records.
+   * Earnings and manual adjustments are untouched, so the available balance
+   * returns to (earned + adjustments).
+   */
+  resetHistory: adminProcedure
+    .input(z.object({ freelancerId: z.string() }))
+    .mutation(async ({ input }) => {
+      const res = await prisma.payout.deleteMany({
+        where: { freelancerId: input.freelancerId },
+      })
+      return { deleted: res.count }
     }),
 })

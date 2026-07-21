@@ -65,7 +65,7 @@ export default function InvoiceSuccessPage({
                 <Link href={`/companies/${companyId}/invoices/${invoiceId}`}>View Payment</Link>
               </Button>
               <Button variant="outline" asChild>
-                <Link href={`/companies/${companyId}/invoices`}>All Payments</Link>
+                <Link href={`/companies/${companyId}/invoices`}>All Invoices</Link>
               </Button>
             </div>
           </div>

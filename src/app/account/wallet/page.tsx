@@ -74,6 +74,7 @@ const typeMeta: Record<
   topup: { label: "Add money", icon: ArrowDownLeftIcon, sign: "+" },
   payout: { label: "Payout", icon: ArrowUpRightIcon, sign: "−" },
   invoice_payment: { label: "Invoice payment", icon: ReceiptIcon, sign: "−" },
+  external_payment: { label: "Invoice payment (Bangla QR)", icon: ReceiptIcon, sign: "−" },
 }
 
 export default function WalletPage() {
@@ -259,7 +260,8 @@ export default function WalletPage() {
                   const meta = typeMeta[tx.type] ?? typeMeta.topup
                   const st = statusBadge[tx.status] ?? statusBadge.pending
                   const cancellable =
-                    tx.status === "pending" && tx.type !== "invoice_payment"
+                    tx.status === "pending" &&
+                    (tx.type === "topup" || tx.type === "payout")
                   return (
                     <TableRow key={tx.id}>
                       <TableCell>
@@ -458,7 +460,7 @@ export default function WalletPage() {
       <p className="text-center text-xs text-muted-foreground">
         Need to pay an invoice?{" "}
         <Link href="/account/invoices" className="text-sky-500 hover:underline">
-          Go to Payments
+          Go to Invoices
         </Link>{" "}
         — unpaid invoices can be settled instantly with your wallet balance.
       </p>

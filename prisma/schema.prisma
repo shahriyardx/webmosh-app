@@ -41,6 +41,7 @@ model User {
   decidedWalletTxs   WalletTransaction[] @relation("WalletDecidedBy")
   taskMessages  TaskMessage[] @relation("TaskMessageSender")
   bankAccounts  BankAccount[]
+  freelancerAdjustments FreelancerAdjustment[]
 
   @@unique([email])
   @@map("user")
@@ -205,6 +206,7 @@ enum OrganizationType {
 
 enum PaymentStatus {
   unpaid
+  partially_paid
   processing
   paid
   rejected
@@ -332,6 +334,7 @@ model Invoice {
   transactionId  String?       @map("transaction_id")
   status         PaymentStatus @default(unpaid)
   rejectReason   String?       @map("reject_reason")
+  amountPaid     Float         @default(0) @map("amount_paid")
   originalAmount Float?        @map("original_amount")
   discountAmount Float?        @map("discount_amount")
   couponCode     String?       @map("coupon_code")
@@ -502,6 +505,8 @@ model Task {
   order          ServiceOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
   revisionNote   String?       @map("revision_note")
   submittedAt    DateTime?     @map("submitted_at")
+  deliveryNote   String?       @map("delivery_note")
+  deliveryNoteIncluded Boolean  @default(false) @map("delivery_note_included")
   messages       TaskMessage[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -532,6 +537,24 @@ enum PayoutStatus {
   pending
   approved
   rejected
+}
+
+/**
+ * Manual admin adjustment to a freelancer's balance. Signed amount:
+ * positive credits the balance, negative deducts it. Kept separate from
+ * Payout so payout history can be reset without losing adjustments.
+ */
+model FreelancerAdjustment {
+  id           String   @id @default(cuid())
+  freelancerId String   @map("freelancer_id")
+  freelancer   User     @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  amount       Float
+  note         String?
+  createdById  String?  @map("created_by_id")
+  createdAt    DateTime @default(now())
+
+  @@index([freelancerId])
+  @@map("freelancer_adjustment")
 }
 
 model Notification {
@@ -588,6 +611,7 @@ enum WalletTxType {
   topup
   payout
   invoice_payment
+  external_payment
 }
 
 enum WalletTxStatus {

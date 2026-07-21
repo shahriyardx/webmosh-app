@@ -118,9 +118,6 @@ export default function DashboardServicesPage() {
             return (
               <Card key={svc.id} className="flex flex-col">
                 <CardHeader>
-                  <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-sky-500/10">
-                    <ConciergeBellIcon className="size-5 text-sky-500" />
-                  </div>
                   <CardTitle>{svc.title}</CardTitle>
                   {svc.description && (
                     <CardDescription className="line-clamp-2">
@@ -153,7 +150,7 @@ export default function DashboardServicesPage() {
                         Processing…
                       </>
                     ) : svc.type === "wordpress" ? (
-                      "Configure"
+                      "Order Now"
                     ) : (
                       "Purchase"
                     )}

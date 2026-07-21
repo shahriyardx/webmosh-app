@@ -390,7 +390,7 @@ export default function AdminFreelancersPage() {
             <TableBody>
               {pendingApprovals.map((t) => (
                 <TableRow key={t.id}>
-                  <TableCell>
+                  <TableCell className="max-w-sm">
                     <p className="font-medium">{t.title}</p>
                     <p className="text-xs text-muted-foreground">
                       {t.organization?.name ??
@@ -398,6 +398,14 @@ export default function AdminFreelancersPage() {
                         "Standalone task"}
                       {t.revisionNote ? " · resubmitted" : ""}
                     </p>
+                    {t.deliveryNoteIncluded && t.deliveryNote && (
+                      <p className="mt-1.5 whitespace-pre-wrap rounded-md border border-border bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
+                        <span className="font-semibold text-foreground">
+                          Delivery note:{" "}
+                        </span>
+                        {t.deliveryNote}
+                      </p>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm">
                     {t.assignedTo?.name ?? "—"}

@@ -66,7 +66,10 @@ export const ticketsRouter = router({
           ...(orgId ? { organizationId: orgId } : {}),
         },
         orderBy: { updatedAt: "desc" },
-        include: { organization: { select: { name: true } } },
+        include: {
+          organization: { select: { name: true } },
+          _count: { select: { messages: true } },
+        },
       })
     }),
 

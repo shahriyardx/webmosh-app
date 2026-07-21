@@ -572,7 +572,7 @@ export default function DashboardPage() {
       {/* Payments */}
       <Card className="rounded-2xl shadow-none">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <SectionTitle icon={DollarSignIcon}>Recent payments</SectionTitle>
+          <SectionTitle icon={DollarSignIcon}>Recent invoices</SectionTitle>
           <Button variant="ghost" size="sm" asChild>
             <Link href="/account/invoices">
               View all
@@ -582,7 +582,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           {!recentInvoices.length ? (
-            <EmptyRow icon={ReceiptIcon} message="No payments yet." />
+            <EmptyRow icon={ReceiptIcon} message="No invoices yet." />
           ) : (
             <div className="divide-y divide-border">
               {recentInvoices.map((inv) => (

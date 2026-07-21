@@ -161,7 +161,7 @@ export default function AdminClientProfilePage({
   const stats = [
     { label: "Companies", value: totals.companies, icon: Building2Icon },
     { label: "Documents", value: totals.documents, icon: FileTextIcon },
-    { label: "Payments", value: totals.invoices, icon: ReceiptIcon },
+    { label: "Invoices", value: totals.invoices, icon: ReceiptIcon },
     { label: "Orders", value: totals.orders, icon: ShoppingCartIcon },
     { label: "Tickets", value: totals.tickets, icon: LifeBuoyIcon },
     {
@@ -174,7 +174,7 @@ export default function AdminClientProfilePage({
   const tabs: { key: Tab; label: string; count: number; icon: typeof Building2Icon }[] = [
     { key: "companies", label: "Companies", count: totals.companies, icon: Building2Icon },
     { key: "documents", label: "Documents", count: totals.documents, icon: FileTextIcon },
-    { key: "payments", label: "Payments", count: totals.invoices, icon: ReceiptIcon },
+    { key: "payments", label: "Invoices", count: totals.invoices, icon: ReceiptIcon },
     { key: "orders", label: "Orders", count: totals.orders, icon: ShoppingCartIcon },
     { key: "tickets", label: "Tickets", count: totals.tickets, icon: LifeBuoyIcon },
   ]

@@ -337,6 +337,39 @@ export async function emailFreelancerInvite(toEmail: string) {
   })
 }
 
+export async function emailFreelancerTaskAssigned(
+  toEmail: string,
+  toName: string | null,
+  args: {
+    taskId: string
+    taskTitle: string
+    priority: string
+    deadline: Date | null
+  },
+) {
+  const first = toName?.split(" ")[0] || "there"
+  const t = await resolveTemplate("freelancer.task_assigned", {
+    name: first,
+    taskTitle: args.taskTitle,
+    priority: args.priority
+      ? args.priority.charAt(0).toUpperCase() + args.priority.slice(1)
+      : "Medium",
+    deadline: args.deadline
+      ? new Date(args.deadline).toLocaleDateString()
+      : "No deadline",
+  })
+  if (!t) return
+  await sendMail(toEmail, t.subject, {
+    heading: t.heading,
+    greeting: `Hi ${first},`,
+    intro: t.intro,
+    cta: {
+      label: t.ctaLabel ?? "View Task",
+      url: appUrl(`/freelancer/tasks/${args.taskId}`),
+    },
+  })
+}
+
 // ---------- ADMIN NOTIFICATIONS ----------
 
 export async function emailAdminNewTicket(

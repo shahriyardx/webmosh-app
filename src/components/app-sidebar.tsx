@@ -61,7 +61,7 @@ export function AppSidebar({
     { title: "Documents", href: `${base}/documents`, icon: FileTextIcon },
     { title: "Services", href: `${base}/services`, icon: ConciergeBellIcon },
     { title: "Orders", href: `${base}/orders`, icon: ShoppingCartIcon },
-    { title: "Payments", href: `${base}/invoices`, icon: ReceiptIcon },
+    { title: "Invoices", href: `${base}/invoices`, icon: ReceiptIcon },
     { title: "Wallet", href: "/account/wallet", icon: WalletIcon },
     { title: "Mail", href: `${base}/mail`, icon: MailIcon },
     { title: "Support", href: `${base}/tickets`, icon: LifeBuoyIcon },

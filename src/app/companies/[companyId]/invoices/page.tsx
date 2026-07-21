@@ -10,6 +10,7 @@ import { formatInvoiceNumber } from "@/lib/invoice-number"
 
 const statusLabel: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
   unpaid: { label: "Unpaid", variant: "outline" },
+  partially_paid: { label: "Partially paid", variant: "secondary" },
   processing: { label: "Processing", variant: "secondary" },
   paid: { label: "Paid", variant: "default" },
   rejected: { label: "Rejected", variant: "destructive" },
@@ -37,9 +38,9 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Payments</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Invoices</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          View and pay your formation payments.
+          View and pay your invoices.
         </p>
       </div>
 

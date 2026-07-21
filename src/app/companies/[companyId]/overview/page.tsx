@@ -337,7 +337,7 @@ export default function OverviewPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <ReceiptIcon className="size-4 text-sky-500" />
-              Pending Payments
+              Pending Invoices
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">

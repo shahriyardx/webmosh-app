@@ -8,6 +8,7 @@ import {
 } from "../server"
 import { prisma } from "@/lib/prisma"
 import { createAdminNotification } from "@/lib/notifications"
+import { emailFreelancerTaskAssigned } from "@/lib/notify"
 import { PayoutStatus, TaskPriority, TaskStatus } from "@/generated/prisma/enums"
 
 const priorityEnum = z.nativeEnum(TaskPriority)
@@ -58,6 +59,8 @@ const taskSelect = {
   orderId: true,
   revisionNote: true,
   submittedAt: true,
+  deliveryNote: true,
+  deliveryNoteIncluded: true,
   createdAt: true,
   updatedAt: true,
   assignedTo: {
@@ -164,6 +167,7 @@ export const tasksRouter = router({
       pipelineAgg,
       approvedPayoutAgg,
       pendingPayoutAgg,
+      adjustmentAgg,
       doneCount,
     ] = await Promise.all([
       prisma.task.aggregate({
@@ -191,6 +195,10 @@ export const tasksRouter = router({
         },
         _sum: { amount: true },
       }),
+      prisma.freelancerAdjustment.aggregate({
+        where: { freelancerId: ctx.user.id },
+        _sum: { amount: true },
+      }),
       prisma.task.count({
         where: { assignedToId: ctx.user.id, status: TaskStatus.done },
       }),
@@ -199,7 +207,8 @@ export const tasksRouter = router({
     const pipeline = pipelineAgg._sum.payoutAmount ?? 0
     const paidOut = approvedPayoutAgg._sum.amount ?? 0
     const requested = pendingPayoutAgg._sum.amount ?? 0
-    const available = Math.max(0, earned - paidOut - requested)
+    const adjustments = adjustmentAgg._sum.amount ?? 0
+    const available = Math.max(0, earned + adjustments - paidOut - requested)
     return {
       earned,
       pending: pipeline,
@@ -259,7 +268,7 @@ export const tasksRouter = router({
           message: "Assignee must be a freelancer.",
         })
       }
-      return prisma.task.create({
+      const task = await prisma.task.create({
         data: {
           title: input.title,
           description: input.description,
@@ -274,12 +283,28 @@ export const tasksRouter = router({
         },
         select: taskSelect,
       })
+
+      if (task.assignedTo?.email) {
+        await emailFreelancerTaskAssigned(
+          task.assignedTo.email,
+          task.assignedTo.name,
+          {
+            taskId: task.id,
+            taskTitle: task.title,
+            priority: task.priority,
+            deadline: task.deadline,
+          },
+        ).catch(() => {})
+      }
+
+      return task
     }),
 
   update: adminProcedure
     .input(taskUpdateSchema)
     .mutation(async ({ input }) => {
       const { id, ...rest } = input
+      let previousAssignee: string | null = null
       if (rest.assignedToId) {
         const assignee = await prisma.user.findFirst({
           where: { id: rest.assignedToId, role: "freelancer" },
@@ -291,12 +316,38 @@ export const tasksRouter = router({
             message: "Assignee must be a freelancer.",
           })
         }
+        const existing = await prisma.task.findUnique({
+          where: { id },
+          select: { assignedToId: true },
+        })
+        previousAssignee = existing?.assignedToId ?? null
       }
-      return prisma.task.update({
+
+      const task = await prisma.task.update({
         where: { id },
         data: rest,
         select: taskSelect,
       })
+
+      // Notify the freelancer only when the task is (re)assigned to them.
+      if (
+        rest.assignedToId &&
+        rest.assignedToId !== previousAssignee &&
+        task.assignedTo?.email
+      ) {
+        await emailFreelancerTaskAssigned(
+          task.assignedTo.email,
+          task.assignedTo.name,
+          {
+            taskId: task.id,
+            taskTitle: task.title,
+            priority: task.priority,
+            deadline: task.deadline,
+          },
+        ).catch(() => {})
+      }
+
+      return task
     }),
 
   /**
@@ -343,8 +394,43 @@ export const tasksRouter = router({
    * `in_review` and notifies the admin. Payment is only credited once the
    * admin approves.
    */
+  /** Freelancer: save the private delivery note (notepad) on their own task. */
+  saveDeliveryNote: freelancerProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        note: z.string(),
+        included: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const task = await prisma.task.findUnique({
+        where: { id: input.id },
+        select: { assignedToId: true },
+      })
+      if (!task || task.assignedToId !== ctx.user.id) {
+        throw new TRPCError({ code: "NOT_FOUND" })
+      }
+      return prisma.task.update({
+        where: { id: input.id },
+        data: {
+          deliveryNote: input.note.trim() || null,
+          ...(input.included !== undefined
+            ? { deliveryNoteIncluded: input.included }
+            : {}),
+        },
+        select: taskSelect,
+      })
+    }),
+
   submitForReview: freelancerProcedure
-    .input(z.object({ id: z.string() }))
+    .input(
+      z.object({
+        id: z.string(),
+        includeNote: z.boolean().optional(),
+        note: z.string().optional(),
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       const task = await prisma.task.findUnique({
         where: { id: input.id },
@@ -367,7 +453,16 @@ export const tasksRouter = router({
       }
       const updated = await prisma.task.update({
         where: { id: input.id },
-        data: { status: TaskStatus.in_review, submittedAt: new Date() },
+        data: {
+          status: TaskStatus.in_review,
+          submittedAt: new Date(),
+          ...(input.includeNote !== undefined
+            ? { deliveryNoteIncluded: input.includeNote }
+            : {}),
+          ...(input.note !== undefined
+            ? { deliveryNote: input.note.trim() || null }
+            : {}),
+        },
         select: taskSelect,
       })
       await createAdminNotification({

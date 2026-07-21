@@ -1,27 +1,14 @@
 "use client"
 
-import { use, useState } from "react"
-import { QRCodeSVG } from "qrcode.react"
+import { use } from "react"
 import { trpc } from "@/lib/trpc/client"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { ArrowLeftIcon, DownloadIcon, WalletIcon } from "lucide-react"
+import { ArrowLeftIcon, DownloadIcon } from "lucide-react"
 import Link from "next/link"
-import { toast } from "sonner"
 import { formatInvoiceNumber } from "@/lib/invoice-number"
 import { InvoiceCoupon } from "@/components/invoice-coupon"
-
-const QR_CONTENT =
-  "00020101021126540013com.pathaopay01020302041008031991008200186593649045204739953030505802BD5907WEBMOSH60045460625002110186593649003085594973007082f9893880807PAYMENT63049E3F"
-
-const statusLabel: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
-  unpaid: { label: "Unpaid", variant: "outline" },
-  processing: { label: "Processing", variant: "secondary" },
-  paid: { label: "Paid", variant: "default" },
-  rejected: { label: "Rejected", variant: "destructive" },
-}
+import { InvoiceSummaryCard } from "@/components/invoice-summary-card"
+import { InvoicePayPanel } from "@/components/invoice-pay-panel"
 
 export default function AccountInvoiceDetailPage({
   params,
@@ -33,28 +20,6 @@ export default function AccountInvoiceDetailPage({
 
   const { data: invoice, isLoading } = trpc.invoices.getById.useQuery({ id: invoiceId })
   const { data: settings } = trpc.settings.getAll.useQuery()
-  const { data: walletBalance } = trpc.wallet.myBalance.useQuery()
-
-  const [transactionId, setTransactionId] = useState("")
-
-  const submitTx = trpc.invoices.submitTransaction.useMutation({
-    onSuccess: () => {
-      utils.invoices.listForUser.invalidate()
-      utils.invoices.getById.invalidate({ id: invoiceId })
-      setTransactionId("")
-    },
-  })
-
-  const payWithWallet = trpc.wallet.payInvoice.useMutation({
-    onSuccess: () => {
-      utils.invoices.listForUser.invalidate()
-      utils.invoices.getById.invalidate({ id: invoiceId })
-      utils.wallet.myBalance.invalidate()
-      utils.wallet.myTransactions.invalidate()
-      toast.success("Invoice paid from your wallet balance")
-    },
-    onError: (e) => toast.error(e.message),
-  })
 
   if (isLoading) {
     return (
@@ -67,18 +32,21 @@ export default function AccountInvoiceDetailPage({
   if (!invoice) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <p className="text-sm text-muted-foreground">Payment not found.</p>
+        <p className="text-sm text-muted-foreground">Invoice not found.</p>
       </div>
     )
   }
 
-  const st = statusLabel[invoice.status] ?? statusLabel.unpaid
-  const canPay = invoice.status === "unpaid"
+  const canPay = invoice.status !== "paid"
   const rate = settings?.usd_to_bdt_rate ? parseFloat(settings.usd_to_bdt_rate) : null
-  const bdtAmount = rate ? (invoice.amount * rate).toFixed(2) : null
+
+  const onChanged = () => {
+    utils.invoices.getById.invalidate({ id: invoiceId })
+    utils.invoices.listForUser.invalidate()
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-6xl space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" asChild className="size-8">
           <Link href="/account/invoices">
@@ -87,7 +55,7 @@ export default function AccountInvoiceDetailPage({
         </Button>
         <div className="flex-1">
           <h1 className="text-xl font-semibold text-foreground">
-            Payment {formatInvoiceNumber(invoice.number)}
+            Invoice {formatInvoiceNumber(invoice.number)}
           </h1>
           <p className="text-xs text-muted-foreground font-mono">{invoice.id}</p>
         </div>
@@ -99,152 +67,29 @@ export default function AccountInvoiceDetailPage({
         </Button>
       </div>
 
-      <div className="rounded-xl border border-border">
-        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-          <span className="text-sm font-semibold">Amount Due</span>
-          <Badge variant={st.variant}>{st.label}</Badge>
-        </div>
-        <div className="space-y-4 px-5 py-4">
-          <div>
-            <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-bold">${invoice.amount}</p>
-              {invoice.originalAmount != null && (
-                <p className="text-lg font-medium text-muted-foreground line-through">
-                  ${invoice.originalAmount}
-                </p>
-              )}
-            </div>
-            {invoice.couponCode && (
-              <p className="mt-1 text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                Coupon {invoice.couponCode} — saved $
-                {(invoice.discountAmount ?? 0).toFixed(2)}
-              </p>
-            )}
-            {bdtAmount && (
-              <p className="mt-1 text-sm text-muted-foreground">৳{bdtAmount} BDT</p>
-            )}
+      {canPay ? (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-start">
+          <div className="lg:sticky lg:top-6">
+            <InvoiceSummaryCard invoice={invoice} bdtRate={rate} />
           </div>
-
-          {invoice.description && (
-            <div className="border-t border-border pt-4 text-sm text-muted-foreground">
-              {invoice.description}
-            </div>
-          )}
-
-          {invoice.item && (
-            <div className="border-t border-border pt-4 text-sm text-muted-foreground">
-              {invoice.item.type === "service" ? "Service" : "Package"}:{" "}
-              <span className="font-medium text-foreground">{invoice.item.title}</span>
-            </div>
-          )}
-
-          {invoice.paymentMethod === "stripe" && (
-            <div className="text-sm text-muted-foreground">
-              Paid via <span className="font-medium">Stripe</span>
-            </div>
-          )}
-          {invoice.paymentMethod && invoice.paymentMethod !== "stripe" && (
-            <div className="text-sm text-muted-foreground">
-              Payment method:{" "}
-              <span className="font-medium capitalize">{invoice.paymentMethod}</span>
-            </div>
-          )}
-          {invoice.transactionId && (
-            <div className="text-sm text-muted-foreground">
-              Transaction ID: <span className="font-medium">{invoice.transactionId}</span>
-            </div>
-          )}
-          {(invoice.status === "rejected" || invoice.status === "unpaid") &&
-            invoice.rejectReason && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600">
-                {invoice.rejectReason}
-              </div>
-            )}
-        </div>
-      </div>
-
-      {canPay && (
-        <InvoiceCoupon
-          invoiceId={invoiceId}
-          couponCode={invoice.couponCode}
-          discountAmount={invoice.discountAmount}
-          originalAmount={invoice.originalAmount}
-          onChanged={() => {
-            utils.invoices.getById.invalidate({ id: invoiceId })
-            utils.invoices.listForUser.invalidate()
-          }}
-        />
-      )}
-
-      {canPay && (
-        <div className="rounded-xl border border-sky-500/30 bg-sky-500/5">
-          <div className="flex flex-col justify-between gap-3 px-5 py-4 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
-                <WalletIcon className="size-5 text-sky-500" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold">Pay with wallet balance</p>
-                <p className="text-xs text-muted-foreground">
-                  Available: ${(walletBalance?.available ?? 0).toFixed(2)}
-                  {(walletBalance?.available ?? 0) < invoice.amount &&
-                    " — not enough for this invoice"}
-                </p>
-              </div>
-            </div>
-            {(walletBalance?.available ?? 0) >= invoice.amount ? (
-              <Button
-                disabled={payWithWallet.isPending}
-                onClick={() => payWithWallet.mutate({ invoiceId })}
-              >
-                {payWithWallet.isPending
-                  ? "Paying…"
-                  : `Pay $${invoice.amount} now`}
-              </Button>
-            ) : (
-              <Button variant="outline" asChild>
-                <Link href="/account/wallet">Add money</Link>
-              </Button>
-            )}
+          <div className="space-y-6">
+            <InvoiceCoupon
+              invoiceId={invoiceId}
+              couponCode={invoice.couponCode}
+              discountAmount={invoice.discountAmount}
+              originalAmount={invoice.originalAmount}
+              onChanged={onChanged}
+            />
+            <InvoicePayPanel
+              invoiceId={invoiceId}
+              bdtRate={rate}
+              onChanged={onChanged}
+            />
           </div>
         </div>
-      )}
-
-      {canPay && (
-        <div className="rounded-xl border border-border">
-          <div className="border-b border-border px-5 py-3.5">
-            <span className="text-sm font-semibold">Pay with Bangla QR</span>
-          </div>
-          <div className="space-y-5 px-5 py-4">
-            <div className="flex flex-col items-center gap-3">
-              <div className="rounded-xl bg-white p-4">
-                <QRCodeSVG value={QR_CONTENT} size={220} level="M" />
-              </div>
-              <p className="text-center text-sm text-muted-foreground">
-                Scan with any Bangla QR enabled app (bKash, Nagad, Rocket, bank app) and pay{" "}
-                {bdtAmount ? <strong>৳{bdtAmount}</strong> : <strong>${invoice.amount}</strong>}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Transaction ID (TrxID)</Label>
-              <Input
-                placeholder="Paste the transaction ID after paying"
-                value={transactionId}
-                onChange={(e) => setTransactionId(e.target.value)}
-              />
-            </div>
-
-            <Button
-              className="w-full"
-              onClick={() =>
-                submitTx.mutate({ invoiceId, paymentMethod: "BanglaQR", transactionId })
-              }
-              disabled={!transactionId || submitTx.isPending}
-            >
-              {submitTx.isPending ? "Submitting…" : "Confirm Payment"}
-            </Button>
-          </div>
+      ) : (
+        <div className="mx-auto w-full max-w-2xl">
+          <InvoiceSummaryCard invoice={invoice} bdtRate={rate} />
         </div>
       )}
     </div>
