@@ -29,7 +29,7 @@ const schema = z.object({
     .array(z.object({ value: z.string().min(1, "Feature cannot be empty") }))
     .min(1, "At least one feature required"),
   price: z.string().min(1, "Price is required"),
-  country: z.enum(["us", "uk"]),
+  country: z.enum(["us", "uk", "any"]),
   type: z.enum(["general", "wordpress"]),
 })
 
@@ -50,7 +50,10 @@ function parseForm(data: Schema) {
     description: data.description,
     features: data.features.map((f) => f.value),
     price: parseFloat(data.price),
-    country: data.type === "wordpress" ? null : data.country,
+    country:
+      data.type === "wordpress" || data.country === "any"
+        ? null
+        : data.country,
     type: data.type,
   }
 }
@@ -112,6 +115,7 @@ export function ServiceForm({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="any">Any country</SelectItem>
                     <SelectItem value="us">United States</SelectItem>
                     <SelectItem value="uk">United Kingdom</SelectItem>
                   </SelectContent>

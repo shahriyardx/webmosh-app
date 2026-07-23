@@ -64,7 +64,7 @@ export default function EditServicePage({
           description: svc.description,
           features: svc.features.map((f) => ({ value: f })),
           price: String(svc.price),
-          country: (svc.country as "us" | "uk" | null) ?? "us",
+          country: (svc.country as "us" | "uk" | null) ?? "any",
           type: (svc.type as "general" | "wordpress") ?? "general",
         }}
         loading={updateSvc.isPending}

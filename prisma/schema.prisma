@@ -557,6 +557,26 @@ model FreelancerAdjustment {
   @@map("freelancer_adjustment")
 }
 
+/**
+ * Admin-only money-exchange ledger. Records a transfer of `amount` from one
+ * account to another at a given BDT `rate`; amount-in-BDT is amount * rate.
+ */
+model ExchangeTransaction {
+  id          String   @id @default(cuid())
+  date        DateTime
+  amount      Float
+  rate        Float
+  fromAccount String   @map("from_account")
+  toAccount   String   @map("to_account")
+  remark      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([date])
+  @@index([toAccount])
+  @@map("exchange_transaction")
+}
+
 model Notification {
   id        String    @id @default(cuid())
   kind      String

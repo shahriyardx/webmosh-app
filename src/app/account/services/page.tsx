@@ -86,12 +86,17 @@ export default function AccountServicesPage() {
     ? (companies ?? []).filter(
         (c) =>
           c.type !== "personal" &&
-          (picking.type === "wordpress" || c.country === picking.country),
+          (picking.type === "wordpress" ||
+            !picking.country ||
+            c.country === picking.country),
       )
     : []
 
   const wordpressServices = (allServices ?? []).filter(
     (s) => s.type === "wordpress",
+  )
+  const globalServices = (allServices ?? []).filter(
+    (s) => s.type !== "wordpress" && !s.country,
   )
   const usServices = (allServices ?? []).filter(
     (s) => s.type !== "wordpress" && s.country === "us",
@@ -160,6 +165,17 @@ export default function AccountServicesPage() {
         </section>
       )}
 
+      {globalServices.length > 0 && (
+        <section className="space-y-4">
+          <SectionHeading
+            icon={GlobeIcon}
+            title="Available for any company"
+            subtitle="For any of your companies, worldwide"
+          />
+          <ServiceGrid services={globalServices} onPurchase={startPurchase} />
+        </section>
+      )}
+
       {ukServices.length > 0 && (
         <section className="space-y-4">
           <SectionHeading
@@ -184,7 +200,8 @@ export default function AccountServicesPage() {
 
       {ukServices.length === 0 &&
         usServices.length === 0 &&
-        wordpressServices.length === 0 && (
+        wordpressServices.length === 0 &&
+        globalServices.length === 0 && (
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border py-20 text-center">
             <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-muted/40">
               <ConciergeBellIcon className="size-6 text-muted-foreground/60" />
@@ -206,7 +223,7 @@ export default function AccountServicesPage() {
             <DialogTitle>Purchase for which company?</DialogTitle>
             <DialogDescription>
               {picking?.title}
-              {picking?.type === "wordpress"
+              {picking?.type === "wordpress" || !picking?.country
                 ? " — available for any of your companies"
                 : ` — ${
                     picking?.country === "uk"
@@ -219,7 +236,7 @@ export default function AccountServicesPage() {
             <Label>Company</Label>
             {eligibleCompanies.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                {picking?.type === "wordpress"
+                {picking?.type === "wordpress" || !picking?.country
                   ? "You have no companies yet. Create one first."
                   : `You have no ${
                       picking?.country === "uk" ? "UK" : "US"

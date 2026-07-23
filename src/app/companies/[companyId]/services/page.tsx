@@ -72,7 +72,7 @@ export default function DashboardServicesPage() {
   const country = overview?.country
 
   const filtered = (allServices ?? []).filter(
-    (s) => s.type === "wordpress" || s.country === country,
+    (s) => s.type === "wordpress" || !s.country || s.country === country,
   )
 
   if (svcLoading) {

@@ -33,6 +33,7 @@ import {
   CreditCardIcon,
   MessagesSquareIcon,
   TicketPercentIcon,
+  ArrowLeftRightIcon,
   Settings,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
@@ -104,6 +105,11 @@ const links = [
     title: "Coupons",
     href: "/admin/coupons",
     icon: TicketPercentIcon,
+  },
+  {
+    title: "Exchange",
+    href: "/admin/exchange",
+    icon: ArrowLeftRightIcon,
   },
   {
     title: "Emails",
