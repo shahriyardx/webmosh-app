@@ -8,7 +8,10 @@ import {
 } from "../server"
 import { prisma } from "@/lib/prisma"
 import { createAdminNotification } from "@/lib/notifications"
-import { emailFreelancerTaskAssigned } from "@/lib/notify"
+import {
+  emailFreelancerTaskAssigned,
+  emailAdminTaskSubmitted,
+} from "@/lib/notify"
 import { PayoutStatus, TaskPriority, TaskStatus } from "@/generated/prisma/enums"
 
 const priorityEnum = z.nativeEnum(TaskPriority)
@@ -469,8 +472,13 @@ export const tasksRouter = router({
         kind: "task.submitted",
         title: `Task ready for review: ${task.title}`,
         body: `${ctx.user.name ?? ctx.user.email} submitted a task for approval.`,
-        link: "/admin/freelancers",
+        link: `/admin/tasks/${input.id}`,
       })
+      await emailAdminTaskSubmitted(
+        ctx.user.name ?? ctx.user.email,
+        input.id,
+        task.title,
+      ).catch(() => {})
       return updated
     }),
 

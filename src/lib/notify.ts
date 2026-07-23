@@ -395,6 +395,30 @@ export async function emailAdminNewTicket(
   })
 }
 
+export async function emailAdminTaskSubmitted(
+  freelancerName: string | null,
+  taskId: string,
+  taskTitle: string,
+) {
+  const t = await resolveTemplate("admin.task_submitted", {
+    freelancerName: freelancerName ?? "A freelancer",
+    taskTitle,
+  })
+  if (!t) return
+  await notifyAdmin(t.subject, {
+    heading: t.heading,
+    intro: t.intro,
+    details: [
+      { label: "Freelancer", value: freelancerName ?? "—" },
+      { label: "Task", value: taskTitle },
+    ],
+    cta: {
+      label: t.ctaLabel ?? "Review Task",
+      url: appUrl(`/admin/tasks/${taskId}`),
+    },
+  })
+}
+
 export async function emailAdminTicketReply(
   userName: string | null,
   ticketId: string,

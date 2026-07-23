@@ -439,6 +439,24 @@ export const EMAIL_EVENTS: EmailEventDef[] = [
       ctaLabel: "View Users",
     },
   },
+  {
+    event: "admin.task_submitted",
+    label: "Task submitted for review",
+    description:
+      "Alerts the admin when a freelancer submits a task for approval.",
+    audience: "admin",
+    variables: [
+      v("freelancerName", "Freelancer's name", "Arif Hasan"),
+      v("taskTitle", "Title of the submitted task", "Build landing page"),
+    ],
+    defaults: {
+      subject: "Task ready for review: {{taskTitle}}",
+      heading: "A task is ready for review",
+      intro:
+        "{{freelancerName}} submitted a task for your approval. Review the work, then approve it or send it back for revision.",
+      ctaLabel: "Review Task",
+    },
+  },
 ]
 
 export type EmailEvent = (typeof EMAIL_EVENTS)[number]["event"]
