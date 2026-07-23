@@ -127,24 +127,10 @@ export default function AdminSettingsPage() {
 
           <Controller
             control={control}
-            name="invoiceFromAddress"
-            render={({ field, fieldState }) => (
-              <Field>
-                <FieldLabel>Address</FieldLabel>
-                <FieldContent>
-                  <Textarea rows={2} placeholder="Street, City, Postcode, Country" {...field} />
-                  <FieldError errors={[fieldState.error]} />
-                </FieldContent>
-              </Field>
-            )}
-          />
-
-          <Controller
-            control={control}
             name="invoiceFromPhone"
             render={({ field, fieldState }) => (
               <Field>
-                <FieldLabel>Phone</FieldLabel>
+                <FieldLabel>Phone Number</FieldLabel>
                 <FieldContent>
                   <Input placeholder="e.g. +8801XXXXXXXXX" {...field} />
                   <FieldError errors={[fieldState.error]} />
@@ -161,6 +147,20 @@ export default function AdminSettingsPage() {
                 <FieldLabel>Email</FieldLabel>
                 <FieldContent>
                   <Input placeholder="e.g. info@webmosh.com" {...field} />
+                  <FieldError errors={[fieldState.error]} />
+                </FieldContent>
+              </Field>
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="invoiceFromAddress"
+            render={({ field, fieldState }) => (
+              <Field>
+                <FieldLabel>Address</FieldLabel>
+                <FieldContent>
+                  <Textarea rows={2} placeholder="Street, City, Postcode, Country" {...field} />
                   <FieldError errors={[fieldState.error]} />
                 </FieldContent>
               </Field>

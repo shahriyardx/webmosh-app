@@ -72,31 +72,42 @@ export async function GET(
     items = [{ title, amount: invoice.amount, features }]
   }
 
-  // Bill To — custom receiver (advanced create flow) wins; else director; else org owner.
-  const director = await prisma.director.findFirst({
-    where: { organizationId: invoice.organizationId },
-    orderBy: { createdAt: "asc" },
-  })
+  // Bill To — custom receiver (advanced create flow) wins; else the account
+  // user (org owner); else a company director as a last resort.
   const owner = await prisma.member.findFirst({
     where: { organizationId: invoice.organizationId, role: "owner" },
-    include: { user: { select: { name: true, email: true } } },
+    include: {
+      user: {
+        select: { name: true, email: true, phone: true, address: true },
+      },
+    },
   })
+  const director = owner?.user
+    ? null
+    : await prisma.director.findFirst({
+        where: { organizationId: invoice.organizationId },
+        orderBy: { createdAt: "asc" },
+      })
   const billTo = invoice.receiverEmail
     ? {
         name: invoice.receiverName ?? "Customer",
         email: invoice.receiverEmail,
       }
-    : director
+    : owner?.user
       ? {
-          name: `${director.firstName} ${director.lastName}`,
-          phone: director.phone,
-          email: director.email,
-          address: director.address,
+          name: owner.user.name,
+          email: owner.user.email,
+          phone: owner.user.phone,
+          address: owner.user.address,
         }
-      : {
-          name: owner?.user?.name ?? "Customer",
-          email: owner?.user?.email ?? null,
-        }
+      : director
+        ? {
+            name: `${director.firstName} ${director.lastName}`,
+            phone: director.phone,
+            email: director.email,
+            address: director.address,
+          }
+        : { name: "Customer", email: null }
 
   const qrDataUrl =
     invoice.status === "paid"

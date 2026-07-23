@@ -7,8 +7,8 @@ import { trpc } from "@/lib/trpc/client"
 import { TaskPriority, TaskStatus } from "@/generated/prisma/enums"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
+import { NoteEditor, NoteView } from "@/components/note-editor"
 import {
   Dialog,
   DialogContent,
@@ -496,10 +496,9 @@ export default function FreelancerTaskDetailPage({
                   anything worth flagging. You&apos;ll choose whether to share
                   it with the admin when you submit for approval.
                 </p>
-                <Textarea
+                <NoteEditor
                   value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  rows={5}
+                  onChange={setNote}
                   placeholder="Notes about your work, delivery links, what you completed…"
                 />
                 <Button
@@ -521,9 +520,10 @@ export default function FreelancerTaskDetailPage({
                     Delivery note
                   </h2>
                 </div>
-                <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                  {task.deliveryNote}
-                </p>
+                <NoteView
+                  text={task.deliveryNote}
+                  className="text-muted-foreground"
+                />
               </CardContent>
             </Card>
           ) : null}
@@ -675,9 +675,9 @@ export default function FreelancerTaskDetailPage({
                   <NotebookPenIcon className="size-4 text-muted-foreground" />
                   <p className="text-sm font-semibold">Delivery note</p>
                 </div>
-                <p className="max-h-32 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-card p-3 text-sm text-muted-foreground">
-                  {note}
-                </p>
+                <div className="max-h-32 overflow-y-auto rounded-lg border border-border bg-card p-3 text-muted-foreground">
+                  <NoteView text={note} />
+                </div>
                 <label className="flex cursor-pointer items-center gap-2 pt-1">
                   <Checkbox
                     checked={includeNote}

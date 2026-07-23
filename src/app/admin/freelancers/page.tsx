@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { NoteView } from "@/components/note-editor"
 import {
   MailPlusIcon,
   UserCogIcon,
@@ -43,6 +44,7 @@ import {
   ClipboardCheckIcon,
   CheckIcon,
   RotateCcwIcon,
+  EyeIcon,
 } from "lucide-react"
 import { TaskPriority } from "@/generated/prisma/enums"
 
@@ -348,7 +350,7 @@ export default function AdminFreelancersPage() {
                       </Button>
                     ) : (
                       <Button variant="outline" size="sm" asChild>
-                        <Link href={`/admin/freelancers/${o.task.assignedTo?.id ?? ""}`}>
+                        <Link href={`/admin/tasks/${o.task.id}`}>
                           View
                           <ExternalLinkIcon className="ml-1 size-3" />
                         </Link>
@@ -399,12 +401,15 @@ export default function AdminFreelancersPage() {
                       {t.revisionNote ? " · resubmitted" : ""}
                     </p>
                     {t.deliveryNoteIncluded && t.deliveryNote && (
-                      <p className="mt-1.5 whitespace-pre-wrap rounded-md border border-border bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
-                        <span className="font-semibold text-foreground">
-                          Delivery note:{" "}
-                        </span>
-                        {t.deliveryNote}
-                      </p>
+                      <div className="mt-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-2">
+                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                          Delivery note
+                        </p>
+                        <NoteView
+                          text={t.deliveryNote}
+                          className="text-xs text-muted-foreground"
+                        />
+                      </div>
                     )}
                   </TableCell>
                   <TableCell className="text-sm">
@@ -422,6 +427,12 @@ export default function AdminFreelancersPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1.5">
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={`/admin/tasks/${t.id}`}>
+                          <EyeIcon className="size-3.5" />
+                          View
+                        </Link>
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"

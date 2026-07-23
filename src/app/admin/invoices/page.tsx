@@ -31,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import Link from "next/link"
 import {
   ReceiptIcon,
   DownloadIcon,
@@ -38,6 +39,7 @@ import {
   PlusIcon,
   XIcon,
   BellIcon,
+  EyeIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
@@ -244,9 +246,6 @@ export default function AdminInvoicesPage() {
                           {(inv.amount - inv.amountPaid).toFixed(2)} due
                         </p>
                       )}
-                      {inv.description && (
-                        <p className="mt-0.5 max-w-xs text-xs text-muted-foreground">{inv.description}</p>
-                      )}
                     </TableCell>
                     <TableCell className="capitalize">
                       {inv.paymentMethod ?? "—"}
@@ -289,6 +288,17 @@ export default function AdminInvoicesPage() {
                         {inv.status === PaymentStatus.paid && (
                           <span className="text-xs text-green-600">Completed</span>
                         )}
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="size-8"
+                          title="View invoice"
+                          asChild
+                        >
+                          <Link href={`/admin/invoices/${inv.id}`}>
+                            <EyeIcon className="size-4" />
+                          </Link>
+                        </Button>
                         <Button variant="outline" size="icon" className="size-8" asChild>
                           <a
                             href={`/companies/${inv.organizationId}/invoices/${inv.id}/pdf`}

@@ -294,9 +294,9 @@ function InvoiceDocument({ data }: { data: InvoicePdfData }) {
           <View style={s.partyCol}>
             <Text style={s.label}>From</Text>
             <Text style={s.partyName}>{company.name}</Text>
-            <Text style={s.partyLine}>{company.address}</Text>
             <Text style={s.partyLine}>{company.phone}</Text>
             <Text style={s.partyLine}>{company.email}</Text>
+            <Text style={s.partyLine}>{company.address}</Text>
           </View>
           <View style={s.partyCol}>
             <Text style={s.label}>Bill To</Text>

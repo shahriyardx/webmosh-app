@@ -542,6 +542,34 @@ export const tasksRouter = router({
       })
     }),
 
+  /**
+   * Admin: reject a submitted task. Moves it to `blocked` with a reason so the
+   * freelancer knows it wasn't accepted (no payment is released).
+   */
+  rejectTask: adminProcedure
+    .input(z.object({ id: z.string(), note: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const task = await prisma.task.findUnique({
+        where: { id: input.id },
+        select: { status: true },
+      })
+      if (!task) throw new TRPCError({ code: "NOT_FOUND" })
+      if (task.status !== TaskStatus.in_review) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Only tasks awaiting approval can be rejected.",
+        })
+      }
+      return prisma.task.update({
+        where: { id: input.id },
+        data: {
+          status: TaskStatus.blocked,
+          revisionNote: input.note.trim(),
+        },
+        select: taskSelect,
+      })
+    }),
+
   delete: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
