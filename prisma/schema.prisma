@@ -158,6 +158,9 @@ model Organization {
   stateFilingDue           DateTime? @map("state_filing_due")
   federalFilingDue         DateTime? @map("federal_filing_due")
   stateTaxDue              DateTime? @map("state_tax_due")
+  stripeStatus   AccountStatus @default(not_started) @map("stripe_status")
+  wiseStatus     AccountStatus @default(not_started) @map("wise_status")
+  websiteStatusOverride AccountStatus? @map("website_status_override")
   directors      Director[]
   documents      Document[]
   invoices       Invoice[]
@@ -204,6 +207,14 @@ enum CompanyStatus {
 enum OrganizationType {
   company
   personal
+}
+
+enum AccountStatus {
+  not_started
+  pending
+  active
+  rejected
+  closed
 }
 
 enum PaymentStatus {

@@ -38,7 +38,7 @@ async function getOrCreatePersonalOrg(user: { id: string; name?: string | null }
   return org.id
 }
 
-const wordpressInputSchema = z
+export const wordpressInputSchema = z
   .object({
     mode: z.enum(["demo", "custom"]),
     themeId: z.string().optional(),
@@ -68,9 +68,9 @@ const wordpressInputSchema = z
   })
   .optional()
 
-type WordpressInput = z.infer<typeof wordpressInputSchema>
+export type WordpressInput = z.infer<typeof wordpressInputSchema>
 
-async function purchaseServiceCore({
+export async function purchaseServiceCore({
   organizationId,
   serviceId,
   wordpress,
@@ -291,6 +291,109 @@ export const serviceOrdersRouter = router({
         input.status,
       ).catch(() => {})
       return updated
+    }),
+
+  /** Admin: modify any field of an order (status, requirements, price). */
+  adminUpdate: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        status: z.nativeEnum(ServiceOrderStatus).optional(),
+        amount: z.number().nonnegative().optional(),
+        themeId: z.string().nullable().optional(),
+        customDesignUrl: z.string().nullable().optional(),
+        contactCompany: z.string().nullable().optional(),
+        contactAddress: z.string().nullable().optional(),
+        contactEmail: z.string().nullable().optional(),
+        contactPhone: z.string().nullable().optional(),
+        credentials: z.any().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const order = await prisma.serviceOrder.findUnique({
+        where: { id: input.id },
+      })
+      if (!order) throw new Error("Order not found")
+
+      const updated = await prisma.serviceOrder.update({
+        where: { id: input.id },
+        data: {
+          ...(input.status !== undefined && { status: input.status }),
+          ...(input.themeId !== undefined && { themeId: input.themeId }),
+          ...(input.customDesignUrl !== undefined && {
+            customDesignUrl: input.customDesignUrl,
+          }),
+          ...(input.contactCompany !== undefined && {
+            contactCompany: input.contactCompany,
+          }),
+          ...(input.contactAddress !== undefined && {
+            contactAddress: input.contactAddress,
+          }),
+          ...(input.contactEmail !== undefined && {
+            contactEmail: input.contactEmail,
+          }),
+          ...(input.contactPhone !== undefined && {
+            contactPhone: input.contactPhone,
+          }),
+          ...(input.credentials !== undefined && {
+            credentials: input.credentials,
+          }),
+        },
+      })
+
+      // Adjust the linked invoice price when asked. Guard against invoices that
+      // are shared by several orders (e.g. onboarding multi-service checkout).
+      if (input.amount !== undefined && order.invoiceId) {
+        const shareCount = await prisma.serviceOrder.count({
+          where: { invoiceId: order.invoiceId },
+        })
+        if (shareCount > 1) {
+          throw new Error(
+            "This invoice covers multiple orders — edit the amount from the Invoices page instead.",
+          )
+        }
+        const svc = await prisma.service.findUnique({
+          where: { id: order.serviceId },
+          select: { title: true },
+        })
+        await prisma.invoice.update({
+          where: { id: order.invoiceId },
+          data: {
+            amount: input.amount,
+            items: [{ title: svc?.title ?? "Service", amount: input.amount }],
+          },
+        })
+      }
+
+      return updated
+    }),
+
+  /** Admin: delete an order (optionally the linked invoice too). */
+  remove: adminProcedure
+    .input(z.object({ id: z.string(), deleteInvoice: z.boolean().optional() }))
+    .mutation(async ({ input }) => {
+      const order = await prisma.serviceOrder.findUnique({
+        where: { id: input.id },
+      })
+      if (!order) throw new Error("Order not found")
+
+      // Tasks referencing this order have onDelete: SetNull, so they survive.
+      await prisma.serviceOrder.delete({ where: { id: input.id } })
+
+      if (input.deleteInvoice && order.invoiceId) {
+        // Only soft-delete the invoice if no other order still points to it.
+        const shareCount = await prisma.serviceOrder.count({
+          where: { invoiceId: order.invoiceId },
+        })
+        if (shareCount === 0) {
+          await prisma.invoice.update({
+            where: { id: order.invoiceId },
+            data: { deletedAt: new Date() },
+          })
+        }
+      }
+
+      return { ok: true }
     }),
 
   purchase: protectedProcedure

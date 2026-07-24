@@ -54,6 +54,10 @@ export type FormValues = {
   website?: string
   packageId: string
   serviceIds: string[]
+  wordpressOrders: {
+    serviceId: string
+    wordpress: WordpressPurchasePayload["wordpress"]
+  }[]
   passportUrl: string
   bankStatementUrl: string
   director: z.infer<typeof directorSchema>
@@ -823,7 +827,9 @@ export default function OnboardPage() {
                 <StepServices
                   onNext={handleNext}
                   country={formData.country}
+                  companyName={formData.companyName}
                   initialValue={formData.serviceIds}
+                  initialWordpress={formData.wordpressOrders}
                 />
               )}
               {currentStep === "review" && (

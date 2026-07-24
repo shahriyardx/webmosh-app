@@ -15,6 +15,10 @@ export function StepReview({ data }: StepReviewProps) {
   const selectedServices = (allServices ?? []).filter((s) =>
     data.serviceIds?.includes(s.id),
   )
+  const wordpressOrders = (data.wordpressOrders ?? []).map((o) => ({
+    ...o,
+    service: (allServices ?? []).find((s) => s.id === o.serviceId),
+  }))
 
   const packagePrice = selectedPackage?.price ?? 0
   const servicesTotal = selectedServices.reduce((sum, s) => sum + s.price, 0)
@@ -132,9 +136,51 @@ export function StepReview({ data }: StepReviewProps) {
         )}
       </div>
 
+      {/* WordPress — separate orders */}
+      {wordpressOrders.length > 0 && (
+        <div className="rounded-xl border border-border">
+          <div className="border-b border-border px-5 py-3">
+            <h3 className="text-sm font-semibold">Web development</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Each is placed as its own order with a separate invoice.
+            </p>
+          </div>
+          {wordpressOrders.map((o) => {
+            const isCustom = o.wordpress.mode === "custom"
+            return (
+              <div
+                key={o.serviceId}
+                className="flex items-center justify-between px-5 py-3.5 border-b border-border last:border-b-0"
+              >
+                <div>
+                  <span className="text-sm font-medium">
+                    {o.service?.title ?? "WordPress website"}
+                  </span>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {isCustom
+                      ? "Custom design — quoted after review"
+                      : "Demo theme"}
+                  </p>
+                </div>
+                <span className="text-sm font-semibold">
+                  {isCustom ? "Quoted" : `$${o.service?.price ?? 0}`}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Total */}
       <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-5 py-4">
-        <span className="text-base font-semibold">Total</span>
+        <div>
+          <span className="text-base font-semibold">Formation Total</span>
+          {wordpressOrders.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Web development billed separately
+            </p>
+          )}
+        </div>
         <span className="text-xl font-bold">${grandTotal}</span>
       </div>
 

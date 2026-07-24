@@ -21,6 +21,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  CompaniesTable,
+  type SetStatusValue,
+} from "@/components/companies-table"
+import {
   Building2Icon,
   FileTextIcon,
   ReceiptIcon,
@@ -81,8 +85,28 @@ export default function AdminClientProfilePage({
   const utils = trpc.useUtils()
 
   const { data, isLoading } = trpc.admin.clientProfile.useQuery({ userId })
+  const { data: adminCompanies } =
+    trpc.companies.adminCompaniesForUser.useQuery({ userId })
 
   const [tab, setTab] = useState<Tab>("companies")
+  const [statusPending, setStatusPending] = useState<string | null>(null)
+
+  const setAccountStatus = trpc.companies.setAccountStatus.useMutation({
+    onSuccess: () => {
+      utils.companies.adminCompaniesForUser.invalidate({ userId })
+    },
+    onError: (e) => toast.error(e.message),
+    onSettled: () => setStatusPending(null),
+  })
+
+  const handleSetStatus = (
+    organizationId: string,
+    field: "stripe" | "wise" | "website",
+    status: SetStatusValue,
+  ) => {
+    setStatusPending(`${organizationId}:${field}`)
+    setAccountStatus.mutate({ organizationId, field, status })
+  }
   const [editOpen, setEditOpen] = useState(false)
   const [suspendOpen, setSuspendOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -331,35 +355,21 @@ export default function AdminClientProfilePage({
       </div>
 
       {/* Tab content */}
-      {tab === "companies" && (
-        <div className="space-y-2">
-          {companies.length === 0 ? (
-            <EmptyState icon={Building2Icon} message="No companies." />
-          ) : (
-            companies.map((c) => (
-              <Link
-                key={c.id}
-                href={`/admin/formations/${c.id}`}
-                className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/40"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-base font-medium uppercase">
-                    {c.name}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {c.country?.toUpperCase() ?? "—"} · Created{" "}
-                    {new Date(c.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <StatusPill status={c.status} />
-                  <ArrowRightIcon className="size-4 text-muted-foreground" />
-                </div>
-              </Link>
-            ))
-          )}
-        </div>
-      )}
+      {tab === "companies" &&
+        (companies.length === 0 ? (
+          <EmptyState icon={Building2Icon} message="No companies." />
+        ) : !adminCompanies ? (
+          <div className="flex justify-center py-10">
+            <div className="size-5 animate-pulse rounded-full bg-sky-500/50" />
+          </div>
+        ) : (
+          <CompaniesTable
+            companies={adminCompanies.filter((c) => c.type !== "personal")}
+            mode="admin"
+            onSetStatus={handleSetStatus}
+            pendingKey={statusPending}
+          />
+        ))}
 
       {tab === "documents" && (
         <div className="space-y-2">

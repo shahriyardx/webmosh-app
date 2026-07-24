@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { inferRouterOutputs } from "@trpc/server"
 import { toast } from "sonner"
 import { trpc } from "@/lib/trpc/client"
@@ -19,6 +19,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Field, FieldContent, FieldLabel } from "@/components/ui/field"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -27,7 +35,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { ShoppingCartIcon, ExternalLinkIcon } from "lucide-react"
+import {
+  ShoppingCartIcon,
+  ExternalLinkIcon,
+  PencilIcon,
+  Trash2Icon,
+} from "lucide-react"
 import { formatInvoiceNumber } from "@/lib/invoice-number"
 
 const statusBadge: Record<
@@ -61,9 +74,22 @@ export default function AdminOrdersPage() {
   })
 
   const [detailsOrder, setDetailsOrder] = useState<OrderRow | null>(null)
+  const [editOrder, setEditOrder] = useState<OrderRow | null>(null)
+  const [deleteOrder, setDeleteOrder] = useState<OrderRow | null>(null)
+  const [alsoDeleteInvoice, setAlsoDeleteInvoice] = useState(false)
   const [quoteOrder, setQuoteOrder] = useState<OrderRow | null>(null)
   const [quoteAmount, setQuoteAmount] = useState("")
   const [quoteDescription, setQuoteDescription] = useState("")
+
+  const remove = trpc.serviceOrders.remove.useMutation({
+    onSuccess: () => {
+      utils.serviceOrders.listAll.invalidate()
+      toast.success("Order deleted")
+      setDeleteOrder(null)
+      setAlsoDeleteInvoice(false)
+    },
+    onError: (err) => toast.error(err.message),
+  })
 
   const quote = trpc.serviceOrders.quoteCustomOrder.useMutation({
     onSuccess: () => {
@@ -122,7 +148,7 @@ export default function AdminOrdersPage() {
                 <TableHead>Amount</TableHead>
                 <TableHead>Invoice</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-64">Actions</TableHead>
+                <TableHead className="w-80">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -218,6 +244,26 @@ export default function AdminOrdersPage() {
                         {order.status === ServiceOrderStatus.completed && (
                           <span className="text-xs text-green-600">Done</span>
                         )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditOrder(order)}
+                        >
+                          <PencilIcon className="size-3.5" />
+                          Modify
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            setDeleteOrder(order)
+                            setAlsoDeleteInvoice(false)
+                          }}
+                        >
+                          <Trash2Icon className="size-3.5" />
+                          Delete
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -277,6 +323,81 @@ export default function AdminOrdersPage() {
             </Button>
             <Button onClick={submitQuote} disabled={quote.isPending}>
               {quote.isPending ? "Issuing…" : "Issue invoice"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <OrderEditDialog
+        order={editOrder}
+        onClose={() => setEditOrder(null)}
+        onSaved={() => {
+          utils.serviceOrders.listAll.invalidate()
+          setEditOrder(null)
+        }}
+      />
+
+      <Dialog
+        open={!!deleteOrder}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteOrder(null)
+            setAlsoDeleteInvoice(false)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete order</DialogTitle>
+            <DialogDescription>
+              Delete the order for{" "}
+              <span className="font-medium text-foreground">
+                {deleteOrder?.service?.title ?? "this service"}
+              </span>
+              ? This can&apos;t be undone. Any tasks linked to it are kept but
+              unlinked.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteOrder?.invoice && (
+            <label className="flex items-start gap-2.5 rounded-lg border border-border p-3 text-sm">
+              <Checkbox
+                checked={alsoDeleteInvoice}
+                onCheckedChange={(v) => setAlsoDeleteInvoice(v === true)}
+                className="mt-0.5"
+              />
+              <span>
+                Also delete invoice{" "}
+                <span className="font-mono">
+                  {formatInvoiceNumber(deleteOrder.invoice.number)}
+                </span>{" "}
+                <span className="text-muted-foreground">
+                  (${deleteOrder.invoice.amount})
+                </span>
+              </span>
+            </label>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteOrder(null)
+                setAlsoDeleteInvoice(false)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={remove.isPending}
+              onClick={() =>
+                deleteOrder &&
+                remove.mutate({
+                  id: deleteOrder.id,
+                  deleteInvoice: alsoDeleteInvoice,
+                })
+              }
+            >
+              {remove.isPending ? "Deleting…" : "Delete order"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -446,5 +567,332 @@ function CredsBlock({
         </dl>
       )}
     </div>
+  )
+}
+
+const STATUS_OPTIONS: { value: ServiceOrderStatus; label: string }[] = [
+  { value: ServiceOrderStatus.pending, label: "Pending" },
+  { value: ServiceOrderStatus.processing, label: "Processing" },
+  { value: ServiceOrderStatus.completed, label: "Completed" },
+  { value: ServiceOrderStatus.awaiting_quote, label: "Awaiting quote" },
+]
+
+const EMPTY_CREDS: OrderCredentials = {
+  cpanel: { url: "", username: "", password: "" },
+  wpAdmin: { url: "", username: "", password: "" },
+}
+
+function OrderEditDialog({
+  order,
+  onClose,
+  onSaved,
+}: {
+  order: OrderRow | null
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const isWordpress = order?.service?.type === "wordpress"
+  const { data: themes } = trpc.themes.list.useQuery(undefined, {
+    enabled: !!order && isWordpress,
+  })
+
+  const [status, setStatus] = useState<ServiceOrderStatus>(
+    ServiceOrderStatus.pending,
+  )
+  const [amount, setAmount] = useState("")
+  const [designMode, setDesignMode] = useState<"theme" | "custom">("theme")
+  const [themeId, setThemeId] = useState("")
+  const [customDesignUrl, setCustomDesignUrl] = useState("")
+  const [contact, setContact] = useState({
+    company: "",
+    email: "",
+    phone: "",
+    address: "",
+  })
+  const [creds, setCreds] = useState<OrderCredentials>(EMPTY_CREDS)
+
+  useEffect(() => {
+    if (!order) return
+    setStatus(order.status as ServiceOrderStatus)
+    setAmount(order.invoice?.amount != null ? String(order.invoice.amount) : "")
+    setDesignMode(order.customDesignUrl ? "custom" : "theme")
+    setThemeId(order.themeId ?? "")
+    setCustomDesignUrl(order.customDesignUrl ?? "")
+    setContact({
+      company: order.contactCompany ?? "",
+      email: order.contactEmail ?? "",
+      phone: order.contactPhone ?? "",
+      address: order.contactAddress ?? "",
+    })
+    const c = (order.credentials as OrderCredentials | null) ?? null
+    setCreds({
+      cpanel: {
+        url: c?.cpanel?.url ?? "",
+        username: c?.cpanel?.username ?? "",
+        password: c?.cpanel?.password ?? "",
+      },
+      wpAdmin: {
+        url: c?.wpAdmin?.url ?? "",
+        username: c?.wpAdmin?.username ?? "",
+        password: c?.wpAdmin?.password ?? "",
+      },
+    })
+  }, [order])
+
+  const update = trpc.serviceOrders.adminUpdate.useMutation({
+    onSuccess: () => {
+      toast.success("Order updated")
+      onSaved()
+    },
+    onError: (err) => toast.error(err.message),
+  })
+
+  const save = () => {
+    if (!order) return
+    const patch: Parameters<typeof update.mutate>[0] = {
+      id: order.id,
+      status,
+    }
+    if (order.invoice) {
+      const n = parseFloat(amount)
+      if (!Number.isFinite(n) || n < 0) {
+        toast.error("Enter a valid amount")
+        return
+      }
+      patch.amount = n
+    }
+    if (isWordpress) {
+      if (designMode === "theme") {
+        patch.themeId = themeId || null
+        patch.customDesignUrl = null
+      } else {
+        patch.customDesignUrl = customDesignUrl.trim() || null
+        patch.themeId = null
+      }
+      patch.contactCompany = contact.company.trim() || null
+      patch.contactEmail = contact.email.trim() || null
+      patch.contactPhone = contact.phone.trim() || null
+      patch.contactAddress = contact.address.trim() || null
+      patch.credentials = creds
+    }
+    update.mutate(patch)
+  }
+
+  return (
+    <Dialog open={!!order} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Modify order</DialogTitle>
+          <DialogDescription>{order?.service?.title ?? "—"}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel>Status</FieldLabel>
+              <FieldContent>
+                <Select
+                  value={status}
+                  onValueChange={(v) => setStatus(v as ServiceOrderStatus)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FieldContent>
+            </Field>
+            {order?.invoice && (
+              <Field>
+                <FieldLabel>Invoice amount (USD)</FieldLabel>
+                <FieldContent>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </FieldContent>
+              </Field>
+            )}
+          </div>
+
+          {isWordpress && (
+            <>
+              <div className="space-y-3 rounded-lg border border-border p-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDesignMode("theme")}
+                    className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                      designMode === "theme"
+                        ? "border-sky-500 bg-sky-500/5 font-medium"
+                        : "border-border hover:bg-muted/40"
+                    }`}
+                  >
+                    Demo theme
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDesignMode("custom")}
+                    className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                      designMode === "custom"
+                        ? "border-sky-500 bg-sky-500/5 font-medium"
+                        : "border-border hover:bg-muted/40"
+                    }`}
+                  >
+                    Custom design
+                  </button>
+                </div>
+                {designMode === "theme" ? (
+                  <Select
+                    value={themeId || "none"}
+                    onValueChange={(v) => setThemeId(v === "none" ? "" : v)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a theme" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No theme</SelectItem>
+                      {(themes ?? []).map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    placeholder="https://figma.com/… or design URL"
+                    value={customDesignUrl}
+                    onChange={(e) => setCustomDesignUrl(e.target.value)}
+                  />
+                )}
+              </div>
+
+              <div className="space-y-3 rounded-lg border border-border p-3">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Website details
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Input
+                    placeholder="Company"
+                    value={contact.company}
+                    onChange={(e) =>
+                      setContact({ ...contact, company: e.target.value })
+                    }
+                  />
+                  <Input
+                    placeholder="Email"
+                    value={contact.email}
+                    onChange={(e) =>
+                      setContact({ ...contact, email: e.target.value })
+                    }
+                  />
+                  <Input
+                    placeholder="Phone"
+                    value={contact.phone}
+                    onChange={(e) =>
+                      setContact({ ...contact, phone: e.target.value })
+                    }
+                  />
+                  <Input
+                    placeholder="Address"
+                    value={contact.address}
+                    onChange={(e) =>
+                      setContact({ ...contact, address: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-lg border border-border p-3">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Hosting access
+                </p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <Input
+                    placeholder="cPanel URL"
+                    value={creds.cpanel?.url ?? ""}
+                    onChange={(e) =>
+                      setCreds({
+                        ...creds,
+                        cpanel: { ...creds.cpanel, url: e.target.value },
+                      })
+                    }
+                  />
+                  <Input
+                    placeholder="cPanel user"
+                    value={creds.cpanel?.username ?? ""}
+                    onChange={(e) =>
+                      setCreds({
+                        ...creds,
+                        cpanel: { ...creds.cpanel, username: e.target.value },
+                      })
+                    }
+                  />
+                  <Input
+                    placeholder="cPanel pass"
+                    value={creds.cpanel?.password ?? ""}
+                    onChange={(e) =>
+                      setCreds({
+                        ...creds,
+                        cpanel: { ...creds.cpanel, password: e.target.value },
+                      })
+                    }
+                  />
+                  <Input
+                    placeholder="wp-admin URL"
+                    value={creds.wpAdmin?.url ?? ""}
+                    onChange={(e) =>
+                      setCreds({
+                        ...creds,
+                        wpAdmin: { ...creds.wpAdmin, url: e.target.value },
+                      })
+                    }
+                  />
+                  <Input
+                    placeholder="wp-admin user"
+                    value={creds.wpAdmin?.username ?? ""}
+                    onChange={(e) =>
+                      setCreds({
+                        ...creds,
+                        wpAdmin: { ...creds.wpAdmin, username: e.target.value },
+                      })
+                    }
+                  />
+                  <Input
+                    placeholder="wp-admin pass"
+                    value={creds.wpAdmin?.password ?? ""}
+                    onChange={(e) =>
+                      setCreds({
+                        ...creds,
+                        wpAdmin: { ...creds.wpAdmin, password: e.target.value },
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={update.isPending}>
+            {update.isPending ? "Saving…" : "Save changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

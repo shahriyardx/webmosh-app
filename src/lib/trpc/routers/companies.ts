@@ -3,7 +3,12 @@ import { adminProcedure, assertOrgMember, protectedProcedure, router } from "../
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
-import { CompanyStatus, DocumentStatus, PaymentStatus } from "@/generated/prisma/enums"
+import {
+  AccountStatus,
+  CompanyStatus,
+  DocumentStatus,
+  PaymentStatus,
+} from "@/generated/prisma/enums"
 import {
   emailAdminNewFormation,
   emailAdminDocumentResubmitted,
@@ -14,6 +19,7 @@ import {
 } from "@/lib/notify"
 import { createAdminNotification } from "@/lib/notifications"
 import { getCompaniesHouseProfile, getCompaniesHouseDates } from "@/lib/companies-house"
+import { purchaseServiceCore, wordpressInputSchema } from "./service-orders"
 
 const directorInput = z.object({
   firstName: z.string().min(1),
@@ -32,6 +38,14 @@ const createCompanySchema = z.object({
   website: z.string().optional(),
   packageId: z.string().min(1),
   serviceIds: z.array(z.string()),
+  wordpressOrders: z
+    .array(
+      z.object({
+        serviceId: z.string().min(1),
+        wordpress: wordpressInputSchema,
+      }),
+    )
+    .optional(),
   passportUrl: z.string().min(1),
   bankStatementUrl: z.string().min(1),
   director: directorInput,
@@ -44,6 +58,96 @@ function slugify(text: string): string {
     .replace(/^-|-$/g, "")
 }
 
+/**
+ * Enrich orgs with live Companies House data (incorporation date, status,
+ * filing dues) and the latest website (WordPress) order status. DB dues
+ * override CH values.
+ */
+async function enrichCompanies<
+  T extends {
+    id: string
+    country: string | null
+    companyId: string | null
+    confirmationStatementDue: Date | null
+    accountsFilingDue: Date | null
+  },
+>(orgs: T[]) {
+  const orgIds = orgs.map((o) => o.id)
+  const wpOrders = orgIds.length
+    ? await prisma.serviceOrder.findMany({
+        where: {
+          organizationId: { in: orgIds },
+          service: { type: "wordpress" },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { organizationId: true, status: true },
+      })
+    : []
+  const websiteByOrg = new Map<string, string>()
+  for (const o of wpOrders) {
+    if (!websiteByOrg.has(o.organizationId)) {
+      websiteByOrg.set(o.organizationId, o.status)
+    }
+  }
+
+  return Promise.all(
+    orgs.map(async (o) => {
+      const base = {
+        ...o,
+        incorporationDate: null as Date | null,
+        chStatus: null as string | null,
+        websiteStatus: websiteByOrg.get(o.id) ?? null,
+      }
+      if (o.country !== "uk" || !o.companyId) return base
+      const dates = await getCompaniesHouseDates(o.companyId).catch(() => null)
+      if (!dates) return base
+      return {
+        ...base,
+        confirmationStatementDue:
+          o.confirmationStatementDue ??
+          (dates.confirmationNextDue
+            ? new Date(dates.confirmationNextDue)
+            : null),
+        accountsFilingDue:
+          o.accountsFilingDue ??
+          (dates.accountsNextDue ? new Date(dates.accountsNextDue) : null),
+        incorporationDate: dates.incorporationDate
+          ? new Date(dates.incorporationDate)
+          : null,
+        chStatus: dates.status,
+      }
+    }),
+  )
+}
+
+/** Shared: the enriched company list for a given user (self or, for admins, a client). */
+async function listCompaniesForUser(userId: string) {
+  const members = await prisma.member.findMany({
+    where: { userId, organization: { deletedAt: null } },
+    select: {
+      organization: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logo: true,
+          type: true,
+          country: true,
+          status: true,
+          companyId: true,
+          createdAt: true,
+          confirmationStatementDue: true,
+          accountsFilingDue: true,
+          stripeStatus: true,
+          wiseStatus: true,
+          websiteStatusOverride: true,
+        },
+      },
+    },
+  })
+  return enrichCompanies(members.map((m) => m.organization))
+}
+
 export const companiesRouter = router({
   /** Minimal profile lookup used for form auto-fill. */
   myProfile: protectedProcedure.query(({ ctx }) =>
@@ -52,6 +156,23 @@ export const companiesRouter = router({
       select: { name: true, email: true, phone: true, address: true },
     }),
   ),
+
+  /** Director contact for a company the caller belongs to (for prefills). */
+  directorContact: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      await assertOrgMember(ctx.user.id, input.organizationId)
+      const director = await prisma.director.findFirst({
+        where: { organizationId: input.organizationId },
+        orderBy: { createdAt: "asc" },
+        select: { email: true, phone: true, address: true },
+      })
+      return {
+        email: director?.email ?? "",
+        phone: director?.phone ?? "",
+        address: director?.address ?? "",
+      }
+    }),
 
   checkName: protectedProcedure
     .input(
@@ -153,10 +274,18 @@ export const companiesRouter = router({
         website,
         packageId,
         serviceIds,
+        wordpressOrders,
         passportUrl,
         bankStatementUrl,
         director,
       } = input
+
+      // WordPress services are billed as their own separate orders (with their
+      // own requirements + invoice), so keep them out of the formation bundle.
+      const wpServiceIds = new Set(
+        (wordpressOrders ?? []).map((o) => o.serviceId),
+      )
+      const bundledServiceIds = serviceIds.filter((id) => !wpServiceIds.has(id))
 
       const slug = slugify(companyName)
       const hdrs = await headers()
@@ -176,7 +305,7 @@ export const companiesRouter = router({
           sicDescription: sicDescription ?? null,
           website: website || null,
           packageId,
-          serviceIds,
+          serviceIds: bundledServiceIds,
         },
       })
 
@@ -213,8 +342,8 @@ export const companiesRouter = router({
 
       // Calculate invoice amount from package + services
       const formationPkg = await prisma.package.findUnique({ where: { id: packageId } })
-      const selectedSvcs = serviceIds.length > 0
-        ? await prisma.service.findMany({ where: { id: { in: serviceIds } } })
+      const selectedSvcs = bundledServiceIds.length > 0
+        ? await prisma.service.findMany({ where: { id: { in: bundledServiceIds } } })
         : []
       const pkgPrice = formationPkg?.price ?? 0
       const svcTotal = selectedSvcs.reduce((sum, s) => sum + s.price, 0)
@@ -235,6 +364,16 @@ export const companiesRouter = router({
         body: `${country.toUpperCase()} company registration requested.`,
         link: `/admin/formations/${org.id}`,
       })
+
+      // Spin off a separate service order (+ its own invoice) for each
+      // WordPress service configured during onboarding.
+      for (const wo of wordpressOrders ?? []) {
+        await purchaseServiceCore({
+          organizationId: org.id,
+          serviceId: wo.serviceId,
+          wordpress: wo.wordpress,
+        })
+      }
 
       return org
     }),
@@ -697,58 +836,46 @@ export const companiesRouter = router({
     }),
 
   // User's own non-deleted companies (for the Companies list page)
-  myCompanies: protectedProcedure.query(async ({ ctx }) => {
-    const members = await prisma.member.findMany({
-      where: { userId: ctx.user.id, organization: { deletedAt: null } },
-      select: {
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            logo: true,
-            type: true,
-            country: true,
-            status: true,
-            companyId: true,
-            createdAt: true,
-            confirmationStatementDue: true,
-            accountsFilingDue: true,
-          },
-        },
-      },
-    })
-    const orgs = members.map((m) => m.organization)
+  myCompanies: protectedProcedure.query(({ ctx }) =>
+    listCompaniesForUser(ctx.user.id),
+  ),
 
-    // Enrich UK companies with live Companies House data (1h fetch cache):
-    // incorporation date, status and filing due-dates. DB dues override CH.
-    const enriched = await Promise.all(
-      orgs.map(async (o) => {
-        const base = {
-          ...o,
-          incorporationDate: null as Date | null,
-          chStatus: null as string | null,
-        }
-        if (o.country !== "uk" || !o.companyId) return base
-        const dates = await getCompaniesHouseDates(o.companyId).catch(() => null)
-        if (!dates) return base
-        return {
-          ...base,
-          confirmationStatementDue:
-            o.confirmationStatementDue ??
-            (dates.confirmationNextDue ? new Date(dates.confirmationNextDue) : null),
-          accountsFilingDue:
-            o.accountsFilingDue ??
-            (dates.accountsNextDue ? new Date(dates.accountsNextDue) : null),
-          incorporationDate: dates.incorporationDate
-            ? new Date(dates.incorporationDate)
-            : null,
-          chStatus: dates.status,
-        }
+  /** Admin: same enriched company list as the user sees, for a given client. */
+  adminCompaniesForUser: adminProcedure
+    .input(z.object({ userId: z.string() }))
+    .query(({ input }) => listCompaniesForUser(input.userId)),
+
+  /** Admin: set a company's Stripe, Wise, or Website account status. */
+  setAccountStatus: adminProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        field: z.enum(["stripe", "wise", "website"]),
+        // "auto" clears a Website override so it follows the order again.
+        status: z.union([z.nativeEnum(AccountStatus), z.literal("auto")]),
       }),
     )
-    return enriched
-  }),
+    .mutation(async ({ input }) => {
+      const { organizationId, field, status } = input
+      if (field === "website") {
+        return prisma.organization.update({
+          where: { id: organizationId },
+          data: {
+            websiteStatusOverride: status === "auto" ? null : status,
+          },
+          select: { id: true, websiteStatusOverride: true },
+        })
+      }
+      if (status === "auto") throw new Error("Invalid status")
+      return prisma.organization.update({
+        where: { id: organizationId },
+        data:
+          field === "stripe"
+            ? { stripeStatus: status }
+            : { wiseStatus: status },
+        select: { id: true, stripeStatus: true, wiseStatus: true },
+      })
+    }),
 
   // User soft-deletes their own company; reassigns active org
   deleteCompany: protectedProcedure
