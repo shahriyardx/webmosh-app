@@ -27,6 +27,7 @@ function getBreadcrumb(pathname: string) {
   if (pathname === "/account/invoices") return "Invoices"
   if (pathname.startsWith("/account/invoices/")) return "Invoice"
   if (pathname === "/account/wallet") return "Wallet"
+  if (pathname === "/account/exchange") return "Exchange"
   if (pathname === "/account/mail") return "Mail"
   if (pathname === "/account/tickets") return "Support"
   if (pathname.startsWith("/account/tickets/")) return "Ticket"

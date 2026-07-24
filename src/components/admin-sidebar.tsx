@@ -39,88 +39,41 @@ import {
 import { trpc } from "@/lib/trpc/client"
 import { Badge } from "@/components/ui/badge"
 
-const links = [
+type CountKey =
+  | "formations"
+  | "wordpress"
+  | "orders"
+  | "tickets"
+  | "freelancers"
+  | "discussions"
+  | "payouts"
+  | "invoices"
+  | "wallet"
+  | "exchange"
+
+const links: {
+  title: string
+  href: string
+  icon: typeof ShieldIcon
+  badge?: CountKey
+}[] = [
   { title: "Dashboard", href: "/admin", icon: ShieldIcon },
-  {
-    title: "Formations",
-    href: "/admin/formations",
-    icon: Building2Icon,
-  },
-  {
-    title: "Packages",
-    href: "/admin/packages",
-    icon: PackageIcon,
-  },
-  {
-    title: "Services",
-    href: "/admin/services",
-    icon: ConciergeBellIcon,
-  },
-  {
-    title: "Wordpress",
-    href: "/admin/wordpress-demo",
-    icon: PaletteIcon,
-  },
-  {
-    title: "Orders",
-    href: "/admin/orders",
-    icon: ShoppingCartIcon,
-  },
-  {
-    title: "Tickets",
-    href: "/admin/tickets",
-    icon: LifeBuoyIcon,
-  },
-  {
-    title: "Clients",
-    href: "/admin/users",
-    icon: UsersIcon,
-  },
-  {
-    title: "Freelancers",
-    href: "/admin/freelancers",
-    icon: UserCogIcon,
-  },
-  {
-    title: "Discussions",
-    href: "/admin/discussions",
-    icon: MessagesSquareIcon,
-  },
-  {
-    title: "Payouts",
-    href: "/admin/payouts",
-    icon: WalletIcon,
-  },
-  {
-    title: "Invoices",
-    href: "/admin/invoices",
-    icon: ReceiptIcon,
-  },
-  {
-    title: "Wallet",
-    href: "/admin/wallet",
-    icon: CreditCardIcon,
-  },
-  {
-    title: "Coupons",
-    href: "/admin/coupons",
-    icon: TicketPercentIcon,
-  },
-  {
-    title: "Exchange",
-    href: "/admin/exchange",
-    icon: ArrowLeftRightIcon,
-  },
-  {
-    title: "Emails",
-    href: "/admin/emails",
-    icon: MailIcon,
-  },
-  {
-    title: "Settings",
-    href: "/admin/settings",
-    icon: Settings,
-  },
+  { title: "Formations", href: "/admin/formations", icon: Building2Icon, badge: "formations" },
+  { title: "Packages", href: "/admin/packages", icon: PackageIcon },
+  { title: "Services", href: "/admin/services", icon: ConciergeBellIcon },
+  { title: "Wordpress", href: "/admin/wordpress-demo", icon: PaletteIcon },
+  { title: "Orders", href: "/admin/orders", icon: ShoppingCartIcon, badge: "orders" },
+  { title: "Tickets", href: "/admin/tickets", icon: LifeBuoyIcon, badge: "tickets" },
+  { title: "Clients", href: "/admin/users", icon: UsersIcon },
+  { title: "Freelancers", href: "/admin/freelancers", icon: UserCogIcon, badge: "freelancers" },
+  { title: "Discussions", href: "/admin/discussions", icon: MessagesSquareIcon, badge: "discussions" },
+  { title: "Payouts", href: "/admin/payouts", icon: WalletIcon, badge: "payouts" },
+  { title: "Invoices", href: "/admin/invoices", icon: ReceiptIcon, badge: "invoices" },
+  { title: "Wallet", href: "/admin/wallet", icon: CreditCardIcon, badge: "wallet" },
+  { title: "Coupons", href: "/admin/coupons", icon: TicketPercentIcon },
+  { title: "Exchange", href: "/admin/exchange", icon: ArrowLeftRightIcon, badge: "exchange" },
+  { title: "Emails", href: "/admin/emails", icon: MailIcon },
+  { title: "Settings", href: "/admin/settings", icon: Settings },
 ]
 
 export function AdminSidebar({
@@ -132,16 +85,7 @@ export function AdminSidebar({
   onSignOut?: () => void
 }) {
   const pathname = usePathname()
-  const { data: openTickets } = trpc.tickets.adminOpenCount.useQuery()
-  const { data: unreadDiscussions } = trpc.discussions.unreadCount.useQuery(
-    undefined,
-    { refetchInterval: 30_000, refetchOnWindowFocus: true },
-  )
-  const { data: pendingApprovals } = trpc.tasks.pendingApprovalCount.useQuery(
-    undefined,
-    { refetchInterval: 30_000, refetchOnWindowFocus: true },
-  )
-  const { data: pendingWallet } = trpc.wallet.pendingCount.useQuery(undefined, {
+  const { data: counts } = trpc.admin.actionCounts.useQuery(undefined, {
     refetchInterval: 30_000,
     refetchOnWindowFocus: true,
   })
@@ -186,32 +130,10 @@ export function AdminSidebar({
                   <Link href={link.href}>
                     <link.icon />
                     <span>{link.title}</span>
-                    {link.title === "Tickets" &&
-                      openTickets !== undefined &&
-                      openTickets > 0 && (
+                    {link.badge &&
+                      (counts?.[link.badge] ?? 0) > 0 && (
                         <Badge className="ml-auto size-5 rounded-full p-0 text-[10px]">
-                          {openTickets}
-                        </Badge>
-                      )}
-                    {link.title === "Discussions" &&
-                      unreadDiscussions !== undefined &&
-                      unreadDiscussions > 0 && (
-                        <Badge className="ml-auto size-5 rounded-full p-0 text-[10px]">
-                          {unreadDiscussions}
-                        </Badge>
-                      )}
-                    {link.title === "Freelancers" &&
-                      pendingApprovals !== undefined &&
-                      pendingApprovals > 0 && (
-                        <Badge className="ml-auto size-5 rounded-full bg-amber-500 p-0 text-[10px] text-white hover:bg-amber-500">
-                          {pendingApprovals}
-                        </Badge>
-                      )}
-                    {link.title === "Wallet" &&
-                      pendingWallet !== undefined &&
-                      pendingWallet > 0 && (
-                        <Badge className="ml-auto size-5 rounded-full p-0 text-[10px]">
-                          {pendingWallet}
+                          {counts?.[link.badge]}
                         </Badge>
                       )}
                   </Link>

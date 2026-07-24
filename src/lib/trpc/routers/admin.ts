@@ -4,9 +4,13 @@ import { prisma } from "@/lib/prisma"
 import {
   CompanyStatus,
   DocumentStatus,
+  ExchangeTxStatus,
   PaymentStatus,
+  PayoutStatus,
   ServiceOrderStatus,
+  TaskStatus,
   TicketStatus,
+  WalletTxStatus,
 } from "@/generated/prisma/enums"
 import { getCompaniesHouseDates } from "@/lib/companies-house"
 
@@ -33,6 +37,70 @@ function ticketPriority(t: {
 }
 
 export const adminRouter = router({
+  /**
+   * Counts of items needing admin attention per sidebar section. One query,
+   * polled by the admin sidebar to render the badge next to each tab.
+   */
+  actionCounts: adminProcedure.query(async () => {
+    const [
+      formations,
+      wordpress,
+      orders,
+      tickets,
+      freelancers,
+      discussions,
+      payouts,
+      invoices,
+      wallet,
+      exchange,
+    ] = await Promise.all([
+      prisma.organization.count({
+        where: {
+          deletedAt: null,
+          type: "company",
+          status: CompanyStatus.pending,
+        },
+      }),
+      prisma.serviceOrder.count({
+        where: { service: { type: "wordpress" }, tasks: { none: {} } },
+      }),
+      prisma.serviceOrder.count({
+        where: {
+          status: {
+            in: [ServiceOrderStatus.pending, ServiceOrderStatus.awaiting_quote],
+          },
+        },
+      }),
+      prisma.ticket.count({ where: { status: TicketStatus.open } }),
+      prisma.task.count({ where: { status: TaskStatus.in_review } }),
+      prisma.taskMessage.count({
+        where: { fromAdmin: false, readByAdmin: false },
+      }),
+      prisma.payout.count({ where: { status: PayoutStatus.pending } }),
+      prisma.invoice.count({
+        where: { deletedAt: null, status: PaymentStatus.processing },
+      }),
+      prisma.walletTransaction.count({
+        where: { status: WalletTxStatus.pending },
+      }),
+      prisma.exchangeTransaction.count({
+        where: { status: ExchangeTxStatus.pending },
+      }),
+    ])
+    return {
+      formations,
+      wordpress,
+      orders,
+      tickets,
+      freelancers,
+      discussions,
+      payouts,
+      invoices,
+      wallet,
+      exchange,
+    }
+  }),
+
   /**
    * 1. Compliance deadline tracker — companies with confirmation-statement or
    *    annual-accounts filings due in the next 90 days, bucketed by urgency.

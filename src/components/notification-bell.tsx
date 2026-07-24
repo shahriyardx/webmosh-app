@@ -40,6 +40,7 @@ const kindIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   "wallet.payout_requested": WalletIcon,
   "discussion.message": MessagesSquareIcon,
   "task.submitted": ClipboardCheckIcon,
+  "exchange.submitted": ReceiptIcon,
 }
 
 const kindColors: Record<string, string> = {
@@ -57,6 +58,7 @@ const kindColors: Record<string, string> = {
   "wallet.payout_requested": "bg-purple-500/15 text-purple-500",
   "discussion.message": "bg-sky-500/15 text-sky-500",
   "task.submitted": "bg-emerald-500/15 text-emerald-500",
+  "exchange.submitted": "bg-amber-500/15 text-amber-500",
 }
 
 function timeAgo(date: Date) {

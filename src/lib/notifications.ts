@@ -15,6 +15,7 @@ export type NotificationKind =
   | "wallet.payout_requested"
   | "discussion.message"
   | "task.submitted"
+  | "exchange.submitted"
 
 /**
  * Create a single global admin notification. Never throws — logs and swallows.

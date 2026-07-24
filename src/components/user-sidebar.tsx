@@ -29,6 +29,7 @@ import {
   UserXIcon,
   WalletIcon,
   PlusIcon,
+  ArrowLeftRightIcon,
 } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 import { trpc } from "@/lib/trpc/client"
@@ -68,6 +69,18 @@ export function UserSidebar({
   const { data: unreadMailCount } = trpc.mails.unreadCountForUser.useQuery()
   const { data: pendingTicketCount } = trpc.tickets.pendingCount.useQuery()
   const { data: walletBalance } = trpc.wallet.myBalance.useQuery()
+  const { data: exchangeAccess } = trpc.exchange.myAccess.useQuery()
+
+  const tailLinks = exchangeAccess?.enabled
+    ? [
+        ...links.slice(1),
+        {
+          title: "Exchange",
+          href: "/account/exchange",
+          icon: ArrowLeftRightIcon,
+        },
+      ]
+    : links.slice(1)
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -119,7 +132,7 @@ export function UserSidebar({
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            {links.slice(1).map((link) => (
+            {tailLinks.map((link) => (
               <SidebarMenuItem key={link.href}>
                 <SidebarMenuButton
                   asChild

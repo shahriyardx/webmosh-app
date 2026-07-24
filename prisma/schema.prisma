@@ -42,6 +42,8 @@ model User {
   taskMessages  TaskMessage[] @relation("TaskMessageSender")
   bankAccounts  BankAccount[]
   freelancerAdjustments FreelancerAdjustment[]
+  exchangeEnabled Boolean @default(false) @map("exchange_enabled")
+  exchangeTransactions ExchangeTransaction[]
 
   @@unique([email])
   @@map("user")
@@ -561,17 +563,26 @@ model FreelancerAdjustment {
  * Admin-only money-exchange ledger. Records a transfer of `amount` from one
  * account to another at a given BDT `rate`; amount-in-BDT is amount * rate.
  */
+enum ExchangeTxStatus {
+  pending
+  approved
+}
+
 model ExchangeTransaction {
-  id          String   @id @default(cuid())
+  id          String           @id @default(cuid())
+  userId      String           @map("user_id")
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      ExchangeTxStatus @default(approved)
   date        DateTime
   amount      Float
   rate        Float
-  fromAccount String   @map("from_account")
-  toAccount   String   @map("to_account")
+  fromAccount String           @map("from_account")
+  toAccount   String           @map("to_account")
   remark      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
+  @@index([userId])
   @@index([date])
   @@index([toAccount])
   @@map("exchange_transaction")
