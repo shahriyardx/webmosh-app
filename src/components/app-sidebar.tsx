@@ -29,6 +29,7 @@ import {
   LifeBuoyIcon,
   WalletIcon,
   PlusIcon,
+  ArrowLeftRightIcon,
 } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 import { trpc } from "@/lib/trpc/client"
@@ -96,6 +97,19 @@ export function AppSidebar({
     companyId ? { organizationId: companyId } : undefined,
   )
   const { data: walletBalance } = trpc.wallet.myBalance.useQuery()
+  const { data: exchangeAccess } = trpc.exchange.myAccess.useQuery()
+
+  // Exchange is account-scoped; show it when the client has been granted access.
+  const tailLinks = exchangeAccess?.enabled
+    ? [
+        ...scopedLinks.slice(1),
+        {
+          title: "Exchange",
+          href: "/account/exchange",
+          icon: ArrowLeftRightIcon,
+        },
+      ]
+    : scopedLinks.slice(1)
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -151,7 +165,7 @@ export function AppSidebar({
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            {scopedLinks.slice(1).map((link) => (
+            {tailLinks.map((link) => (
               <SidebarMenuItem key={link.href}>
                 <SidebarMenuButton
                   asChild

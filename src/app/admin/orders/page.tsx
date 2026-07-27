@@ -1,13 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Fragment, useEffect, useState } from "react"
+import Link from "next/link"
 import type { inferRouterOutputs } from "@trpc/server"
 import { toast } from "sonner"
 import { trpc } from "@/lib/trpc/client"
 import type { AppRouter } from "@/lib/trpc/routers"
 import { ServiceOrderStatus } from "@/generated/prisma/enums"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { AdminOrderDetails } from "@/components/admin-order-details"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -37,21 +38,12 @@ import {
 } from "@/components/ui/table"
 import {
   ShoppingCartIcon,
-  ExternalLinkIcon,
   PencilIcon,
   Trash2Icon,
+  ChevronRightIcon,
+  EyeIcon,
 } from "lucide-react"
 import { formatInvoiceNumber } from "@/lib/invoice-number"
-
-const statusBadge: Record<
-  string,
-  { label: string; variant: "outline" | "secondary" | "default" | "destructive" }
-> = {
-  pending: { label: "Pending", variant: "outline" },
-  processing: { label: "Processing", variant: "secondary" },
-  completed: { label: "Completed", variant: "default" },
-  awaiting_quote: { label: "Awaiting quote", variant: "destructive" },
-}
 
 type OrderRow = inferRouterOutputs<AppRouter>["serviceOrders"]["listAll"][number]
 
@@ -73,7 +65,7 @@ export default function AdminOrdersPage() {
     onSuccess: () => utils.serviceOrders.listAll.invalidate(),
   })
 
-  const [detailsOrder, setDetailsOrder] = useState<OrderRow | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [editOrder, setEditOrder] = useState<OrderRow | null>(null)
   const [deleteOrder, setDeleteOrder] = useState<OrderRow | null>(null)
   const [alsoDeleteInvoice, setAlsoDeleteInvoice] = useState(false)
@@ -153,19 +145,32 @@ export default function AdminOrdersPage() {
             </TableHeader>
             <TableBody>
               {orders?.map((order) => {
-                const sb = statusBadge[order.status] ?? statusBadge.pending
                 const isWordpress = order.service?.type === "wordpress"
+                const expanded = expandedId === order.id
                 return (
-                  <TableRow key={order.id}>
+                  <Fragment key={order.id}>
+                  <TableRow>
                     <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedId(expanded ? null : order.id)
+                        }
+                        className="flex items-center gap-2 text-left transition-colors hover:text-sky-600 dark:hover:text-sky-400"
+                        title={expanded ? "Collapse" : "Expand order"}
+                      >
+                        <ChevronRightIcon
+                          className={`size-4 shrink-0 text-muted-foreground transition-transform ${
+                            expanded ? "rotate-90" : ""
+                          }`}
+                        />
                         <span>{order.service?.title ?? "—"}</span>
                         {isWordpress && (
                           <span className="inline-flex items-center rounded-md bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-500 ring-1 ring-inset ring-sky-500/25">
                             WP
                           </span>
                         )}
-                      </div>
+                      </button>
                     </TableCell>
                     <TableCell>
                       {order.invoice?.amount != null
@@ -185,19 +190,35 @@ export default function AdminOrdersPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={sb.variant}>{sb.label}</Badge>
+                      <Select
+                        value={order.status}
+                        onValueChange={(v) =>
+                          updateStatus.mutate({
+                            id: order.id,
+                            status: v as ServiceOrderStatus,
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-8 w-[150px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map((s) => (
+                            <SelectItem key={s.value} value={s.value}>
+                              {s.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1">
-                        {isWordpress && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setDetailsOrder(order)}
-                          >
-                            View details
-                          </Button>
-                        )}
+                        <Button size="sm" variant="outline" asChild>
+                          <Link href={`/admin/orders/${order.id}`}>
+                            <EyeIcon className="size-3.5" />
+                            View
+                          </Link>
+                        </Button>
                         {order.status === ServiceOrderStatus.awaiting_quote && (
                           <Button
                             size="sm"
@@ -210,39 +231,6 @@ export default function AdminOrdersPage() {
                           >
                             Issue quote
                           </Button>
-                        )}
-                        {order.status === ServiceOrderStatus.pending && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() =>
-                              updateStatus.mutate({
-                                id: order.id,
-                                status: ServiceOrderStatus.processing,
-                              })
-                            }
-                            disabled={updateStatus.isPending}
-                          >
-                            Mark Processing
-                          </Button>
-                        )}
-                        {order.status === ServiceOrderStatus.processing && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() =>
-                              updateStatus.mutate({
-                                id: order.id,
-                                status: ServiceOrderStatus.completed,
-                              })
-                            }
-                            disabled={updateStatus.isPending}
-                          >
-                            Mark Completed
-                          </Button>
-                        )}
-                        {order.status === ServiceOrderStatus.completed && (
-                          <span className="text-xs text-green-600">Done</span>
                         )}
                         <Button
                           size="sm"
@@ -267,17 +255,20 @@ export default function AdminOrdersPage() {
                       </div>
                     </TableCell>
                   </TableRow>
+                  {expanded && (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={5} className="bg-muted/20 p-5">
+                        <AdminOrderDetails order={order} />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  </Fragment>
                 )
               })}
             </TableBody>
           </Table>
         </div>
       )}
-
-      <WordpressDetailsDialog
-        order={detailsOrder}
-        onClose={() => setDetailsOrder(null)}
-      />
 
       <Dialog
         open={!!quoteOrder}
@@ -402,170 +393,6 @@ export default function AdminOrdersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  )
-}
-
-function WordpressDetailsDialog({
-  order,
-  onClose,
-}: {
-  order: OrderRow | null
-  onClose: () => void
-}) {
-  const creds = (order?.credentials as OrderCredentials | null) ?? null
-  return (
-    <Dialog open={!!order} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>WordPress order details</DialogTitle>
-          <DialogDescription>
-            {order?.service?.title ?? "—"}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-5">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Design
-            </p>
-            {order?.customDesignUrl ? (
-              <a
-                href={order.customDesignUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1 inline-flex items-center gap-1 text-sm text-sky-500 hover:underline"
-              >
-                {order.customDesignUrl}
-                <ExternalLinkIcon className="size-3" />
-              </a>
-            ) : order?.theme ? (
-              <div className="mt-1 flex items-center gap-3">
-                {order.theme.image && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={order.theme.image}
-                    alt={order.theme.title}
-                    className="size-16 rounded-md object-cover"
-                  />
-                )}
-                <div>
-                  <p className="text-sm font-medium">{order.theme.title}</p>
-                  {order.theme.demoUrl && (
-                    <a
-                      href={order.theme.demoUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-sky-500 hover:underline"
-                    >
-                      View demo
-                      <ExternalLinkIcon className="size-3" />
-                    </a>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <p className="mt-1 text-sm text-muted-foreground">
-                No design specified.
-              </p>
-            )}
-          </div>
-
-          <ContactBlock order={order} />
-
-          <CredsBlock label="cPanel access" section={creds?.cpanel} />
-          <CredsBlock label="WP-admin access" section={creds?.wpAdmin} />
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function ContactBlock({ order }: { order: OrderRow | null }) {
-  const c = order
-    ? {
-        company: order.contactCompany ?? "",
-        address: order.contactAddress ?? "",
-        email: order.contactEmail ?? "",
-        phone: order.contactPhone ?? "",
-      }
-    : null
-  const hasAny = c && (c.company || c.address || c.email || c.phone)
-  return (
-    <div className="rounded-lg border border-border p-3">
-      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        Website details
-      </p>
-      {!hasAny ? (
-        <p className="mt-1 text-sm text-muted-foreground">
-          Not provided (older order).
-        </p>
-      ) : (
-        <dl className="mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-xs text-muted-foreground">Company</dt>
-            <dd className="text-sm">{c?.company || "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">Email</dt>
-            <dd className="break-all text-sm">{c?.email || "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">Phone</dt>
-            <dd className="text-sm">{c?.phone || "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">Address</dt>
-            <dd className="whitespace-pre-wrap text-sm">{c?.address || "—"}</dd>
-          </div>
-        </dl>
-      )}
-    </div>
-  )
-}
-
-function CredsBlock({
-  label,
-  section,
-}: {
-  label: string
-  section: CredentialSection | undefined
-}) {
-  const anyValue =
-    !!section && (!!section.url || !!section.username || !!section.password)
-  return (
-    <div className="rounded-lg border border-border p-3">
-      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
-      {!anyValue ? (
-        <p className="mt-1 text-sm text-muted-foreground">Not provided.</p>
-      ) : (
-        <dl className="mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-          <div>
-            <dt className="text-xs text-muted-foreground">URL</dt>
-            <dd className="break-all font-mono text-xs">
-              {section?.url || "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">Username</dt>
-            <dd className="break-all font-mono text-xs">
-              {section?.username || "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">Password</dt>
-            <dd className="break-all font-mono text-xs">
-              {section?.password || "—"}
-            </dd>
-          </div>
-        </dl>
-      )}
     </div>
   )
 }

@@ -385,15 +385,44 @@ export const companiesRouter = router({
         authCode: z.string().min(1),
       }),
     )
-    .mutation(async ({ input }) => {
-      const profile = await getCompaniesHouseProfile(input.companyId.trim())
+    .mutation(async ({ input, ctx }) => {
+      const companyId = input.companyId.trim()
+      const authCode = input.authCode.trim()
+
+      // Idempotency: if this user already imported this company (e.g. a first
+      // attempt succeeded but the response never reached the client and the
+      // screen appeared to freeze), just return the existing org so the client
+      // navigates into it instead of erroring on the unique slug.
+      const already = await prisma.member.findFirst({
+        where: {
+          userId: ctx.user.id,
+          organization: { companyId, deletedAt: null },
+        },
+        select: { organizationId: true },
+      })
+      if (already) return { id: already.organizationId }
+
+      const profile = await getCompaniesHouseProfile(companyId)
       if (!profile || !profile.name) {
-        throw new Error("Company not found on Companies House. Check the Company ID.")
+        throw new Error(
+          "Couldn't reach Companies House for that Company ID. Check the ID and try again.",
+        )
       }
 
-      const slug = slugify(profile.name) || slugify(input.companyId)
-      const hdrs = await headers()
+      // Organization.slug is globally unique — make sure ours won't collide
+      // (e.g. two companies with the same name, or a retry).
+      const base = slugify(profile.name) || slugify(companyId)
+      let slug = base
+      for (let i = 0; i < 6; i++) {
+        const taken = await prisma.organization.findUnique({
+          where: { slug },
+          select: { id: true },
+        })
+        if (!taken) break
+        slug = `${base}-${Math.random().toString(36).slice(2, 7)}`
+      }
 
+      const hdrs = await headers()
       const org = await auth.api.createOrganization({
         body: { name: profile.name, slug },
         headers: hdrs,
@@ -403,8 +432,8 @@ export const companiesRouter = router({
         where: { id: org.id },
         data: {
           country: "uk",
-          companyId: input.companyId.trim(),
-          authCode: input.authCode.trim(),
+          companyId,
+          authCode,
           sicCode: profile.sicCodes[0] ?? null,
           status: CompanyStatus.completed,
         },
@@ -413,11 +442,11 @@ export const companiesRouter = router({
       await createAdminNotification({
         kind: "formation.imported",
         title: `Company imported: ${profile.name}`,
-        body: `UK company ${input.companyId.trim()} linked by client.`,
+        body: `UK company ${companyId} linked by client.`,
         link: `/admin/formations/${org.id}`,
       })
 
-      return org
+      return { id: org.id }
     }),
 
   hasPersonalCompany: protectedProcedure.query(async ({ ctx }) => {

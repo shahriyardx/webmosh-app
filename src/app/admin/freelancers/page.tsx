@@ -3,7 +3,10 @@
 import Link from "next/link"
 import { useState } from "react"
 import { toast } from "sonner"
+import type { inferRouterOutputs } from "@trpc/server"
+import type { AppRouter } from "@/lib/trpc/routers"
 import { trpc } from "@/lib/trpc/client"
+import { OrderDetailsEditor } from "@/components/order-details-editor"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -54,11 +57,9 @@ type FreelancerRow = {
   email: string
 }
 
-type AssignTarget = {
-  orderId: string
-  serviceTitle: string
-  orgName: string
-}
+type WpOrder =
+  inferRouterOutputs<AppRouter>["tasks"]["wordpressOrdersQueue"][number]
+type AssignTarget = WpOrder
 
 export default function AdminFreelancersPage() {
   const utils = trpc.useUtils()
@@ -102,8 +103,13 @@ export default function AdminFreelancersPage() {
   const [deleteTarget, setDeleteTarget] = useState<FreelancerRow | null>(null)
 
   const [assignTarget, setAssignTarget] = useState<AssignTarget | null>(null)
-  const defaultDescription = (orgName: string) =>
-    `Build the WordPress site for ${orgName}. Theme, custom design URL and hosting credentials are on the task page.`
+  const DEFAULT_DESCRIPTION = `1. Change the content for the full website
+
+2. Add a new user and delete the old one
+
+3. Business Niche:
+
+4. Currency:`
 
   const [assignForm, setAssignForm] = useState({
     freelancerId: "",
@@ -137,7 +143,7 @@ export default function AdminFreelancersPage() {
       freelancerId: "",
       priority: TaskPriority.medium,
       deadline: "",
-      description: defaultDescription(target.orgName),
+      description: DEFAULT_DESCRIPTION,
       payout: "",
     })
   }
@@ -158,14 +164,16 @@ export default function AdminFreelancersPage() {
       toast.error("Please enter a valid payment amount")
       return
     }
+    const serviceTitle = assignTarget.service?.title ?? "WordPress"
+    const orgName = assignTarget.organization?.name ?? "customer"
     assignTask.mutate({
-      title: `${assignTarget.serviceTitle} — ${assignTarget.orgName}`,
+      title: `${serviceTitle} — ${orgName}`,
       description: assignForm.description.trim(),
       priority: assignForm.priority,
       deadline: assignForm.deadline ? new Date(assignForm.deadline) : null,
       payoutAmount,
       assignedToId: assignForm.freelancerId,
-      orderId: assignTarget.orderId,
+      orderId: assignTarget.id,
     })
   }
 
@@ -336,16 +344,7 @@ export default function AdminFreelancersPage() {
                   </TableCell>
                   <TableCell>
                     {!o.task ? (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          openAssign({
-                            orderId: o.id,
-                            serviceTitle: o.service?.title ?? "WordPress",
-                            orgName: o.organization?.name ?? "customer",
-                          })
-                        }
-                      >
+                      <Button size="sm" onClick={() => openAssign(o)}>
                         Assign
                       </Button>
                     ) : (
@@ -570,16 +569,45 @@ export default function AdminFreelancersPage() {
         open={!!assignTarget}
         onOpenChange={(open) => !open && setAssignTarget(null)}
       >
-        <DialogContent className="max-h-[90dvh] overflow-y-auto">
+        <DialogContent className="max-h-[92dvh] w-[95vw] overflow-y-auto sm:max-w-5xl">
           <DialogHeader>
-            <DialogTitle>Assign to a freelancer</DialogTitle>
-            <DialogDescription>
-              {assignTarget?.serviceTitle} — {assignTarget?.orgName}
-            </DialogDescription>
+            <div className="flex items-start gap-3 pr-8">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-500 ring-1 ring-inset ring-sky-500/20">
+                <UserCogIcon className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <DialogTitle className="text-lg">Assign to a freelancer</DialogTitle>
+                <DialogDescription className="mt-0.5">
+                  {assignTarget?.service?.title} —{" "}
+                  <span className="font-medium text-foreground">
+                    {assignTarget?.organization?.name}
+                  </span>
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="space-y-4">
-            <Field>
-              <FieldLabel>Freelancer</FieldLabel>
+
+          <div className="grid gap-5 lg:grid-cols-2">
+            {assignTarget && (
+              <OrderDetailsEditor
+                order={assignTarget}
+                onSaved={() => utils.tasks.wordpressOrdersQueue.invalidate()}
+              />
+            )}
+            <div className="space-y-4 rounded-xl border border-border p-5">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+                  <UserCogIcon className="size-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold leading-tight">Assignment</p>
+                  <p className="text-xs text-muted-foreground">
+                    Who works on it, and what they see.
+                  </p>
+                </div>
+              </div>
+              <Field>
+                <FieldLabel>Freelancer</FieldLabel>
               <FieldContent>
                 {!freelancers?.length ? (
                   <p className="text-sm text-muted-foreground">
@@ -674,7 +702,7 @@ export default function AdminFreelancersPage() {
                     onClick={() =>
                       setAssignForm({
                         ...assignForm,
-                        description: defaultDescription(assignTarget.orgName),
+                        description: DEFAULT_DESCRIPTION,
                       })
                     }
                     className="text-xs text-muted-foreground hover:text-foreground"
@@ -702,6 +730,7 @@ export default function AdminFreelancersPage() {
                 </p>
               </FieldContent>
             </Field>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignTarget(null)}>

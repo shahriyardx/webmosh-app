@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { trpc } from "@/lib/trpc/client"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,6 +13,8 @@ import {
   UsersIcon,
   DownloadIcon,
   BuildingIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from "lucide-react"
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -243,13 +246,19 @@ export function OfficersCard({ orgId }: { orgId: string }) {
   )
 }
 
+const FILINGS_PREVIEW = 5
+
 export function FilingHistoryCard({ orgId }: { orgId: string }) {
+  const [expanded, setExpanded] = useState(false)
   const { data, isLoading } = trpc.companies.companiesHouse.useQuery(
     { orgId },
     { enabled: !!orgId },
   )
 
   if (isLoading || !data || data.filings.length === 0) return null
+
+  const visible = expanded ? data.filings : data.filings.slice(0, FILINGS_PREVIEW)
+  const hiddenCount = data.filings.length - FILINGS_PREVIEW
 
   return (
     <Card>
@@ -261,7 +270,7 @@ export function FilingHistoryCard({ orgId }: { orgId: string }) {
       </CardHeader>
       <CardContent>
         <div className="divide-y divide-border">
-          {data.filings.map((f, i) => (
+          {visible.map((f, i) => (
             <div key={i} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">
@@ -286,6 +295,25 @@ export function FilingHistoryCard({ orgId }: { orgId: string }) {
             </div>
           ))}
         </div>
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-border py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+          >
+            {expanded ? (
+              <>
+                Show less
+                <ChevronUpIcon className="size-4" />
+              </>
+            ) : (
+              <>
+                Show {hiddenCount} more
+                <ChevronDownIcon className="size-4" />
+              </>
+            )}
+          </button>
+        )}
       </CardContent>
     </Card>
   )

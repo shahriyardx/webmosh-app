@@ -34,6 +34,7 @@ import {
   ArrowLeftIcon,
   UserIcon,
   LogOutIcon,
+  LayoutDashboardIcon,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
 
@@ -151,6 +152,11 @@ export default function OnboardPage() {
   })
 
   const { data: hasPersonal } = trpc.companies.hasPersonalCompany.useQuery()
+  // Existing users (who already have at least one company/account) reach this
+  // screen by choosing to add another — they get a way back to their dashboard.
+  // A brand-new user has no companies yet, so no dashboard button is shown.
+  const { data: existingCompanies } = trpc.companies.myCompanies.useQuery()
+  const hasExistingCompanies = (existingCompanies?.length ?? 0) > 0
   const { data: services, isLoading: servicesLoading } = trpc.services.list.useQuery(
     undefined,
     { enabled: mode === "personal" },
@@ -241,18 +247,29 @@ export default function OnboardPage() {
         <div className="mx-auto flex w-full max-w-7xl items-center gap-2">
           <Image src="/logo.png" alt="Webmosh" width={32} height={32} className="size-8 object-contain" />
           <span className="text-sm font-semibold tracking-wide">WEBMOSH</span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="ml-auto"
-            onClick={async () => {
-              await authClient.signOut()
-              router.push("/")
-            }}
-          >
-            <LogOutIcon className="size-4" />
-            Logout
-          </Button>
+          <div className="ml-auto flex items-center gap-2">
+            {hasExistingCompanies && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push("/dashboard")}
+              >
+                <LayoutDashboardIcon className="size-4" />
+                Dashboard
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                await authClient.signOut()
+                router.push("/")
+              }}
+            >
+              <LogOutIcon className="size-4" />
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
 

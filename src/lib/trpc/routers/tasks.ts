@@ -102,10 +102,17 @@ export const tasksRouter = router({
         id: true,
         status: true,
         customDesignUrl: true,
+        themeId: true,
+        contactCompany: true,
+        contactAddress: true,
+        contactEmail: true,
+        contactPhone: true,
+        credentials: true,
+        invoiceId: true,
         createdAt: true,
         service: { select: { id: true, title: true } },
         organization: { select: { id: true, name: true, country: true } },
-        theme: { select: { id: true, title: true } },
+        theme: { select: { id: true, title: true, demoUrl: true } },
         tasks: {
           orderBy: { createdAt: "desc" },
           take: 1,
@@ -117,14 +124,33 @@ export const tasksRouter = router({
         },
       },
     })
+
+    const invoiceIds = orders
+      .map((o) => o.invoiceId)
+      .filter((id): id is string => !!id)
+    const invoices = invoiceIds.length
+      ? await prisma.invoice.findMany({
+          where: { id: { in: invoiceIds } },
+          select: { id: true, number: true, amount: true, status: true },
+        })
+      : []
+    const invoiceMap = new Map(invoices.map((i) => [i.id, i]))
+
     return orders.map((o) => ({
       id: o.id,
       status: o.status,
       customDesignUrl: o.customDesignUrl,
+      themeId: o.themeId,
+      contactCompany: o.contactCompany,
+      contactAddress: o.contactAddress,
+      contactEmail: o.contactEmail,
+      contactPhone: o.contactPhone,
+      credentials: o.credentials,
       createdAt: o.createdAt,
       service: o.service,
       organization: o.organization,
       theme: o.theme,
+      invoice: (o.invoiceId && invoiceMap.get(o.invoiceId)) || null,
       task: o.tasks[0] ?? null,
     }))
   }),

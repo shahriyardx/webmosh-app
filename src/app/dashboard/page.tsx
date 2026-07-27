@@ -123,6 +123,19 @@ export default function DashboardPage() {
   const recentInvoices = (invoices ?? []).slice(0, 4)
   const recentMails = (mails ?? []).slice(0, 4)
 
+  // Recent-activity widgets (orders, invoices, mail) share one responsive grid
+  // so present ones pack side by side; a lonely/odd-out card spans full width.
+  const hasOrders = recentOrders.length > 0
+  const hasInvoices = recentInvoices.length > 0
+  const hasMails = recentMails.length > 0
+  const recentCount = [hasOrders, hasInvoices, hasMails].filter(Boolean).length
+  const oddFull = recentCount % 2 === 1
+  // Order in the grid: orders → mail → invoices. The last present card spans
+  // full width when the count is odd so nothing sits alone at half width.
+  const ordersSpan = hasOrders && !hasMails && !hasInvoices && oddFull ? "lg:col-span-2" : ""
+  const mailSpan = hasMails && !hasInvoices && oddFull ? "lg:col-span-2" : ""
+  const invoicesSpan = hasInvoices && oddFull ? "lg:col-span-2" : ""
+
   const userCountries = new Set(
     (companies ?? [])
       .filter((c) => c.type !== "personal" && c.country)
@@ -461,9 +474,12 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Orders + mail */}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card className="rounded-2xl shadow-none">
+      {/* Recent activity — each widget shows only when it has something, and
+          present ones pack side by side. */}
+      {recentCount > 0 && (
+      <div className={`grid gap-5 ${recentCount >= 2 ? "lg:grid-cols-2" : ""}`}>
+        {hasOrders && (
+        <Card className={`rounded-2xl shadow-none ${ordersSpan}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <SectionTitle icon={ShoppingCartIcon}>Recent orders</SectionTitle>
             <Button variant="ghost" size="sm" asChild>
@@ -512,8 +528,10 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        )}
 
-        <Card className="rounded-2xl shadow-none">
+        {hasMails && (
+        <Card className={`rounded-2xl shadow-none ${mailSpan}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <SectionTitle icon={MailIcon}>Recent mail</SectionTitle>
             <Button variant="ghost" size="sm" asChild>
@@ -567,23 +585,20 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+        )}
 
-      {/* Payments */}
-      <Card className="rounded-2xl shadow-none">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <SectionTitle icon={DollarSignIcon}>Recent invoices</SectionTitle>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/account/invoices">
-              View all
-              <ArrowRightIcon className="size-3" />
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {!recentInvoices.length ? (
-            <EmptyRow icon={ReceiptIcon} message="No invoices yet." />
-          ) : (
+        {hasInvoices && (
+        <Card className={`rounded-2xl shadow-none ${invoicesSpan}`}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <SectionTitle icon={DollarSignIcon}>Recent invoices</SectionTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/account/invoices">
+                View all
+                <ArrowRightIcon className="size-3" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
             <div className="divide-y divide-border">
               {recentInvoices.map((inv) => (
                 <Link
@@ -611,9 +626,11 @@ export default function DashboardPage() {
                 </Link>
               ))}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+        )}
+      </div>
+      )}
 
       {/* Recommended */}
       {recommended.length > 0 && (

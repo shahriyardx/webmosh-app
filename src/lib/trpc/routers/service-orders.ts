@@ -270,8 +270,36 @@ export const serviceOrdersRouter = router({
     const orders = await prisma.serviceOrder.findMany({
       orderBy: { createdAt: "desc" },
     })
-    return attachInvoiceAndService(orders)
+    const enriched = await attachInvoiceAndService(orders)
+    const orgIds = [...new Set(orders.map((o) => o.organizationId))]
+    const orgs = orgIds.length
+      ? await prisma.organization.findMany({
+          where: { id: { in: orgIds } },
+          select: { id: true, name: true },
+        })
+      : []
+    const orgMap = new Map(orgs.map((o) => [o.id, o]))
+    return enriched.map((o) => ({
+      ...o,
+      organization: orgMap.get(o.organizationId) ?? null,
+    }))
   }),
+
+  /** Admin: a single enriched order (same shape as listAll rows). */
+  adminGetById: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      const order = await prisma.serviceOrder.findUnique({
+        where: { id: input.id },
+      })
+      if (!order) return null
+      const enriched = await attachInvoiceAndService([order])
+      const org = await prisma.organization.findUnique({
+        where: { id: order.organizationId },
+        select: { id: true, name: true },
+      })
+      return { ...enriched[0], organization: org ?? null }
+    }),
 
   updateStatus: adminProcedure
     .input(z.object({ id: z.string(), status: z.nativeEnum(ServiceOrderStatus) }))

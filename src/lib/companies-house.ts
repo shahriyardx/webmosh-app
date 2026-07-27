@@ -55,11 +55,18 @@ export async function getCompaniesHouseProfile(
   const auth = authHeader()
   if (!auth) return null
 
-  const res = await fetch(`${BASE}/company/${encodeURIComponent(number)}`, {
-    headers: { Authorization: auth },
-    // Cache 1h at the fetch layer
-    next: { revalidate: 3600 },
-  })
+  let res: Response
+  try {
+    res = await fetch(`${BASE}/company/${encodeURIComponent(number)}`, {
+      headers: { Authorization: auth },
+      // Cache 1h at the fetch layer; bail after 15s so a slow/hung
+      // Companies House response can't freeze the caller.
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch {
+    return null
+  }
   if (!res.ok) return null
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -75,7 +82,11 @@ export async function getCompaniesHouseProfile(
   try {
     const oRes = await fetch(
       `${BASE}/company/${encodeURIComponent(number)}/officers?items_per_page=35`,
-      { headers: { Authorization: auth }, next: { revalidate: 3600 } },
+      {
+        headers: { Authorization: auth },
+        next: { revalidate: 3600 },
+        signal: AbortSignal.timeout(15000),
+      },
     )
     if (oRes.ok) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -107,7 +118,11 @@ export async function getCompaniesHouseProfile(
   try {
     const fRes = await fetch(
       `${BASE}/company/${encodeURIComponent(number)}/filing-history?items_per_page=25`,
-      { headers: { Authorization: auth }, next: { revalidate: 3600 } },
+      {
+        headers: { Authorization: auth },
+        next: { revalidate: 3600 },
+        signal: AbortSignal.timeout(15000),
+      },
     )
     if (fRes.ok) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
