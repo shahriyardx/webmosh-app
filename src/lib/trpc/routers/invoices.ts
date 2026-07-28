@@ -19,6 +19,7 @@ import {
   getPayState,
   nextInvoiceState,
   validatePayment,
+  round2,
 } from "@/lib/invoice-pay"
 
 export type EnrichedInvoice = Awaited<ReturnType<typeof prisma.invoice.findMany>>[number] & {
@@ -264,6 +265,121 @@ export const invoicesRouter = router({
       })
 
       return tx
+    }),
+
+  /**
+   * Submit one Bangla QR / bKash payment covering several invoices at once.
+   * Records a pending external payment per invoice (each for its remaining
+   * amount) sharing the same transaction ID; the admin verifies on the Wallet
+   * page. Coupons are already baked into each invoice amount, so the combined
+   * total is simply the sum of what's left on each.
+   */
+  submitCombinedTransaction: protectedProcedure
+    .input(
+      z.object({
+        invoiceIds: z.array(z.string()).min(1),
+        paymentMethod: z.enum(["bkash", "BanglaQR"]),
+        transactionId: z.string().min(1, "Transaction ID is required"),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const ids = [...new Set(input.invoiceIds)]
+      const invoices = await prisma.invoice.findMany({
+        where: { id: { in: ids }, deletedAt: null },
+      })
+      if (!invoices.length) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "No invoices found." })
+      }
+      for (const inv of invoices) {
+        await assertOrgMember(ctx.user.id, inv.organizationId)
+      }
+
+      const items: { invoice: (typeof invoices)[number]; amount: number }[] = []
+      let total = 0
+      for (const inv of invoices) {
+        if (inv.status === PaymentStatus.paid) continue
+        const state = await getPayState(inv)
+        if (state.payableNow <= 0) continue
+        items.push({ invoice: inv, amount: state.payableNow })
+        total = round2(total + state.payableNow)
+      }
+      if (!items.length) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Nothing left to pay on the selected invoices.",
+        })
+      }
+
+      const txnId = input.transactionId.trim()
+      await prisma.$transaction(async (db) => {
+        for (const { invoice, amount } of items) {
+          await db.walletTransaction.create({
+            data: {
+              userId: ctx.user.id,
+              type: WalletTxType.external_payment,
+              status: WalletTxStatus.pending,
+              amount,
+              method: input.paymentMethod,
+              transactionId: txnId,
+              invoiceId: invoice.id,
+            },
+          })
+          await db.invoice.update({
+            where: { id: invoice.id },
+            data: { paymentMethod: input.paymentMethod, transactionId: txnId },
+          })
+        }
+      })
+
+      await emailAdminPaymentSubmitted(
+        `${items.length} invoice${items.length === 1 ? "" : "s"}`,
+        total,
+        input.paymentMethod,
+        txnId,
+      ).catch(() => {})
+      await createAdminNotification({
+        kind: "invoice.payment_submitted",
+        title: `Combined payment submitted: $${total.toFixed(2)}`,
+        body: `A customer submitted a ${input.paymentMethod} payment of $${total.toFixed(2)} covering ${items.length} invoice${items.length === 1 ? "" : "s"}. Please verify on the Wallet page.`,
+        link: "/admin/wallet",
+      })
+
+      return { count: items.length, total }
+    }),
+
+  /** Admin: mark several invoices fully paid at once (offline settlement). */
+  adminMarkPaidCombined: adminProcedure
+    .input(z.object({ invoiceIds: z.array(z.string()).min(1) }))
+    .mutation(async ({ input }) => {
+      const ids = [...new Set(input.invoiceIds)]
+      const invoices = await prisma.invoice.findMany({
+        where: { id: { in: ids }, deletedAt: null },
+      })
+      const toPay = invoices.filter((i) => i.status !== PaymentStatus.paid)
+      if (!toPay.length) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "The selected invoices are already paid.",
+        })
+      }
+
+      let total = 0
+      await prisma.$transaction(async (db) => {
+        for (const inv of toPay) {
+          total = round2(total + Math.max(0, inv.amount - inv.amountPaid))
+          await db.invoice.update({
+            where: { id: inv.id },
+            data: {
+              status: PaymentStatus.paid,
+              amountPaid: inv.amount,
+              paymentMethod: inv.paymentMethod ?? "manual",
+              rejectReason: null,
+            },
+          })
+        }
+      })
+
+      return { count: toPay.length, total }
     }),
 
   createCheckoutSession: protectedProcedure

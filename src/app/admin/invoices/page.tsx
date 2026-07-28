@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -88,6 +89,36 @@ export default function AdminInvoicesPage() {
   })
   const sendReminder = trpc.invoices.sendReminder.useMutation({
     onSuccess: () => toast.success("Reminder email sent"),
+    onError: (e) => toast.error(e.message),
+  })
+
+  // ---- Multi-select + combined "mark paid" ----
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [markOpen, setMarkOpen] = useState(false)
+  const selectable = (invoices ?? []).filter((i) => i.status !== "paid")
+  const remainingOf = (i: { amount: number; amountPaid: number }) =>
+    Math.max(0, i.amount - (i.amountPaid ?? 0))
+  const selectedTotal = (invoices ?? [])
+    .filter((i) => selected.has(i.id))
+    .reduce((s, i) => s + remainingOf(i), 0)
+  const allSelected =
+    selectable.length > 0 && selectable.every((i) => selected.has(i.id))
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  const toggleAll = () =>
+    setSelected(allSelected ? new Set() : new Set(selectable.map((i) => i.id)))
+  const markPaid = trpc.invoices.adminMarkPaidCombined.useMutation({
+    onSuccess: (r) => {
+      utils.invoices.listAll.invalidate()
+      setSelected(new Set())
+      setMarkOpen(false)
+      toast.success(`Marked ${r.count} invoice${r.count === 1 ? "" : "s"} paid`)
+    },
     onError: (e) => toast.error(e.message),
   })
 
@@ -196,7 +227,10 @@ export default function AdminInvoicesPage() {
           <button
             key={tab.label}
             type="button"
-            onClick={() => setStatus(tab.value)}
+            onClick={() => {
+              setStatus(tab.value)
+              setSelected(new Set())
+            }}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               status === tab.value
                 ? "bg-sky-500/10 text-sky-500"
@@ -208,6 +242,27 @@ export default function AdminInvoicesPage() {
         ))}
       </div>
 
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-sky-500/40 bg-sky-500/5 px-4 py-3">
+          <p className="text-sm font-medium">
+            {selected.size} selected ·{" "}
+            <span className="font-bold">${selectedTotal.toFixed(2)}</span>
+          </p>
+          <div className="ml-auto flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelected(new Set())}
+            >
+              Clear
+            </Button>
+            <Button size="sm" onClick={() => setMarkOpen(true)}>
+              Mark {selected.size} paid
+            </Button>
+          </div>
+        </div>
+      )}
+
       {invoices?.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <ReceiptIcon className="size-10 text-muted-foreground/40" />
@@ -218,6 +273,14 @@ export default function AdminInvoicesPage() {
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={toggleAll}
+                    disabled={selectable.length === 0}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead className="w-28">Invoice #</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Amount</TableHead>
@@ -231,7 +294,19 @@ export default function AdminInvoicesPage() {
               {invoices?.map((inv) => {
                 const sb = statusBadge[inv.status] ?? statusBadge.unpaid
                 return (
-                  <TableRow key={inv.id}>
+                  <TableRow
+                    key={inv.id}
+                    data-state={selected.has(inv.id) ? "selected" : undefined}
+                  >
+                    <TableCell>
+                      {inv.status !== PaymentStatus.paid && (
+                        <Checkbox
+                          checked={selected.has(inv.id)}
+                          onCheckedChange={() => toggle(inv.id)}
+                          aria-label="Select invoice"
+                        />
+                      )}
+                    </TableCell>
                     <TableCell className="font-mono text-xs">
                       {formatInvoiceNumber(inv.number)}
                     </TableCell>
@@ -342,6 +417,35 @@ export default function AdminInvoicesPage() {
           </Table>
         </div>
       )}
+
+      <Dialog open={markOpen} onOpenChange={(o) => !o && setMarkOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark {selected.size} invoices paid</DialogTitle>
+            <DialogDescription>
+              This settles the selected invoices as fully paid (
+              <span className="font-semibold text-foreground">
+                ${selectedTotal.toFixed(2)}
+              </span>{" "}
+              total) — use this for payments received offline. It doesn&apos;t
+              charge anyone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMarkOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                markPaid.mutate({ invoiceIds: Array.from(selected) })
+              }
+              disabled={markPaid.isPending}
+            >
+              {markPaid.isPending ? "Saving…" : "Mark paid"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <DeleteConfirmDialog
         open={!!deleteTarget}

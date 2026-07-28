@@ -286,6 +286,91 @@ export const walletRouter = router({
       return { transaction: tx, invoice: updated }
     }),
 
+  /**
+   * Pay several invoices at once from the wallet balance. Each invoice is paid
+   * in full (its remaining amount) in one atomic transaction. Coupons are
+   * already baked into each invoice's amount, so the combined total is just the
+   * sum of what's left on each.
+   */
+  payInvoicesCombined: protectedProcedure
+    .input(z.object({ invoiceIds: z.array(z.string()).min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const ids = [...new Set(input.invoiceIds)]
+      const invoices = await prisma.invoice.findMany({
+        where: { id: { in: ids }, deletedAt: null },
+      })
+      if (!invoices.length) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "No invoices found." })
+      }
+      for (const inv of invoices) {
+        await assertOrgMember(ctx.user.id, inv.organizationId)
+      }
+
+      const items: { invoice: (typeof invoices)[number]; amount: number }[] = []
+      let total = 0
+      for (const inv of invoices) {
+        if (inv.status === PaymentStatus.paid) continue
+        const state = await getPayState(inv)
+        if (state.payableNow <= 0) continue
+        items.push({ invoice: inv, amount: state.payableNow })
+        total = round2(total + state.payableNow)
+      }
+      if (!items.length) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Nothing left to pay on the selected invoices.",
+        })
+      }
+
+      const balance = await computeWalletBalance(ctx.user.id)
+      if (total > balance.available + 0.001) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Insufficient wallet balance ($${balance.available.toFixed(2)} available, $${total.toFixed(2)} needed).`,
+        })
+      }
+
+      await prisma.$transaction(async (db) => {
+        for (const { invoice, amount } of items) {
+          const next = nextInvoiceState(
+            invoice.amount,
+            invoice.amountPaid,
+            amount,
+          )
+          const tx = await db.walletTransaction.create({
+            data: {
+              userId: ctx.user.id,
+              type: WalletTxType.invoice_payment,
+              status: WalletTxStatus.approved,
+              amount,
+              method: "wallet",
+              invoiceId: invoice.id,
+              decidedAt: new Date(),
+            },
+          })
+          await db.invoice.update({
+            where: { id: invoice.id },
+            data: {
+              status: next.status,
+              amountPaid: next.amountPaid,
+              paymentMethod: "wallet",
+              transactionId: tx.id,
+              rejectReason: null,
+            },
+          })
+        }
+      })
+
+      await createAdminNotification({
+        kind: "invoice.paid",
+        title: `Combined wallet payment: $${total.toFixed(2)}`,
+        body: `${ctx.user.name ?? ctx.user.email} paid ${items.length} invoice${items.length === 1 ? "" : "s"} ($${total.toFixed(2)}) from their wallet.`,
+        link: "/admin/invoices",
+      })
+
+      return { count: items.length, total }
+    }),
+
   // ---------- ADMIN ----------
 
   listAll: adminProcedure
