@@ -14,6 +14,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import {
   MultiSelect,
   MultiSelectTrigger,
@@ -42,7 +43,10 @@ type Service = {
   price: number
   country: string | null
   type: "general" | "wordpress"
+  requiresRdp: boolean
 }
+
+const EMPTY_RDP = { host: "", username: "", password: "" }
 
 export default function AccountServicesPage() {
   const router = useRouter()
@@ -52,6 +56,7 @@ export default function AccountServicesPage() {
   const [picking, setPicking] = useState<Service | null>(null)
   const [orgId, setOrgId] = useState<string>("")
   const [wpFor, setWpFor] = useState<Service | null>(null)
+  const [rdp, setRdp] = useState(EMPTY_RDP)
 
   const purchase = trpc.serviceOrders.purchase.useMutation({
     onSuccess: (order) => {
@@ -119,12 +124,33 @@ export default function AccountServicesPage() {
       return
     }
     setOrgId("")
+    setRdp(EMPTY_RDP)
     setPicking(svc)
   }
 
+  const rdpReady =
+    !picking?.requiresRdp ||
+    (!!rdp.host.trim() && !!rdp.username.trim() && !!rdp.password.trim())
+
   const confirmPurchase = () => {
     if (!picking || !orgId) return
-    purchase.mutate({ organizationId: orgId, serviceId: picking.id })
+    if (picking.requiresRdp && !rdpReady) {
+      toast.error("Please provide the RDP host, username and password")
+      return
+    }
+    purchase.mutate({
+      organizationId: orgId,
+      serviceId: picking.id,
+      ...(picking.requiresRdp
+        ? {
+            rdp: {
+              host: rdp.host.trim(),
+              username: rdp.username.trim(),
+              password: rdp.password.trim(),
+            },
+          }
+        : {}),
+    })
   }
 
   const submitWordpress = (payload: WordpressPurchasePayload) => {
@@ -261,10 +287,51 @@ export default function AccountServicesPage() {
               </MultiSelect>
             )}
           </div>
+
+          {picking?.requiresRdp && (
+            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+              <div>
+                <p className="text-sm font-semibold">RDP access</p>
+                <p className="text-xs text-muted-foreground">
+                  This service needs remote access to your machine. Provide the
+                  RDP details so our team can get to work.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Host / IP address</Label>
+                  <Input
+                    placeholder="e.g. 203.0.113.10"
+                    value={rdp.host}
+                    onChange={(e) => setRdp({ ...rdp, host: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Username</Label>
+                  <Input
+                    value={rdp.username}
+                    onChange={(e) =>
+                      setRdp({ ...rdp, username: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Password</Label>
+                  <Input
+                    value={rdp.password}
+                    onChange={(e) =>
+                      setRdp({ ...rdp, password: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <Button
               onClick={confirmPurchase}
-              disabled={!orgId || purchase.isPending}
+              disabled={!orgId || !rdpReady || purchase.isPending}
             >
               {purchase.isPending ? (
                 <>

@@ -36,6 +36,7 @@ import {
   MailIcon,
   PaperclipIcon,
   Trash2Icon,
+  MonitorIcon,
 } from "lucide-react"
 import {
   MultiSelect,
@@ -94,6 +95,28 @@ const statusBadge: Record<string, { label: string; variant: "outline" | "seconda
   processing: { label: "Processing", variant: "secondary" },
   completed: { label: "Completed", variant: "default" },
   rejected: { label: "Rejected", variant: "destructive" },
+}
+
+function initials(name: string) {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  )
+}
+
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="bg-card px-4 py-3">
+      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <div className="mt-1 truncate text-sm font-semibold">{value}</div>
+    </div>
+  )
 }
 
 const docStatusBadge: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
@@ -338,19 +361,46 @@ export default function FormationDetailPage({
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" asChild className="size-8">
+      <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-gradient-to-br from-sky-500/[0.07] via-transparent to-transparent p-5">
+        <Button variant="outline" size="icon" asChild className="size-9 shrink-0">
           <Link href="/admin/formations">
             <ArrowLeftIcon className="size-4" />
           </Link>
         </Button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold text-foreground">{org.name}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {org.country === "uk" ? "United Kingdom" : "United States"} Company
-          </p>
+        <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-sky-500/10 text-lg font-bold text-sky-600 ring-1 ring-inset ring-sky-500/20 dark:text-sky-400">
+          {initials(org.name)}
         </div>
-        <Button variant="outline" className="text-red-500" onClick={() => setDeleteOpen(true)}>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="truncate text-2xl font-bold tracking-tight text-foreground">
+              {org.name}
+            </h1>
+            <Badge variant={sb.variant}>{sb.label}</Badge>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <GlobeIcon className="size-3.5" />
+              {org.country === "uk" ? "United Kingdom" : "United States"}
+            </span>
+            {org.companyId && (
+              <span className="inline-flex items-center gap-1.5 font-mono text-xs">
+                <HashIcon className="size-3.5" />
+                {org.companyId}
+              </span>
+            )}
+            {owner && (
+              <span className="inline-flex items-center gap-1.5">
+                <UserIcon className="size-3.5" />
+                {owner.name ?? owner.email}
+              </span>
+            )}
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          className="text-red-500 hover:text-red-500"
+          onClick={() => setDeleteOpen(true)}
+        >
           <Trash2Icon className="size-4" />
           Delete
         </Button>
@@ -374,8 +424,9 @@ export default function FormationDetailPage({
         loading={deleteFormation.isPending}
       />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-      {/* Company info */}
+      <div className="grid items-start gap-6 lg:grid-cols-3">
+      {/* Main column — company info */}
+      <div className="space-y-6 lg:col-span-2">
       <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -384,68 +435,80 @@ export default function FormationDetailPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-start gap-3">
-              <GlobeIcon className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Country</p>
-                <p className="text-sm font-medium capitalize">{org.country ?? "—"}</p>
-              </div>
+            <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
+              <Stat
+                label="Country"
+                value={
+                  <span className="capitalize">
+                    {org.country === "uk"
+                      ? "United Kingdom"
+                      : org.country === "us"
+                        ? "United States"
+                        : (org.country ?? "—")}
+                  </span>
+                }
+              />
+              <Stat label="SIC Code" value={org.sicCode ?? "—"} />
+              <Stat
+                label="Created"
+                value={new Date(org.createdAt).toLocaleDateString()}
+              />
             </div>
-            <div className="flex items-start gap-3">
-              <HashIcon className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">SIC Code</p>
-                <p className="text-sm font-medium">{org.sicCode ?? "—"}</p>
-              </div>
-            </div>
+
             {org.sicDescription && (
-              <div className="flex items-start gap-3">
-                <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Business Activity</p>
-                  <p className="text-sm font-medium">{org.sicDescription}</p>
-                </div>
-              </div>
-            )}
-            {org.website && (
-              <div className="flex items-start gap-3">
-                <GlobeIcon className="size-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Website</p>
-                  <a
-                    href={org.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-medium text-sky-600 hover:underline"
-                  >
-                    {org.website}
-                  </a>
-                </div>
-              </div>
-            )}
-            <div className="flex items-start gap-3">
-              <CalendarIcon className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Created</p>
-                <p className="text-sm font-medium">
-                  {new Date(org.createdAt).toLocaleDateString()}
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Business Activity
                 </p>
+                <p className="mt-0.5 text-sm font-medium">{org.sicDescription}</p>
               </div>
-            </div>
+            )}
+
+            {org.website && (
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Website
+                </p>
+                <a
+                  href={org.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-0.5 block break-all text-sm font-medium text-sky-600 hover:underline dark:text-sky-400"
+                >
+                  {org.website}
+                </a>
+              </div>
+            )}
+
             {owner && (
-              <div className="flex items-start gap-3">
-                <UserIcon className="size-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Owner</p>
-                  <p className="text-sm font-medium">{owner.name ?? "—"}</p>
-                  <p className="text-xs text-muted-foreground">{owner.email}</p>
+              <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-sky-500 text-sm font-semibold text-white">
+                  {initials(owner.name ?? owner.email ?? "?")}
                 </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">
+                    {owner.name ?? "—"}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {owner.email}
+                  </p>
+                </div>
+                <span className="ml-auto shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Owner
+                </span>
               </div>
             )}
           </CardContent>
         </Card>
 
-      {/* Admin Settings */}
+      <CompaniesHouseCard orgId={id} />
+      <OfficersCard orgId={id} />
+      <FilingHistoryCard orgId={id} />
+      </div>
+
+      {/* Admin sidebar — settings + RDP access */}
+      <div className="space-y-6 lg:sticky lg:top-6">
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -537,12 +600,28 @@ export default function FormationDetailPage({
           </form>
         </CardContent>
       </Card>
-      </div>
 
-      {/* Companies House (UK) */}
-      <CompaniesHouseCard orgId={id} />
-      <OfficersCard orgId={id} />
-      <FilingHistoryCard orgId={id} />
+      {org.serviceOrders.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <MonitorIcon className="size-4 text-sky-500" />
+              RDP Access
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {org.serviceOrders.map((o) => (
+              <RdpEditor
+                key={o.id}
+                order={o}
+                onSaved={() => utils.companies.getById.invalidate({ id })}
+              />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+      </div>
+      </div>
 
       {/* Directors */}
       {org.directors.length > 0 && (
@@ -1070,6 +1149,83 @@ export default function FormationDetailPage({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function RdpEditor({
+  order,
+  onSaved,
+}: {
+  order: {
+    id: string
+    rdpHost: string | null
+    rdpUsername: string | null
+    rdpPassword: string | null
+    service: { title: string } | null
+  }
+  onSaved: () => void
+}) {
+  const [host, setHost] = useState(order.rdpHost ?? "")
+  const [username, setUsername] = useState(order.rdpUsername ?? "")
+  const [password, setPassword] = useState(order.rdpPassword ?? "")
+
+  const update = trpc.serviceOrders.adminUpdate.useMutation({
+    onSuccess: () => {
+      toast.success("RDP access saved")
+      onSaved()
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-4">
+      <p className="text-sm font-semibold">{order.service?.title ?? "Service"}</p>
+      <div className="space-y-2">
+        <div>
+          <p className="mb-1 text-xs text-muted-foreground">Host / IP address</p>
+          <Input
+            className="h-8 text-sm"
+            placeholder="e.g. 203.0.113.10"
+            value={host}
+            onChange={(e) => setHost(e.target.value)}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <p className="mb-1 text-xs text-muted-foreground">Username</p>
+            <Input
+              className="h-8 text-sm"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          </div>
+          <div>
+            <p className="mb-1 text-xs text-muted-foreground">Password</p>
+            <Input
+              className="h-8 text-sm"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          disabled={update.isPending}
+          onClick={() =>
+            update.mutate({
+              id: order.id,
+              rdpHost: host.trim() || null,
+              rdpUsername: username.trim() || null,
+              rdpPassword: password.trim() || null,
+            })
+          }
+        >
+          {update.isPending ? "Saving…" : "Save"}
+        </Button>
+      </div>
     </div>
   )
 }

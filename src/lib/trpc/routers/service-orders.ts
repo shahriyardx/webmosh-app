@@ -70,14 +70,27 @@ export const wordpressInputSchema = z
 
 export type WordpressInput = z.infer<typeof wordpressInputSchema>
 
+export const rdpInputSchema = z
+  .object({
+    host: z.string().min(1),
+    username: z.string().min(1),
+    password: z.string().min(1),
+    port: z.string().optional(),
+  })
+  .optional()
+
+export type RdpInput = z.infer<typeof rdpInputSchema>
+
 export async function purchaseServiceCore({
   organizationId,
   serviceId,
   wordpress,
+  rdp,
 }: {
   organizationId: string
   serviceId: string
   wordpress: WordpressInput
+  rdp?: RdpInput
 }) {
   const svc = await prisma.service.findUnique({ where: { id: serviceId } })
   if (!svc) throw new Error("Service not found")
@@ -85,6 +98,9 @@ export async function purchaseServiceCore({
   const isWordpress = svc.type === "wordpress"
   if (isWordpress && !wordpress) {
     throw new Error("WordPress details are required for this service")
+  }
+  if (svc.requiresRdp && !rdp) {
+    throw new Error("RDP access details are required for this service")
   }
   if (wordpress?.mode === "demo" && !wordpress.themeId) {
     throw new Error("Please select a demo theme")
@@ -148,6 +164,10 @@ export async function purchaseServiceCore({
       contactAddress: wordpress?.contact.address ?? null,
       contactEmail: wordpress?.contact.email ?? null,
       contactPhone: wordpress?.contact.phone ?? null,
+      rdpHost: rdp?.host ?? null,
+      rdpUsername: rdp?.username ?? null,
+      rdpPassword: rdp?.password ?? null,
+      rdpPort: rdp?.port ?? null,
     },
   })
 
@@ -193,7 +213,7 @@ async function attachInvoiceAndService(orders: Awaited<ReturnType<typeof prisma.
   const serviceIds = [...new Set(orders.map((o) => o.serviceId))]
   const services = await prisma.service.findMany({
     where: { id: { in: serviceIds } },
-    select: { id: true, title: true, price: true, type: true },
+    select: { id: true, title: true, price: true, type: true, requiresRdp: true },
   })
   const svcMap = new Map(services.map((s) => [s.id, s]))
 
@@ -335,6 +355,10 @@ export const serviceOrdersRouter = router({
         contactEmail: z.string().nullable().optional(),
         contactPhone: z.string().nullable().optional(),
         credentials: z.any().optional(),
+        rdpHost: z.string().nullable().optional(),
+        rdpUsername: z.string().nullable().optional(),
+        rdpPassword: z.string().nullable().optional(),
+        rdpPort: z.string().nullable().optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -366,6 +390,14 @@ export const serviceOrdersRouter = router({
           ...(input.credentials !== undefined && {
             credentials: input.credentials,
           }),
+          ...(input.rdpHost !== undefined && { rdpHost: input.rdpHost }),
+          ...(input.rdpUsername !== undefined && {
+            rdpUsername: input.rdpUsername,
+          }),
+          ...(input.rdpPassword !== undefined && {
+            rdpPassword: input.rdpPassword,
+          }),
+          ...(input.rdpPort !== undefined && { rdpPort: input.rdpPort }),
         },
       })
 
@@ -430,6 +462,7 @@ export const serviceOrdersRouter = router({
         organizationId: z.string(),
         serviceId: z.string(),
         wordpress: wordpressInputSchema,
+        rdp: rdpInputSchema,
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -438,6 +471,7 @@ export const serviceOrdersRouter = router({
         organizationId: input.organizationId,
         serviceId: input.serviceId,
         wordpress: input.wordpress,
+        rdp: input.rdp,
       })
     }),
 
@@ -450,6 +484,7 @@ export const serviceOrdersRouter = router({
       z.object({
         serviceId: z.string(),
         wordpress: wordpressInputSchema,
+        rdp: rdpInputSchema,
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -458,6 +493,7 @@ export const serviceOrdersRouter = router({
         organizationId,
         serviceId: input.serviceId,
         wordpress: input.wordpress,
+        rdp: input.rdp,
       })
     }),
 

@@ -437,6 +437,12 @@ function OrderEditDialog({
     address: "",
   })
   const [creds, setCreds] = useState<OrderCredentials>(EMPTY_CREDS)
+  const requiresRdp = order?.service?.requiresRdp ?? false
+  const [rdp, setRdp] = useState({
+    host: "",
+    username: "",
+    password: "",
+  })
 
   useEffect(() => {
     if (!order) return
@@ -463,6 +469,11 @@ function OrderEditDialog({
         username: c?.wpAdmin?.username ?? "",
         password: c?.wpAdmin?.password ?? "",
       },
+    })
+    setRdp({
+      host: order.rdpHost ?? "",
+      username: order.rdpUsername ?? "",
+      password: order.rdpPassword ?? "",
     })
   }, [order])
 
@@ -501,6 +512,11 @@ function OrderEditDialog({
       patch.contactPhone = contact.phone.trim() || null
       patch.contactAddress = contact.address.trim() || null
       patch.credentials = creds
+    }
+    if (requiresRdp) {
+      patch.rdpHost = rdp.host.trim() || null
+      patch.rdpUsername = rdp.username.trim() || null
+      patch.rdpPassword = rdp.password.trim() || null
     }
     update.mutate(patch)
   }
@@ -550,6 +566,34 @@ function OrderEditDialog({
               </Field>
             )}
           </div>
+
+          {requiresRdp && (
+            <div className="space-y-3 rounded-lg border border-border p-3">
+              <div>
+                <p className="text-sm font-semibold">RDP access</p>
+                <p className="text-xs text-muted-foreground">
+                  Shared with the customer on their company page.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <Input
+                  placeholder="Host / IP address"
+                  value={rdp.host}
+                  onChange={(e) => setRdp({ ...rdp, host: e.target.value })}
+                />
+                <Input
+                  placeholder="Username"
+                  value={rdp.username}
+                  onChange={(e) => setRdp({ ...rdp, username: e.target.value })}
+                />
+                <Input
+                  placeholder="Password"
+                  value={rdp.password}
+                  onChange={(e) => setRdp({ ...rdp, password: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
 
           {isWordpress && (
             <>

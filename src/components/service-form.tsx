@@ -20,7 +20,8 @@ import {
   FieldError,
   FieldLabel,
 } from "@/components/ui/field"
-import { PlusIcon, XIcon, PaletteIcon } from "lucide-react"
+import { PlusIcon, XIcon, PaletteIcon, MonitorIcon } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 
 const schema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -31,6 +32,7 @@ const schema = z.object({
   price: z.string().min(1, "Price is required"),
   country: z.enum(["us", "uk", "any"]),
   type: z.enum(["general", "wordpress"]),
+  requiresRdp: z.boolean(),
 })
 
 type Schema = z.infer<typeof schema>
@@ -42,6 +44,7 @@ const defaultValues: Schema = {
   price: "",
   country: "us",
   type: "general",
+  requiresRdp: false,
 }
 
 function parseForm(data: Schema) {
@@ -55,6 +58,8 @@ function parseForm(data: Schema) {
         ? null
         : data.country,
     type: data.type,
+    // WordPress collects its own hosting access, so RDP only applies elsewhere.
+    requiresRdp: data.type === "wordpress" ? false : data.requiresRdp,
   }
 }
 
@@ -175,6 +180,31 @@ export function ServiceForm({
             </div>
           </div>
         </div>
+      )}
+      {!isWordpress && (
+        <Controller
+          control={form.control}
+          name="requiresRdp"
+          render={({ field }) => (
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/30">
+              <Checkbox
+                checked={field.value}
+                onCheckedChange={(v) => field.onChange(v === true)}
+                className="mt-0.5"
+              />
+              <div>
+                <p className="flex items-center gap-1.5 text-sm font-medium">
+                  <MonitorIcon className="size-4 text-sky-500" />
+                  Requires RDP access
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  When a customer orders this service, they&apos;ll be asked to
+                  provide RDP access (host / IP, username, password, and port).
+                </p>
+              </div>
+            </label>
+          )}
+        />
       )}
       <Controller
         control={form.control}

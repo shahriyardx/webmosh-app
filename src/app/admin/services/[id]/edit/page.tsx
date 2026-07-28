@@ -66,6 +66,7 @@ export default function EditServicePage({
           price: String(svc.price),
           country: (svc.country as "us" | "uk" | null) ?? "any",
           type: (svc.type as "general" | "wordpress") ?? "general",
+          requiresRdp: svc.requiresRdp ?? false,
         }}
         loading={updateSvc.isPending}
         onSubmit={(data) => updateSvc.mutate({ id, ...data })}

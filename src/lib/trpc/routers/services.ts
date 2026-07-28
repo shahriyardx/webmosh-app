@@ -9,6 +9,7 @@ const serviceSchema = z.object({
   price: z.number().min(0, "Price must be non-negative"),
   country: z.enum(["us", "uk"]).nullable(),
   type: z.enum(["general", "wordpress"]).default("general"),
+  requiresRdp: z.boolean().default(false),
 })
 
 export const servicesRouter = router({

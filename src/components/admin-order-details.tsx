@@ -9,6 +9,7 @@ import {
   PaletteIcon,
   GlobeIcon,
   KeyRoundIcon,
+  MonitorIcon,
 } from "lucide-react"
 
 export type AdminOrder =
@@ -110,6 +111,13 @@ export function AdminOrderDetails({ order }: { order: AdminOrder }) {
     order.contactAddress
   )
   const hasHosting = hasCred(creds?.cpanel) || hasCred(creds?.wpAdmin)
+  const requiresRdp = order.service?.requiresRdp
+  const hasRdp = !!(
+    order.rdpHost ||
+    order.rdpUsername ||
+    order.rdpPassword ||
+    order.rdpPort
+  )
 
   const stats: { label: string; value?: string; node?: React.ReactNode; mono?: boolean }[] = [
     {
@@ -248,6 +256,20 @@ export function AdminOrderDetails({ order }: { order: AdminOrder }) {
             )}
           </Section>
         </div>
+      )}
+
+      {(requiresRdp || hasRdp) && (
+        <Section icon={MonitorIcon} title="RDP access">
+          {!hasRdp ? (
+            <p className="text-sm text-muted-foreground">Not set yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <KV label="Host / IP" value={order.rdpHost} mono />
+              <KV label="Username" value={order.rdpUsername} mono />
+              <KV label="Password" value={order.rdpPassword} mono />
+            </div>
+          )}
+        </Section>
       )}
     </div>
   )

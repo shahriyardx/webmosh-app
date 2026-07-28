@@ -13,6 +13,7 @@ import {
   ClockIcon,
   PaletteIcon,
   ReceiptIcon,
+  MonitorIcon,
 } from "lucide-react"
 
 const TONES: Record<string, string> = {
@@ -144,6 +145,12 @@ export default function AccountOrderDetailPage({
   )
   const hasHosting = hasCred(creds?.cpanel) || hasCred(creds?.wpAdmin)
   const hasDetails = isWordpress && (hasDesign || hasContact || hasHosting)
+  const hasRdp = !!(
+    order.rdpHost ||
+    order.rdpUsername ||
+    order.rdpPassword ||
+    order.rdpPort
+  )
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-5">
@@ -276,6 +283,21 @@ export default function AccountOrderDetailPage({
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* RDP access */}
+      {hasRdp && (
+        <div className="rounded-2xl border border-border">
+          <div className="flex items-center gap-2 border-b border-border px-5 py-3.5">
+            <MonitorIcon className="size-4 text-sky-500" />
+            <span className="text-sm font-semibold">RDP access</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-3">
+            <Detail label="Host / IP" value={order.rdpHost} mono />
+            <Detail label="Username" value={order.rdpUsername} mono />
+            <Detail label="Password" value={order.rdpPassword} mono />
           </div>
         </div>
       )}

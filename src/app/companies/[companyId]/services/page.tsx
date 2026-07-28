@@ -14,6 +14,16 @@ import {
   CardFooter,
 } from "@/components/ui/card"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
   ConciergeBellIcon,
   Loader2Icon,
   CheckIcon,
@@ -24,6 +34,8 @@ import {
 } from "@/components/wordpress-checkout-dialog"
 
 type WordpressTarget = { id: string; title: string; price: number }
+type RdpTarget = { id: string; title: string }
+const EMPTY_RDP = { host: "", username: "", password: "" }
 
 export default function DashboardServicesPage() {
   const router = useRouter()
@@ -38,10 +50,13 @@ export default function DashboardServicesPage() {
   const { data: allServices, isLoading: svcLoading } = trpc.services.list.useQuery()
 
   const [wpTarget, setWpTarget] = useState<WordpressTarget | null>(null)
+  const [rdpTarget, setRdpTarget] = useState<RdpTarget | null>(null)
+  const [rdp, setRdp] = useState(EMPTY_RDP)
 
   const purchase = trpc.serviceOrders.purchase.useMutation({
     onSuccess: (order) => {
       setWpTarget(null)
+      setRdpTarget(null)
       if (order.invoice) {
         router.push(`/companies/${companyId}/orders/${order.id}`)
       } else {
@@ -52,12 +67,40 @@ export default function DashboardServicesPage() {
     onError: (err) => toast.error(err.message),
   })
 
-  const buyService = (svc: { id: string; title: string; price: number; type: string }) => {
+  const buyService = (svc: {
+    id: string
+    title: string
+    price: number
+    type: string
+    requiresRdp: boolean
+  }) => {
     if (svc.type === "wordpress") {
       setWpTarget({ id: svc.id, title: svc.title, price: svc.price })
       return
     }
+    if (svc.requiresRdp) {
+      setRdp(EMPTY_RDP)
+      setRdpTarget({ id: svc.id, title: svc.title })
+      return
+    }
     purchase.mutate({ organizationId: companyId, serviceId: svc.id })
+  }
+
+  const submitRdp = () => {
+    if (!rdpTarget) return
+    if (!rdp.host.trim() || !rdp.username.trim() || !rdp.password.trim()) {
+      toast.error("Please provide the RDP host, username and password")
+      return
+    }
+    purchase.mutate({
+      organizationId: companyId,
+      serviceId: rdpTarget.id,
+      rdp: {
+        host: rdp.host.trim(),
+        username: rdp.username.trim(),
+        password: rdp.password.trim(),
+      },
+    })
   }
 
   const submitWordpress = (payload: WordpressPurchasePayload) => {
@@ -172,6 +215,63 @@ export default function DashboardServicesPage() {
           onSubmit={submitWordpress}
         />
       )}
+
+      <Dialog
+        open={!!rdpTarget}
+        onOpenChange={(open) => !open && setRdpTarget(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>RDP access</DialogTitle>
+            <DialogDescription>
+              {rdpTarget?.title} needs remote access to your machine. Provide
+              the RDP details so our team can get to work.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Host / IP address</Label>
+              <Input
+                placeholder="e.g. 203.0.113.10"
+                value={rdp.host}
+                onChange={(e) => setRdp({ ...rdp, host: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Username</Label>
+              <Input
+                value={rdp.username}
+                onChange={(e) => setRdp({ ...rdp, username: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Password</Label>
+              <Input
+                value={rdp.password}
+                onChange={(e) => setRdp({ ...rdp, password: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRdpTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={submitRdp} disabled={purchase.isPending}>
+              {purchase.isPending ? (
+                <>
+                  <Loader2Icon className="mr-1 size-3 animate-spin" />
+                  Processing…
+                </>
+              ) : (
+                "Purchase"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

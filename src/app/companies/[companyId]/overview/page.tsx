@@ -21,7 +21,20 @@ import {
   MailIcon,
   AlertCircleIcon,
   Trash2Icon,
+  UserIcon,
+  ExternalLinkIcon,
+  MonitorIcon,
 } from "lucide-react"
+
+const docStatusBadge: Record<
+  string,
+  { label: string; variant: "outline" | "secondary" | "default" | "destructive" }
+> = {
+  requested: { label: "Requested", variant: "outline" },
+  submitted: { label: "Submitted", variant: "secondary" },
+  approved: { label: "Approved", variant: "default" },
+  rejected: { label: "Rejected", variant: "destructive" },
+}
 
 function dueMeta(date: Date) {
   const now = new Date()
@@ -268,6 +281,142 @@ export default function OverviewPage() {
       {!isPersonal && companyId && <CompaniesHouseCard orgId={companyId} />}
       {!isPersonal && companyId && <OfficersCard orgId={companyId} />}
       {!isPersonal && companyId && <FilingHistoryCard orgId={companyId} />}
+
+      {/* RDP access provisioned for this company's service orders */}
+      {org.serviceOrders.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <MonitorIcon className="size-4 text-sky-500" />
+              RDP Access
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {org.serviceOrders.map((o) => (
+              <div key={o.id} className="rounded-lg border border-border p-4">
+                <p className="text-sm font-semibold">
+                  {o.service?.title ?? "Service"}
+                </p>
+                <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Host / IP</dt>
+                    <dd className="break-all font-mono text-sm">
+                      {o.rdpHost || "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Username</dt>
+                    <dd className="break-all font-mono text-sm">
+                      {o.rdpUsername || "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Password</dt>
+                    <dd className="break-all font-mono text-sm">
+                      {o.rdpPassword || "—"}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Formation details the client submitted */}
+      {!isPersonal && org.directors.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <UserIcon className="size-4 text-sky-500" />
+              {org.directors.length > 1 ? "Directors" : "Director"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {org.directors.map((d) => (
+              <div key={d.id} className="rounded-lg border border-border p-4">
+                <p className="text-sm font-semibold">
+                  {d.firstName} {d.lastName}
+                </p>
+                <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Email</dt>
+                    <dd className="break-all text-sm">{d.email || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Phone</dt>
+                    <dd className="text-sm">{d.phone || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">
+                      Date of birth
+                    </dt>
+                    <dd className="text-sm">{d.dateOfBirth || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Address</dt>
+                    <dd className="whitespace-pre-wrap text-sm">
+                      {d.address || "—"}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {!isPersonal && org.documents.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileTextIcon className="size-4 text-sky-500" />
+              Your Documents
+            </CardTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={`/companies/${companyId}/documents`}>Manage</Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {org.documents.map((doc) => {
+              const db = docStatusBadge[doc.status] ?? docStatusBadge.submitted
+              return (
+                <div
+                  key={doc.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border p-3"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/40">
+                      <FileTextIcon className="size-4 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{doc.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(doc.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Badge variant={db.variant}>{db.label}</Badge>
+                    {doc.value && (
+                      <Button size="sm" variant="outline" asChild>
+                        <a
+                          href={doc.value}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLinkIcon className="size-3.5" />
+                          View
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {!isPersonal && actionDocuments.length > 0 && (
         <Card className="border-red-500/30">

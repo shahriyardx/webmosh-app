@@ -259,6 +259,9 @@ export function CompaniesTable({
     setPage(1)
   }
 
+  // Only surface the RDP IP column when at least one company actually has one.
+  const showRdp = companies.some((c) => !!c.rdpHost)
+
   const hrefFor = (c: CompanyRow) =>
     mode === "admin"
       ? `/admin/formations/${c.id}`
@@ -301,6 +304,11 @@ export function CompaniesTable({
               <SortHeader label="Website" active={sortKey === "website"} dir={sortDir} onClick={() => toggleSort("website")} />
               <SortHeader label="Stripe" active={sortKey === "stripe"} dir={sortDir} onClick={() => toggleSort("stripe")} />
               <SortHeader label="Wise" active={sortKey === "wise"} dir={sortDir} onClick={() => toggleSort("wise")} />
+              {showRdp && (
+                <th className="px-4 py-3 font-semibold text-muted-foreground">
+                  <span className="whitespace-nowrap">RDP IP</span>
+                </th>
+              )}
               <SortHeader label="My Services" active={sortKey === "services"} dir={sortDir} onClick={() => toggleSort("services")} />
             </tr>
           </thead>
@@ -376,6 +384,11 @@ export function CompaniesTable({
                       pendingKey={pendingKey}
                     />
                   </td>
+                  {showRdp && (
+                    <td className="px-4 py-3 font-mono text-xs">
+                      {c.rdpHost ?? "—"}
+                    </td>
+                  )}
                   <td className="px-4 py-3">
                     {needsAction ? (
                       <span className="inline-flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-400">
@@ -395,7 +408,7 @@ export function CompaniesTable({
             {pageItems.length === 0 && (
               <tr>
                 <td
-                  colSpan={10}
+                  colSpan={showRdp ? 11 : 10}
                   className="px-4 py-10 text-center text-sm text-muted-foreground"
                 >
                   No companies match &ldquo;{search}&rdquo;.

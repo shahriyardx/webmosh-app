@@ -90,6 +90,21 @@ async function enrichCompanies<
     }
   }
 
+  // Latest RDP host per company (for the admin's client company list).
+  const rdpOrders = orgIds.length
+    ? await prisma.serviceOrder.findMany({
+        where: { organizationId: { in: orgIds }, rdpHost: { not: null } },
+        orderBy: { createdAt: "desc" },
+        select: { organizationId: true, rdpHost: true },
+      })
+    : []
+  const rdpByOrg = new Map<string, string>()
+  for (const o of rdpOrders) {
+    if (o.rdpHost && !rdpByOrg.has(o.organizationId)) {
+      rdpByOrg.set(o.organizationId, o.rdpHost)
+    }
+  }
+
   return Promise.all(
     orgs.map(async (o) => {
       const base = {
@@ -97,6 +112,7 @@ async function enrichCompanies<
         incorporationDate: null as Date | null,
         chStatus: null as string | null,
         websiteStatus: websiteByOrg.get(o.id) ?? null,
+        rdpHost: rdpByOrg.get(o.id) ?? null,
       }
       if (o.country !== "uk" || !o.companyId) return base
       const dates = await getCompaniesHouseDates(o.companyId).catch(() => null)
@@ -628,6 +644,18 @@ export const companiesRouter = router({
               role: true,
             },
           },
+          serviceOrders: {
+            where: { rdpHost: { not: null } },
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              rdpHost: true,
+              rdpUsername: true,
+              rdpPassword: true,
+              rdpPort: true,
+              service: { select: { title: true } },
+            },
+          },
         },
       })
     }),
@@ -760,6 +788,11 @@ export const companiesRouter = router({
           invoices: {
             where: { deletedAt: null },
             orderBy: { createdAt: "desc" },
+          },
+          serviceOrders: {
+            where: { rdpHost: { not: null } },
+            orderBy: { createdAt: "desc" },
+            include: { service: { select: { title: true } } },
           },
         },
       })
