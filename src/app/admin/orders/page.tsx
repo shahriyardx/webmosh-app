@@ -137,6 +137,7 @@ export default function AdminOrdersPage() {
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead>Service</TableHead>
+                <TableHead>Company</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Invoice</TableHead>
                 <TableHead>Status</TableHead>
@@ -172,6 +173,9 @@ export default function AdminOrdersPage() {
                         )}
                       </button>
                     </TableCell>
+                    <TableCell className="font-medium uppercase">
+                      {order.organization?.name ?? "—"}
+                    </TableCell>
                     <TableCell>
                       {order.invoice?.amount != null
                         ? `$${order.invoice.amount}`
@@ -199,7 +203,11 @@ export default function AdminOrdersPage() {
                           })
                         }
                       >
-                        <SelectTrigger className="h-8 w-[150px]">
+                        <SelectTrigger
+                          className={`h-8 w-[150px] font-medium ${
+                            STATUS_TRIGGER_CLS[order.status] ?? ""
+                          }`}
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -257,7 +265,7 @@ export default function AdminOrdersPage() {
                   </TableRow>
                   {expanded && (
                     <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={5} className="bg-muted/20 p-5">
+                      <TableCell colSpan={6} className="bg-muted/20 p-5">
                         <AdminOrderDetails order={order} />
                       </TableCell>
                     </TableRow>
@@ -403,6 +411,18 @@ const STATUS_OPTIONS: { value: ServiceOrderStatus; label: string }[] = [
   { value: ServiceOrderStatus.completed, label: "Completed" },
   { value: ServiceOrderStatus.awaiting_quote, label: "Awaiting quote" },
 ]
+
+// Per-status colour for the order status dropdown trigger.
+const STATUS_TRIGGER_CLS: Record<string, string> = {
+  pending:
+    "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  processing:
+    "border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  completed:
+    "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  awaiting_quote:
+    "border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-400",
+}
 
 const EMPTY_CREDS: OrderCredentials = {
   cpanel: { url: "", username: "", password: "" },

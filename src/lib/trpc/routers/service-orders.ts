@@ -264,6 +264,69 @@ export const serviceOrdersRouter = router({
       return enriched[0]
     }),
 
+  /** Client: cancel their own order (only before work starts and while unpaid). */
+  cancel: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const order = await prisma.serviceOrder.findUnique({
+        where: { id: input.id },
+      })
+      if (!order) throw new Error("Order not found")
+      await assertOrgMember(ctx.user.id, order.organizationId)
+
+      if (
+        order.status === ServiceOrderStatus.processing ||
+        order.status === ServiceOrderStatus.completed
+      ) {
+        throw new Error(
+          "This order is already in progress and can't be cancelled — please contact support.",
+        )
+      }
+      if (order.invoiceId) {
+        const inv = await prisma.invoice.findUnique({
+          where: { id: order.invoiceId },
+          select: { status: true },
+        })
+        if (
+          inv &&
+          (inv.status === PaymentStatus.paid ||
+            inv.status === PaymentStatus.partially_paid ||
+            inv.status === PaymentStatus.processing)
+        ) {
+          throw new Error(
+            "This order has a payment against it — please contact support to cancel.",
+          )
+        }
+      }
+
+      // Tasks referencing this order have onDelete: SetNull, so they survive.
+      await prisma.serviceOrder.delete({ where: { id: order.id } })
+      if (order.invoiceId) {
+        const shareCount = await prisma.serviceOrder.count({
+          where: { invoiceId: order.invoiceId },
+        })
+        if (shareCount === 0) {
+          await prisma.invoice.update({
+            where: { id: order.invoiceId },
+            data: { deletedAt: new Date() },
+          })
+        }
+      }
+
+      const org = await prisma.organization.findUnique({
+        where: { id: order.organizationId },
+        select: { name: true },
+      })
+      await createAdminNotification({
+        kind: "order.placed",
+        title: "Order cancelled",
+        body: `${org?.name ?? "A customer"} cancelled an order.`,
+        link: "/admin/orders",
+      }).catch(() => {})
+
+      return { ok: true }
+    }),
+
   listForUser: protectedProcedure.query(async ({ ctx }) => {
     const members = await prisma.member.findMany({
       where: { userId: ctx.user.id, organization: { deletedAt: null } },
