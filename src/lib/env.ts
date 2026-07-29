@@ -22,6 +22,13 @@ export const env = createEnv({
     EMAIL_FROM: z.string().default("Webmosh <noreply@webmosh.com>"),
     ADMIN_EMAIL: z.string().default("info@webmosh.com"),
     APP_URL: z.string().default("https://app.webmosh.com"),
+    // Secret that encrypts integration API keys at rest (AES-256-GCM). Keep out
+    // of version control; the AI Agent feature errors clearly if it's unset.
+    SETTINGS_ENCRYPTION_KEY: z.string().optional(),
+    // Optional fallback Anthropic key; a key saved in Settings takes priority.
+    ANTHROPIC_API_KEY: z.string().optional(),
+    // Optional model override; the model chosen in Settings takes priority.
+    ANTHROPIC_MODEL: z.string().optional(),
   },
   client: {},
   runtimeEnv: {
@@ -39,6 +46,9 @@ export const env = createEnv({
     EMAIL_FROM: process.env.EMAIL_FROM,
     ADMIN_EMAIL: process.env.ADMIN_EMAIL,
     APP_URL: process.env.APP_URL,
+    SETTINGS_ENCRYPTION_KEY: process.env.SETTINGS_ENCRYPTION_KEY,
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
   },
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   emptyStringAsUndefined: false,

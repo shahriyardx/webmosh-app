@@ -24,6 +24,7 @@ import { StepServices } from "./steps/step-services"
 import { StepDocuments } from "./steps/step-documents"
 import { StepDirector } from "./steps/step-director"
 import { StepReview } from "./steps/step-review"
+import { UsCompanyImport } from "@/components/us-company-import"
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -121,6 +122,7 @@ export default function OnboardPage() {
 
   const [importCompanyId, setImportCompanyId] = useState("")
   const [importAuthCode, setImportAuthCode] = useState("")
+  const [importKind, setImportKind] = useState<"uk" | "us">("uk")
 
   const utils = trpc.useUtils()
 
@@ -313,7 +315,8 @@ export default function OnboardPage() {
                   <div>
                     <h3 className="font-semibold text-foreground">I already have a company</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Import an existing UK company with its Company ID & Auth Code.
+                      Import an existing UK Ltd (Company ID & Auth Code) or US
+                      LLC.
                     </p>
                   </div>
                 </CardContent>
@@ -345,7 +348,7 @@ export default function OnboardPage() {
         )}
 
         {mode === "import" && (
-          <div className="mx-auto w-full max-w-md px-6 py-12">
+          <div className="mx-auto w-full max-w-lg px-6 py-12">
             <button
               type="button"
               onClick={() => setMode("choice")}
@@ -356,46 +359,95 @@ export default function OnboardPage() {
             </button>
             <h1 className="text-2xl font-semibold text-foreground">Import your company</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Enter your UK Company ID and Authentication Code. We&apos;ll pull your
-              details from Companies House.
+              Bring an existing company into Webmosh.
             </p>
-            <div className="mt-6 space-y-4">
-              <div className="space-y-2">
-                <Label>Company ID (Companies House)</Label>
-                <Input
-                  placeholder="e.g. 12345678"
-                  value={importCompanyId}
-                  onChange={(e) => setImportCompanyId(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Authentication Code</Label>
-                <Input
-                  placeholder="Enter auth code"
-                  value={importAuthCode}
-                  onChange={(e) => setImportAuthCode(e.target.value)}
-                />
-              </div>
-              <Button
-                className="w-full"
-                onClick={() =>
-                  importCompany.mutate({
-                    companyId: importCompanyId.trim(),
-                    authCode: importAuthCode.trim(),
-                  })
-                }
-                disabled={!importCompanyId || !importAuthCode || importCompany.isPending}
+
+            {/* UK / US selector */}
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setImportKind("uk")}
+                className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
+                  importKind === "uk"
+                    ? "border-sky-500 bg-sky-500/5 text-foreground"
+                    : "border-border text-muted-foreground hover:bg-muted/40"
+                }`}
               >
-                {importCompany.isPending ? (
-                  <>
-                    <Loader2Icon className="mr-1 size-4 animate-spin" />
-                    Importing…
-                  </>
-                ) : (
-                  "Import Company"
-                )}
-              </Button>
+                🇬🇧 UK Ltd
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportKind("us")}
+                className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
+                  importKind === "us"
+                    ? "border-sky-500 bg-sky-500/5 text-foreground"
+                    : "border-border text-muted-foreground hover:bg-muted/40"
+                }`}
+              >
+                🇺🇸 US LLC
+              </button>
             </div>
+
+            {importKind === "uk" ? (
+              <div className="mt-6 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Enter your UK Company ID and Authentication Code. We&apos;ll
+                  pull your details from Companies House.
+                </p>
+                <div className="space-y-2">
+                  <Label>Company ID (Companies House)</Label>
+                  <Input
+                    placeholder="e.g. 12345678"
+                    value={importCompanyId}
+                    onChange={(e) => setImportCompanyId(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Authentication Code</Label>
+                  <Input
+                    placeholder="Enter auth code"
+                    value={importAuthCode}
+                    onChange={(e) => setImportAuthCode(e.target.value)}
+                  />
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() =>
+                    importCompany.mutate({
+                      companyId: importCompanyId.trim(),
+                      authCode: importAuthCode.trim(),
+                    })
+                  }
+                  disabled={
+                    !importCompanyId ||
+                    !importAuthCode ||
+                    importCompany.isPending
+                  }
+                >
+                  {importCompany.isPending ? (
+                    <>
+                      <Loader2Icon className="mr-1 size-4 animate-spin" />
+                      Importing…
+                    </>
+                  ) : (
+                    "Import Company"
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-6">
+                <p className="mb-6 text-sm text-muted-foreground">
+                  US LLCs have no public registry lookup, so enter your details
+                  and upload your formation documents.
+                </p>
+                <UsCompanyImport
+                  onDone={(orgId) => {
+                    utils.companies.myCompanies.invalidate()
+                    router.push(`/companies/${orgId}/overview`)
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
 

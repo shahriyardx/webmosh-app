@@ -465,6 +465,115 @@ export const companiesRouter = router({
       return { id: org.id }
     }),
 
+  // Import an existing US LLC. There is no public US registry API, so all
+  // details are entered manually and supporting documents are uploaded.
+  importUsCompany: protectedProcedure
+    .input(
+      z.object({
+        companyName: z.string().min(1),
+        companyNumber: z.string().optional(),
+        state: z.string().min(1),
+        registeredAddress: z.string().min(1),
+        ein: z.string().optional(),
+        director: z.object({
+          name: z.string().min(1),
+          dateOfBirth: z.string().min(1),
+        }),
+        certificateUrl: z.string().min(1),
+        articlesUrl: z.string().min(1),
+        einLetterUrl: z.string().min(1),
+        passportUrl: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const name = input.companyName.trim()
+
+      // Organization.slug is globally unique — avoid collisions on retries or
+      // duplicate names.
+      const base = slugify(name) || slugify(input.companyNumber ?? "us-company")
+      let slug = base
+      for (let i = 0; i < 6; i++) {
+        const taken = await prisma.organization.findUnique({
+          where: { slug },
+          select: { id: true },
+        })
+        if (!taken) break
+        slug = `${base}-${Math.random().toString(36).slice(2, 7)}`
+      }
+
+      const hdrs = await headers()
+      const org = await auth.api.createOrganization({
+        body: { name, slug },
+        headers: hdrs,
+      })
+
+      await prisma.organization.update({
+        where: { id: org.id },
+        data: {
+          country: "us",
+          companyId: input.companyNumber?.trim() || null,
+          state: input.state.trim(),
+          registeredAddress: input.registeredAddress.trim(),
+          ein: input.ein?.trim() || null,
+          status: CompanyStatus.completed,
+        },
+      })
+
+      // Split the director's full name into first / last for the Director model.
+      const parts = input.director.name.trim().split(/\s+/)
+      const firstName = parts[0] ?? input.director.name.trim()
+      const lastName = parts.slice(1).join(" ") || firstName
+      await prisma.director.create({
+        data: {
+          organizationId: org.id,
+          firstName,
+          lastName,
+          email: "",
+          phone: "",
+          dateOfBirth: input.director.dateOfBirth.trim(),
+          address: input.registeredAddress.trim(),
+        },
+      })
+
+      await prisma.document.createMany({
+        data: [
+          {
+            name: "Certificate of Incorporation",
+            value: input.certificateUrl,
+            status: DocumentStatus.submitted,
+            organizationId: org.id,
+          },
+          {
+            name: "Articles of Organization",
+            value: input.articlesUrl,
+            status: DocumentStatus.submitted,
+            organizationId: org.id,
+          },
+          {
+            name: "EIN Letter",
+            value: input.einLetterUrl,
+            status: DocumentStatus.submitted,
+            organizationId: org.id,
+          },
+          {
+            name: "Director Passport",
+            value: input.passportUrl,
+            status: DocumentStatus.submitted,
+            organizationId: org.id,
+          },
+        ],
+      })
+
+      await createAdminNotification({
+        kind: "formation.imported",
+        title: `Company imported: ${name}`,
+        body: `US LLC (${input.state.trim()}) linked by client.`,
+        link: `/admin/formations/${org.id}`,
+      })
+
+      return { id: org.id }
+    }),
+
   hasPersonalCompany: protectedProcedure.query(async ({ ctx }) => {
     const count = await prisma.member.count({
       where: {

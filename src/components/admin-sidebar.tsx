@@ -34,6 +34,7 @@ import {
   MessagesSquareIcon,
   TicketPercentIcon,
   ArrowLeftRightIcon,
+  SparklesIcon,
   Settings,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc/client"
@@ -73,6 +74,7 @@ const links: {
   { title: "Coupons", href: "/admin/coupons", icon: TicketPercentIcon },
   { title: "Exchange", href: "/admin/exchange", icon: ArrowLeftRightIcon, badge: "exchange" },
   { title: "Emails", href: "/admin/emails", icon: MailIcon },
+  { title: "AI Agent", href: "/admin/ai-agent", icon: SparklesIcon },
   { title: "Settings", href: "/admin/settings", icon: Settings },
 ]
 

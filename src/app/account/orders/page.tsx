@@ -6,14 +6,6 @@ import { toast } from "sonner"
 import { trpc } from "@/lib/trpc/client"
 import { Button } from "@/components/ui/button"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -22,7 +14,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { formatInvoiceNumber } from "@/lib/invoice-number"
-import { ShoppingCartIcon, EyeIcon, XCircleIcon } from "lucide-react"
+import {
+  ShoppingCartIcon,
+  EyeIcon,
+  XCircleIcon,
+  GlobeIcon,
+  PackageIcon,
+} from "lucide-react"
 
 const STATUS_PILL: Record<string, { label: string; cls: string }> = {
   pending: {
@@ -73,6 +71,12 @@ export default function AccountOrdersPage() {
   }
 
   const list = orders ?? []
+  const pendingCount = list.filter((o) => o.status === "pending").length
+  const activeCount = list.filter((o) => o.status === "processing").length
+  const totalValue = list.reduce(
+    (sum, o) => sum + (o.invoice?.amount ?? o.service?.price ?? 0),
+    0,
+  )
 
   return (
     <div className="w-full space-y-6">
@@ -96,99 +100,149 @@ export default function AccountOrdersPage() {
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-border">
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead>Service</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Invoice</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-56 text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {list.map((order) => {
-                const isWordpress = order.service?.type === "wordpress"
-                const inv = order.invoice
-                const st =
-                  STATUS_PILL[order.status] ?? STATUS_PILL.pending
-                const canCancel =
-                  (order.status === "pending" ||
-                    order.status === "awaiting_quote") &&
-                  (!inv ||
-                    inv.status === "unpaid" ||
-                    inv.status === "rejected")
-                return (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">
+        <>
+          {/* Summary stats */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: "Total orders", value: String(list.length), accent: "" },
+              {
+                label: "Pending",
+                value: String(pendingCount),
+                accent: "text-amber-600 dark:text-amber-400",
+              },
+              {
+                label: "In progress",
+                value: String(activeCount),
+                accent: "text-sky-600 dark:text-sky-400",
+              },
+              { label: "Total value", value: money(totalValue), accent: "" },
+            ].map((s) => (
+              <div
+                key={s.label}
+                className="rounded-2xl border border-border bg-card p-4 shadow-sm"
+              >
+                <p className="text-xs font-medium text-muted-foreground">
+                  {s.label}
+                </p>
+                <p
+                  className={`mt-1 text-2xl font-bold tabular-nums ${s.accent || "text-foreground"}`}
+                >
+                  {s.value}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Order cards */}
+          <div className="space-y-3">
+            {list.map((order) => {
+              const isWordpress = order.service?.type === "wordpress"
+              const inv = order.invoice
+              const st = STATUS_PILL[order.status] ?? STATUS_PILL.pending
+              const canCancel =
+                (order.status === "pending" ||
+                  order.status === "awaiting_quote") &&
+                (!inv ||
+                  inv.status === "unpaid" ||
+                  inv.status === "rejected")
+              return (
+                <div
+                  key={order.id}
+                  className="group flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm transition-all hover:border-sky-500/30 hover:shadow-md sm:flex-row sm:items-center sm:gap-5"
+                >
+                  {/* Service + company */}
+                  <div className="flex min-w-0 flex-1 items-center gap-3.5">
+                    <div
+                      className={`flex size-11 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ${
+                        isWordpress
+                          ? "bg-sky-500/10 text-sky-500 ring-sky-500/20"
+                          : "bg-muted text-muted-foreground ring-border"
+                      }`}
+                    >
+                      {isWordpress ? (
+                        <GlobeIcon className="size-5" />
+                      ) : (
+                        <PackageIcon className="size-5" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span>{order.service?.title ?? "Service"}</span>
+                        <span className="truncate font-semibold text-foreground">
+                          {order.service?.title ?? "Service"}
+                        </span>
                         {isWordpress && (
-                          <span className="inline-flex items-center rounded-md bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-500 ring-1 ring-inset ring-sky-500/25">
+                          <span className="inline-flex shrink-0 items-center rounded-md bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-500 ring-1 ring-inset ring-sky-500/25">
                             WP
                           </span>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell className="uppercase text-muted-foreground">
-                      {order.organization?.name ?? "—"}
-                    </TableCell>
-                    <TableCell className="font-semibold tabular-nums">
-                      {money(inv?.amount ?? order.service?.price)}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {inv?.number != null ? (
-                        <Link
-                          href={`/account/invoices/${inv.id}`}
-                          className="underline underline-offset-2 hover:text-foreground"
-                        >
-                          {formatInvoiceNumber(inv.number)}
-                        </Link>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${st.cls}`}
-                      >
-                        {st.label}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-1">
-                        <Button size="sm" variant="outline" asChild>
-                          <Link href={`/account/orders/${order.id}`}>
-                            <EyeIcon className="size-3.5" />
-                            View
-                          </Link>
-                        </Button>
-                        {canCancel && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() =>
-                              setCancelTarget({
-                                id: order.id,
-                                title: order.service?.title ?? "this order",
-                              })
-                            }
-                          >
-                            <XCircleIcon className="size-3.5" />
-                            Cancel Order
-                          </Button>
+                      <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="truncate uppercase tracking-wide">
+                          {order.organization?.name ?? "—"}
+                        </span>
+                        {inv?.number != null && (
+                          <>
+                            <span className="text-border">•</span>
+                            <Link
+                              href={`/account/invoices/${inv.id}`}
+                              className="shrink-0 font-mono underline-offset-2 hover:text-foreground hover:underline"
+                            >
+                              {formatInvoiceNumber(inv.number)}
+                            </Link>
+                          </>
                         )}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                    </div>
+                  </div>
+
+                  {/* Status + amount */}
+                  <div className="flex items-center justify-between gap-4 sm:justify-end sm:gap-6">
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${st.cls}`}
+                    >
+                      <span className="size-1.5 rounded-full bg-current" />
+                      {st.label}
+                    </span>
+                    <span className="text-base font-bold tabular-nums text-foreground">
+                      {money(inv?.amount ?? order.service?.price)}
+                    </span>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 sm:shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 sm:flex-none"
+                      asChild
+                    >
+                      <Link href={`/account/orders/${order.id}`}>
+                        <EyeIcon className="size-3.5" />
+                        View
+                      </Link>
+                    </Button>
+                    {canCancel && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="flex-1 text-destructive hover:text-destructive sm:flex-none"
+                        onClick={() =>
+                          setCancelTarget({
+                            id: order.id,
+                            title: order.service?.title ?? "this order",
+                          })
+                        }
+                      >
+                        <XCircleIcon className="size-3.5" />
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </>
       )}
 
       <Dialog

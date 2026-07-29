@@ -151,6 +151,10 @@ model Organization {
   serviceIds     String[]
   companyId String?   @map("company_id")
   authCode       String?   @map("auth_code")
+  // US LLC (manually imported existing company) details
+  state             String? @map("state")
+  registeredAddress String? @map("registered_address")
+  ein               String? @map("ein")
   type           OrganizationType @default(company) @map("type")
   deletedAt      DateTime? @map("deleted_at")
   confirmationStatementDue DateTime? @map("confirmation_statement_due")
@@ -691,4 +695,62 @@ model WalletTransaction {
   @@index([status])
   @@index([type])
   @@map("wallet_transaction")
+}
+
+// Encrypted third-party integration secrets (e.g. the Anthropic API key). The
+// value is AES-256-GCM encrypted at rest; keyName is generic so more providers
+// can be added without restructuring.
+model IntegrationSetting {
+  id             String   @id @default(cuid())
+  keyName        String   @unique @map("key_name")
+  encryptedValue String   @map("encrypted_value")
+  updatedById    String?  @map("updated_by_id")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("integration_setting")
+}
+
+// Append-only audit trail for sensitive/admin actions (key changes, AI agent
+// tool executions, etc.). Never stores secret values.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?  @map("actor_id")
+  actorEmail String?  @map("actor_email")
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  before     Json?
+  after      Json?
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([action])
+  @@index([actorId])
+  @@map("audit_log")
+}
+
+// Structured data the AI Agent extracts from an uploaded image/PDF (invoice, ID
+// document, transaction screenshot). Extraction is never auto-trusted: an admin
+// reviews and confirms the fields before the row is written. Uploaded documents
+// are sensitive — the extracted fields live here (encrypted at the DB level) and
+// only reference the original file by its stored URL.
+model ExtractedDocument {
+  id             String   @id @default(cuid())
+  kind           String // invoice | id_document | transaction | other
+  data           Json // extracted structured fields (vendor, amount, id number, …)
+  fileUrl        String?  @map("file_url") // reference into existing S3/R2 storage
+  organizationId String?  @map("organization_id")
+  serviceOrderId String?  @map("service_order_id")
+  clientId       String?  @map("client_id")
+  status         String   @default("pending") // pending | confirmed
+  createdById    String?  @map("created_by_id")
+  createdByEmail String?  @map("created_by_email")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([serviceOrderId])
+  @@index([status])
+  @@map("extracted_document")
 }

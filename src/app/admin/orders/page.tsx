@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import type { inferRouterOutputs } from "@trpc/server"
 import { toast } from "sonner"
@@ -29,19 +29,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
   ShoppingCartIcon,
   PencilIcon,
   Trash2Icon,
   ChevronRightIcon,
   EyeIcon,
+  GlobeIcon,
+  PackageIcon,
 } from "lucide-react"
 import { formatInvoiceNumber } from "@/lib/invoice-number"
 
@@ -117,6 +111,14 @@ export default function AdminOrdersPage() {
     )
   }
 
+  const list = orders ?? []
+  const pendingCount = list.filter((o) => o.status === "pending").length
+  const processingCount = list.filter((o) => o.status === "processing").length
+  const totalValue = list.reduce(
+    (sum, o) => sum + (o.invoice?.amount ?? 0),
+    0,
+  )
+
   return (
     <div className="space-y-6">
       <div>
@@ -126,74 +128,108 @@ export default function AdminOrdersPage() {
         </p>
       </div>
 
-      {orders?.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <ShoppingCartIcon className="size-10 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">No orders yet.</p>
+      {list.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border py-20 text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-muted/40">
+            <ShoppingCartIcon className="size-6 text-muted-foreground/60" />
+          </div>
+          <p className="text-sm font-medium text-foreground">No orders yet.</p>
         </div>
       ) : (
-        <div className="rounded-lg border border-border">
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead>Service</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Invoice</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-80">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders?.map((order) => {
-                const isWordpress = order.service?.type === "wordpress"
-                const expanded = expandedId === order.id
-                return (
-                  <Fragment key={order.id}>
-                  <TableRow>
-                    <TableCell className="font-medium">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setExpandedId(expanded ? null : order.id)
-                        }
-                        className="flex items-center gap-2 text-left transition-colors hover:text-sky-600 dark:hover:text-sky-400"
-                        title={expanded ? "Collapse" : "Expand order"}
+        <>
+          {/* Summary stats */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: "Total orders", value: String(list.length), accent: "" },
+              {
+                label: "Pending",
+                value: String(pendingCount),
+                accent: "text-amber-600 dark:text-amber-400",
+              },
+              {
+                label: "Processing",
+                value: String(processingCount),
+                accent: "text-sky-600 dark:text-sky-400",
+              },
+              {
+                label: "Total value",
+                value: `$${totalValue}`,
+                accent: "",
+              },
+            ].map((s) => (
+              <div
+                key={s.label}
+                className="rounded-2xl border border-border bg-card p-4 shadow-sm"
+              >
+                <p className="text-xs font-medium text-muted-foreground">
+                  {s.label}
+                </p>
+                <p
+                  className={`mt-1 text-2xl font-bold tabular-nums ${s.accent || "text-foreground"}`}
+                >
+                  {s.value}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Order cards */}
+          <div className="space-y-3">
+            {list.map((order) => {
+              const isWordpress = order.service?.type === "wordpress"
+              const expanded = expandedId === order.id
+              return (
+                <div
+                  key={order.id}
+                  className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:border-sky-500/30 hover:shadow-md"
+                >
+                  <div className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:gap-5">
+                    {/* Service + company (toggles expand) */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedId(expanded ? null : order.id)
+                      }
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                      title={expanded ? "Collapse" : "Expand order"}
+                    >
+                      <ChevronRightIcon
+                        className={`size-4 shrink-0 text-muted-foreground transition-transform ${
+                          expanded ? "rotate-90" : ""
+                        }`}
+                      />
+                      <div
+                        className={`flex size-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ${
+                          isWordpress
+                            ? "bg-sky-500/10 text-sky-500 ring-sky-500/20"
+                            : "bg-muted text-muted-foreground ring-border"
+                        }`}
                       >
-                        <ChevronRightIcon
-                          className={`size-4 shrink-0 text-muted-foreground transition-transform ${
-                            expanded ? "rotate-90" : ""
-                          }`}
-                        />
-                        <span>{order.service?.title ?? "—"}</span>
-                        {isWordpress && (
-                          <span className="inline-flex items-center rounded-md bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-500 ring-1 ring-inset ring-sky-500/25">
-                            WP
-                          </span>
+                        {isWordpress ? (
+                          <GlobeIcon className="size-5" />
+                        ) : (
+                          <PackageIcon className="size-5" />
                         )}
-                      </button>
-                    </TableCell>
-                    <TableCell className="font-medium uppercase">
-                      {order.organization?.name ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      {order.invoice?.amount != null
-                        ? `$${order.invoice.amount}`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {order.invoice?.number != null ? (
-                        <a
-                          href={`/admin/invoices`}
-                          className="underline underline-offset-2 hover:text-foreground"
-                        >
-                          {formatInvoiceNumber(order.invoice.number)}
-                        </a>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate font-semibold text-foreground">
+                            {order.service?.title ?? "—"}
+                          </span>
+                          {isWordpress && (
+                            <span className="inline-flex shrink-0 items-center rounded-md bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-500 ring-1 ring-inset ring-sky-500/25">
+                              WP
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 truncate text-xs uppercase tracking-wide text-muted-foreground">
+                          {order.organization?.name ?? "—"}
+                        </p>
+                      </div>
+                    </button>
+
+                    {/* Status + amount + invoice */}
+                    <div className="flex items-center justify-between gap-4 lg:justify-end lg:gap-5">
                       <Select
                         value={order.status}
                         onValueChange={(v) =>
@@ -218,64 +254,77 @@ export default function AdminOrdersPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap items-center gap-1">
-                        <Button size="sm" variant="outline" asChild>
-                          <Link href={`/admin/orders/${order.id}`}>
-                            <EyeIcon className="size-3.5" />
-                            View
-                          </Link>
-                        </Button>
-                        {order.status === ServiceOrderStatus.awaiting_quote && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => {
-                              setQuoteOrder(order)
-                              setQuoteAmount("")
-                              setQuoteDescription("")
-                            }}
+                      <div className="text-right">
+                        <div className="text-base font-bold tabular-nums text-foreground">
+                          {order.invoice?.amount != null
+                            ? `$${order.invoice.amount}`
+                            : "—"}
+                        </div>
+                        {order.invoice?.number != null && (
+                          <a
+                            href="/admin/invoices"
+                            className="font-mono text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                           >
-                            Issue quote
-                          </Button>
+                            {formatInvoiceNumber(order.invoice.number)}
+                          </a>
                         )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex flex-wrap items-center gap-1 lg:shrink-0 lg:justify-end">
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={`/admin/orders/${order.id}`}>
+                          <EyeIcon className="size-3.5" />
+                          View
+                        </Link>
+                      </Button>
+                      {order.status === ServiceOrderStatus.awaiting_quote && (
                         <Button
                           size="sm"
-                          variant="ghost"
-                          onClick={() => setEditOrder(order)}
-                        >
-                          <PencilIcon className="size-3.5" />
-                          Modify
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
+                          variant="default"
                           onClick={() => {
-                            setDeleteOrder(order)
-                            setAlsoDeleteInvoice(false)
+                            setQuoteOrder(order)
+                            setQuoteAmount("")
+                            setQuoteDescription("")
                           }}
                         >
-                          <Trash2Icon className="size-3.5" />
-                          Delete
+                          Issue quote
                         </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditOrder(order)}
+                      >
+                        <PencilIcon className="size-3.5" />
+                        Modify
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          setDeleteOrder(order)
+                          setAlsoDeleteInvoice(false)
+                        }}
+                      >
+                        <Trash2Icon className="size-3.5" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+
                   {expanded && (
-                    <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={6} className="bg-muted/20 p-5">
-                        <AdminOrderDetails order={order} />
-                      </TableCell>
-                    </TableRow>
+                    <div className="border-t border-border bg-muted/20 p-5">
+                      <AdminOrderDetails order={order} />
+                    </div>
                   )}
-                  </Fragment>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                </div>
+              )
+            })}
+          </div>
+        </>
       )}
 
       <Dialog

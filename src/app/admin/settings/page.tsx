@@ -15,6 +15,7 @@ import {
   FieldError,
   FieldLabel,
 } from "@/components/ui/field"
+import { AiAgentSettings } from "@/components/ai-agent-settings"
 
 const schema = z.object({
   usdToBdtRate: z.string(),
@@ -172,6 +173,8 @@ export default function AdminSettingsPage() {
           </Button>
         </form>
       </div>
+
+      <AiAgentSettings />
     </div>
   )
 }

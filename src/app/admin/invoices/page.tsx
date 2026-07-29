@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react"
 import { trpc } from "@/lib/trpc/client"
 import { PaymentStatus } from "@/generated/prisma/enums"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -54,11 +53,27 @@ const tabs = [
   { label: "Paid", value: PaymentStatus.paid },
 ] as const
 
-const statusBadge: Record<string, { label: string; variant: "outline" | "secondary" | "default" | "destructive" }> = {
-  unpaid: { label: "Unpaid", variant: "outline" },
-  partially_paid: { label: "Partial", variant: "secondary" },
-  processing: { label: "Processing", variant: "secondary" },
-  paid: { label: "Paid", variant: "default" },
+const STATUS_PILL: Record<string, { label: string; cls: string }> = {
+  unpaid: {
+    label: "Unpaid",
+    cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
+  },
+  partially_paid: {
+    label: "Partial",
+    cls: "bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-violet-500/20",
+  },
+  processing: {
+    label: "Processing",
+    cls: "bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20",
+  },
+  paid: {
+    label: "Paid",
+    cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
+  },
+  rejected: {
+    label: "Rejected",
+    cls: "bg-red-500/10 text-red-600 dark:text-red-400 ring-red-500/20",
+  },
 }
 
 export default function AdminInvoicesPage() {
@@ -222,7 +237,7 @@ export default function AdminInvoicesPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 rounded-lg border border-border p-1">
+      <div className="flex w-fit flex-wrap gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
         {tabs.map((tab) => (
           <button
             key={tab.label}
@@ -231,10 +246,10 @@ export default function AdminInvoicesPage() {
               setStatus(tab.value)
               setSelected(new Set())
             }}
-            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
               status === tab.value
-                ? "bg-sky-500/10 text-sky-500"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-sky-500 text-white shadow-sm"
+                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
             }`}
           >
             {tab.label}
@@ -269,7 +284,7 @@ export default function AdminInvoicesPage() {
           <p className="text-sm text-muted-foreground">No invoices found.</p>
         </div>
       ) : (
-        <div className="rounded-lg border border-border">
+        <div className="overflow-hidden rounded-2xl border border-border shadow-sm">
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
@@ -287,12 +302,12 @@ export default function AdminInvoicesPage() {
                 <TableHead>Method</TableHead>
                 <TableHead>Transaction</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-40">Actions</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {invoices?.map((inv) => {
-                const sb = statusBadge[inv.status] ?? statusBadge.unpaid
+                const sp = STATUS_PILL[inv.status] ?? STATUS_PILL.unpaid
                 return (
                   <TableRow
                     key={inv.id}
@@ -322,22 +337,31 @@ export default function AdminInvoicesPage() {
                         </p>
                       )}
                     </TableCell>
-                    <TableCell className="capitalize">
+                    <TableCell className="capitalize text-muted-foreground">
                       {inv.paymentMethod ?? "—"}
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {inv.transactionId ?? "—"}
+                    <TableCell>
+                      <span
+                        className="block max-w-[160px] truncate font-mono text-xs text-muted-foreground"
+                        title={inv.transactionId ?? undefined}
+                      >
+                        {inv.transactionId ?? "—"}
+                      </span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={sb.variant}>{sb.label}</Badge>
+                      <span
+                        className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${sp.cls}`}
+                      >
+                        <span className="size-1.5 rounded-full bg-current" />
+                        {sp.label}
+                      </span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center justify-end gap-2">
                         {inv.status === PaymentStatus.processing && (
-                          <>
+                          <div className="flex items-center gap-1">
                             <Button
                               size="sm"
-                              variant="default"
                               onClick={() => approve.mutate({ id: inv.id })}
                               disabled={approve.isPending}
                             >
@@ -350,64 +374,65 @@ export default function AdminInvoicesPage() {
                             >
                               Reject
                             </Button>
-                          </>
+                          </div>
                         )}
-                        {inv.status === PaymentStatus.unpaid && (
-                          <span className="text-xs text-muted-foreground">Awaiting payment</span>
-                        )}
-                        {inv.status === PaymentStatus.partially_paid && (
-                          <span className="text-xs text-muted-foreground">
-                            Verify on Wallet
-                          </span>
-                        )}
-                        {inv.status === PaymentStatus.paid && (
-                          <span className="text-xs text-green-600">Completed</span>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="size-8"
-                          title="View invoice"
-                          asChild
-                        >
-                          <Link href={`/admin/invoices/${inv.id}`}>
-                            <EyeIcon className="size-4" />
-                          </Link>
-                        </Button>
-                        <Button variant="outline" size="icon" className="size-8" asChild>
-                          <a
-                            href={`/companies/${inv.organizationId}/invoices/${inv.id}/pdf`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Download invoice"
-                          >
-                            <DownloadIcon className="size-4" />
-                          </a>
-                        </Button>
-                        {inv.status !== PaymentStatus.paid && (
+                        <div className="inline-flex items-center rounded-lg border border-border bg-card">
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="icon"
-                            className="size-8"
-                            title="Send reminder email"
-                            disabled={
-                              sendReminder.isPending &&
-                              sendReminder.variables?.id === inv.id
-                            }
-                            onClick={() => sendReminder.mutate({ id: inv.id })}
+                            className="size-8 rounded-none rounded-l-lg text-muted-foreground hover:text-foreground"
+                            title="View invoice"
+                            asChild
                           >
-                            <BellIcon className="size-4" />
+                            <Link href={`/admin/invoices/${inv.id}`}>
+                              <EyeIcon className="size-4" />
+                            </Link>
                           </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="size-8 text-red-500"
-                          title="Delete invoice"
-                          onClick={() => setDeleteTarget({ id: inv.id })}
-                        >
-                          <Trash2Icon className="size-4" />
-                        </Button>
+                          <span className="h-5 w-px bg-border" />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 rounded-none text-muted-foreground hover:text-foreground"
+                            title="Download invoice"
+                            asChild
+                          >
+                            <a
+                              href={`/companies/${inv.organizationId}/invoices/${inv.id}/pdf`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <DownloadIcon className="size-4" />
+                            </a>
+                          </Button>
+                          {inv.status !== PaymentStatus.paid && (
+                            <>
+                              <span className="h-5 w-px bg-border" />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-8 rounded-none text-muted-foreground hover:text-foreground"
+                                title="Send reminder email"
+                                disabled={
+                                  sendReminder.isPending &&
+                                  sendReminder.variables?.id === inv.id
+                                }
+                                onClick={() => sendReminder.mutate({ id: inv.id })}
+                              >
+                                <BellIcon className="size-4" />
+                              </Button>
+                            </>
+                          )}
+                          <span className="h-5 w-px bg-border" />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 rounded-none rounded-r-lg text-muted-foreground hover:text-red-600"
+                            title="Delete invoice"
+                            onClick={() => setDeleteTarget({ id: inv.id })}
+                          >
+                            <Trash2Icon className="size-4" />
+                          </Button>
+                        </div>
                       </div>
                     </TableCell>
                   </TableRow>

@@ -453,7 +453,20 @@ export default function FormationDetailPage({
                 label="Created"
                 value={new Date(org.createdAt).toLocaleDateString()}
               />
+              {org.state && <Stat label="State" value={org.state} />}
+              {org.ein && <Stat label="EIN" value={org.ein} />}
             </div>
+
+            {org.registeredAddress && (
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Registered Address
+                </p>
+                <p className="mt-0.5 whitespace-pre-line text-sm font-medium">
+                  {org.registeredAddress}
+                </p>
+              </div>
+            )}
 
             {org.sicDescription && (
               <div className="rounded-xl border border-border p-3">
