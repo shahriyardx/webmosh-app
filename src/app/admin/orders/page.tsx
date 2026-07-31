@@ -66,6 +66,8 @@ export default function AdminOrdersPage() {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [companyFilter, setCompanyFilter] = useState<string>("all")
+  const [serviceFilter, setServiceFilter] = useState<string>("all")
+  const [userFilter, setUserFilter] = useState<string>("all")
   const [dateFrom, setDateFrom] = useState<string>("")
   const [dateTo, setDateTo] = useState<string>("")
   const [editOrder, setEditOrder] = useState<OrderRow | null>(null)
@@ -136,13 +138,34 @@ export default function AdminOrdersPage() {
     ).values(),
   ).sort((a, b) => a.name.localeCompare(b.name))
 
+  // Distinct services for the Service filter.
+  const services = Array.from(
+    new Map(
+      list.map((o) => [o.serviceId, o.service?.title ?? "Service"] as const),
+    ).entries(),
+  )
+    .map(([id, title]) => ({ id, title }))
+    .sort((a, b) => a.title.localeCompare(b.title))
+
+  // Distinct client users (owners) for the User filter.
+  const users = Array.from(
+    new Map(
+      list
+        .map((o) => o.owner)
+        .filter((u): u is NonNullable<typeof u> => !!u)
+        .map((u) => [u.id, u] as const),
+    ).values(),
+  ).sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email))
+
   const fromMs = dateFrom ? new Date(dateFrom).getTime() : null
   const toMs = dateTo ? new Date(dateTo).getTime() + 86_400_000 - 1 : null
 
-  // Faceted: status counts reflect company + date + search already applied.
+  // Faceted: status counts reflect every other active filter.
   const base = list.filter((o) => {
     if (companyFilter !== "all" && o.organization?.id !== companyFilter)
       return false
+    if (serviceFilter !== "all" && o.serviceId !== serviceFilter) return false
+    if (userFilter !== "all" && o.owner?.id !== userFilter) return false
     if (!matchesSearch(o)) return false
     const t = new Date(o.createdAt).getTime()
     if (fromMs !== null && t < fromMs) return false
@@ -160,12 +183,16 @@ export default function AdminOrdersPage() {
   const filtersActive =
     statusFilter !== "all" ||
     companyFilter !== "all" ||
+    serviceFilter !== "all" ||
+    userFilter !== "all" ||
     !!dateFrom ||
     !!dateTo ||
     q.length > 0
   const clearFilters = () => {
     setStatusFilter("all")
     setCompanyFilter("all")
+    setServiceFilter("all")
+    setUserFilter("all")
     setDateFrom("")
     setDateTo("")
     setSearch("")
@@ -212,7 +239,7 @@ export default function AdminOrdersPage() {
 
           {/* Always-open filter panel */}
           <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Search</Label>
                 <div className="relative">
@@ -237,6 +264,40 @@ export default function AdminOrdersPage() {
                     {companies.map((org) => (
                       <SelectItem key={org.id} value={org.id}>
                         {org.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">User</Label>
+                <Select value={userFilter} onValueChange={setUserFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All users" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All users</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name ?? u.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Service</Label>
+                <Select value={serviceFilter} onValueChange={setServiceFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All services" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All services</SelectItem>
+                    {services.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.title}
                       </SelectItem>
                     ))}
                   </SelectContent>

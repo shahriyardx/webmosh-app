@@ -754,3 +754,20 @@ model ExtractedDocument {
   @@index([status])
   @@map("extracted_document")
 }
+
+// Manual admin to-do list (dashboard "Task manager"). Simple, admin-authored
+// tasks — separate from the freelancer-assignment Task model.
+model AdminTask {
+  id          String    @id @default(cuid())
+  title       String
+  note        String?
+  priority    String    @default("medium") // low | medium | high
+  done        Boolean   @default(false)
+  dueDate     DateTime? @map("due_date")
+  createdById String?   @map("created_by_id")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([done])
+  @@map("admin_task")
+}

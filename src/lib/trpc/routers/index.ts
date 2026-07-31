@@ -19,6 +19,7 @@ import { bankAccountsRouter } from "./bank-accounts"
 import { couponsRouter } from "./coupons"
 import { exchangeRouter } from "./exchange"
 import { adminRouter } from "./admin"
+import { adminTasksRouter } from "./admin-tasks"
 import { aiAgentRouter } from "./ai-agent"
 
 export const appRouter = router({
@@ -42,6 +43,7 @@ export const appRouter = router({
   coupons: couponsRouter,
   exchange: exchangeRouter,
   admin: adminRouter,
+  adminTasks: adminTasksRouter,
   aiAgent: aiAgentRouter,
 })
 

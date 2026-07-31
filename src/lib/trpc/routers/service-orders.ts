@@ -358,14 +358,26 @@ export const serviceOrdersRouter = router({
     const orgs = orgIds.length
       ? await prisma.organization.findMany({
           where: { id: { in: orgIds } },
-          select: { id: true, name: true },
+          select: {
+            id: true,
+            name: true,
+            members: {
+              where: { role: "owner" },
+              select: { user: { select: { id: true, name: true, email: true } } },
+              take: 1,
+            },
+          },
         })
       : []
     const orgMap = new Map(orgs.map((o) => [o.id, o]))
-    return enriched.map((o) => ({
-      ...o,
-      organization: orgMap.get(o.organizationId) ?? null,
-    }))
+    return enriched.map((o) => {
+      const org = orgMap.get(o.organizationId)
+      return {
+        ...o,
+        organization: org ? { id: org.id, name: org.name } : null,
+        owner: org?.members[0]?.user ?? null,
+      }
+    })
   }),
 
   /** Admin: a single enriched order (same shape as listAll rows). */
@@ -379,9 +391,21 @@ export const serviceOrdersRouter = router({
       const enriched = await attachInvoiceAndService([order])
       const org = await prisma.organization.findUnique({
         where: { id: order.organizationId },
-        select: { id: true, name: true },
+        select: {
+          id: true,
+          name: true,
+          members: {
+            where: { role: "owner" },
+            select: { user: { select: { id: true, name: true, email: true } } },
+            take: 1,
+          },
+        },
       })
-      return { ...enriched[0], organization: org ?? null }
+      return {
+        ...enriched[0],
+        organization: org ? { id: org.id, name: org.name } : null,
+        owner: org?.members[0]?.user ?? null,
+      }
     }),
 
   updateStatus: adminProcedure

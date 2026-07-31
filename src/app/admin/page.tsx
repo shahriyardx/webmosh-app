@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { AdminTaskManager } from "@/components/admin-task-manager"
 import {
   Card,
   CardContent,
@@ -31,7 +32,6 @@ import {
   ArrowRightIcon,
   AlertTriangleIcon,
   CalendarIcon,
-  ClipboardListIcon,
   LifeBuoyIcon,
   CheckIcon,
   XIcon,
@@ -118,7 +118,6 @@ export default function AdminDashboardPage() {
   const { data: stats, isLoading } = trpc.companies.getStats.useQuery()
   const { data: compliance } = trpc.admin.complianceDeadlines.useQuery()
   const { data: activity } = trpc.admin.recentActivity.useQuery()
-  const { data: tasks } = trpc.admin.taskManager.useQuery()
   const { data: docsToReview, refetch: refetchDocs } =
     trpc.admin.docsToReview.useQuery()
   const { data: invoicesToReview, refetch: refetchInvoices } =
@@ -676,48 +675,8 @@ export default function AdminDashboardPage() {
 
       {/* Task manager + Recent activity side by side */}
       <div className="grid gap-4 lg:grid-cols-2">
-      {/* 6. Task manager */}
-      <Card className="rounded-2xl shadow-none">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between text-base font-semibold">
-            <SectionTitle icon={ClipboardListIcon}>Task manager</SectionTitle>
-            <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-              {tasks?.length ?? 0} open
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!tasks?.length ? (
-            <p className="py-6 text-center text-base text-muted-foreground">
-              All caught up — no open tasks.
-            </p>
-          ) : (
-            <div className="divide-y divide-border">
-              {tasks.slice(0, 5).map((t) => (
-                <Link
-                  key={t.id}
-                  href={t.href}
-                  className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-base font-medium">{t.title}</p>
-                    <p className="truncate text-sm text-muted-foreground">
-                      {t.subtitle}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(t.createdAt).toLocaleDateString()}
-                    </span>
-                    <PriorityPill priority={t.priority} />
-                    <ArrowRightIcon className="size-4 text-muted-foreground" />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* 6. Task manager (manual) */}
+      <AdminTaskManager />
 
       {/* 5. Recent activity */}
       <Card className="rounded-2xl shadow-none">
