@@ -163,7 +163,8 @@ export function CompaniesTable({
   pendingKey?: string | null
 }) {
   const [search, setSearch] = useState("")
-  const [sortKey, setSortKey] = useState<SortKey>("name")
+  // Default: sort by incorporation date (oldest first; undated/pending rows last).
+  const [sortKey, setSortKey] = useState<SortKey>("incorporation")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const [page, setPage] = useState(1)
 

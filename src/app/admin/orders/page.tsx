@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 import {
   ShoppingCartIcon,
   PencilIcon,
@@ -36,6 +37,8 @@ import {
   EyeIcon,
   GlobeIcon,
   PackageIcon,
+  SearchIcon,
+  XIcon,
 } from "lucide-react"
 import { formatInvoiceNumber } from "@/lib/invoice-number"
 
@@ -60,6 +63,11 @@ export default function AdminOrdersPage() {
   })
 
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [companyFilter, setCompanyFilter] = useState<string>("all")
+  const [dateFrom, setDateFrom] = useState<string>("")
+  const [dateTo, setDateTo] = useState<string>("")
   const [editOrder, setEditOrder] = useState<OrderRow | null>(null)
   const [deleteOrder, setDeleteOrder] = useState<OrderRow | null>(null)
   const [alsoDeleteInvoice, setAlsoDeleteInvoice] = useState(false)
@@ -112,12 +120,56 @@ export default function AdminOrdersPage() {
   }
 
   const list = orders ?? []
-  const pendingCount = list.filter((o) => o.status === "pending").length
-  const processingCount = list.filter((o) => o.status === "processing").length
-  const totalValue = list.reduce(
-    (sum, o) => sum + (o.invoice?.amount ?? 0),
-    0,
+  const q = search.trim().toLowerCase()
+  const matchesSearch = (o: OrderRow) =>
+    !q ||
+    (o.service?.title ?? "").toLowerCase().includes(q) ||
+    (o.organization?.name ?? "").toLowerCase().includes(q)
+
+  // Distinct companies for the Company filter.
+  const companies = Array.from(
+    new Map(
+      list
+        .map((o) => o.organization)
+        .filter((org): org is NonNullable<typeof org> => !!org)
+        .map((org) => [org.id, org] as const),
+    ).values(),
+  ).sort((a, b) => a.name.localeCompare(b.name))
+
+  const fromMs = dateFrom ? new Date(dateFrom).getTime() : null
+  const toMs = dateTo ? new Date(dateTo).getTime() + 86_400_000 - 1 : null
+
+  // Faceted: status counts reflect company + date + search already applied.
+  const base = list.filter((o) => {
+    if (companyFilter !== "all" && o.organization?.id !== companyFilter)
+      return false
+    if (!matchesSearch(o)) return false
+    const t = new Date(o.createdAt).getTime()
+    if (fromMs !== null && t < fromMs) return false
+    if (toMs !== null && t > toMs) return false
+    return true
+  })
+  const statusCount = (key: string) =>
+    key === "all" ? base.length : base.filter((o) => o.status === key).length
+  const filtered =
+    statusFilter === "all" ? base : base.filter((o) => o.status === statusFilter)
+
+  const presentStatuses = ORDER_STATUS_META.filter((s) =>
+    list.some((o) => o.status === s.key),
   )
+  const filtersActive =
+    statusFilter !== "all" ||
+    companyFilter !== "all" ||
+    !!dateFrom ||
+    !!dateTo ||
+    q.length > 0
+  const clearFilters = () => {
+    setStatusFilter("all")
+    setCompanyFilter("all")
+    setDateFrom("")
+    setDateTo("")
+    setSearch("")
+  }
 
   return (
     <div className="space-y-6">
@@ -137,45 +189,107 @@ export default function AdminOrdersPage() {
         </div>
       ) : (
         <>
-          {/* Summary stats */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              { label: "Total orders", value: String(list.length), accent: "" },
-              {
-                label: "Pending",
-                value: String(pendingCount),
-                accent: "text-amber-600 dark:text-amber-400",
-              },
-              {
-                label: "Processing",
-                value: String(processingCount),
-                accent: "text-sky-600 dark:text-sky-400",
-              },
-              {
-                label: "Total value",
-                value: `$${totalValue}`,
-                accent: "",
-              },
-            ].map((s) => (
-              <div
-                key={s.label}
-                className="rounded-2xl border border-border bg-card p-4 shadow-sm"
-              >
-                <p className="text-xs font-medium text-muted-foreground">
-                  {s.label}
-                </p>
-                <p
-                  className={`mt-1 text-2xl font-bold tabular-nums ${s.accent || "text-foreground"}`}
-                >
-                  {s.value}
-                </p>
-              </div>
+          {/* Status filter cards (click to filter; counts are faceted) */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <FilterCard
+              label="Total"
+              value={statusCount("all")}
+              accent="text-foreground"
+              active={statusFilter === "all"}
+              onClick={() => setStatusFilter("all")}
+            />
+            {presentStatuses.map((s) => (
+              <FilterCard
+                key={s.key}
+                label={s.label}
+                value={statusCount(s.key)}
+                accent={s.accent}
+                active={statusFilter === s.key}
+                onClick={() => setStatusFilter(s.key)}
+              />
             ))}
           </div>
 
+          {/* Always-open filter panel */}
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Search</Label>
+                <div className="relative">
+                  <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Service or company…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Company</Label>
+                <Select value={companyFilter} onValueChange={setCompanyFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All companies" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All companies</SelectItem>
+                    {companies.map((org) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        {org.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">From date</Label>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">To date</Label>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {filtersActive && (
+              <div className="mt-3 flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="text-muted-foreground"
+                >
+                  <XIcon className="size-3.5" />
+                  Clear filters
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Result count */}
+          <p className="text-xs text-muted-foreground">
+            {filtered.length} of {list.length} orders
+          </p>
+
           {/* Order cards */}
+          {filtered.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border py-14 text-center text-sm text-muted-foreground">
+              No orders match your filters.
+            </div>
+          ) : (
           <div className="space-y-3">
-            {list.map((order) => {
+            {filtered.map((order) => {
               const isWordpress = order.service?.type === "wordpress"
               const expanded = expandedId === order.id
               return (
@@ -324,6 +438,7 @@ export default function AdminOrdersPage() {
               )
             })}
           </div>
+          )}
         </>
       )}
 
@@ -451,6 +566,41 @@ export default function AdminOrdersPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+// Clickable status filter cards (order + colour).
+const ORDER_STATUS_META: { key: string; label: string; accent: string }[] = [
+  { key: "pending", label: "Pending", accent: "text-amber-600 dark:text-amber-400" },
+  { key: "processing", label: "Processing", accent: "text-sky-600 dark:text-sky-400" },
+  { key: "completed", label: "Completed", accent: "text-emerald-600 dark:text-emerald-400" },
+  { key: "awaiting_quote", label: "Awaiting quote", accent: "text-violet-600 dark:text-violet-400" },
+]
+
+function FilterCard({
+  label,
+  value,
+  accent,
+  active,
+  onClick,
+}: {
+  label: string
+  value: number
+  accent: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-2xl border bg-card p-4 text-left shadow-sm transition-all hover:border-sky-500/40 ${
+        active ? "border-sky-500 ring-2 ring-sky-500/30" : "border-border"
+      }`}
+    >
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className={`mt-1 text-2xl font-bold tabular-nums ${accent}`}>{value}</p>
+    </button>
   )
 }
 
