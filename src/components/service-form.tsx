@@ -29,9 +29,13 @@ const schema = z.object({
   features: z
     .array(z.object({ value: z.string().min(1, "Feature cannot be empty") }))
     .min(1, "At least one feature required"),
+  requirements: z.array(
+    z.object({ value: z.string().min(1, "Requirement cannot be empty") }),
+  ),
   price: z.string().min(1, "Price is required"),
   country: z.enum(["us", "uk", "any"]),
   type: z.enum(["general", "wordpress"]),
+  category: z.enum(["none", "stripe", "paypal", "wise"]),
   requiresRdp: z.boolean(),
 })
 
@@ -41,9 +45,11 @@ const defaultValues: Schema = {
   title: "",
   description: "",
   features: [{ value: "" }],
+  requirements: [],
   price: "",
   country: "us",
   type: "general",
+  category: "none",
   requiresRdp: false,
 }
 
@@ -52,12 +58,16 @@ function parseForm(data: Schema) {
     title: data.title,
     description: data.description,
     features: data.features.map((f) => f.value),
+    requirements: data.requirements
+      .map((r) => r.value.trim())
+      .filter(Boolean),
     price: parseFloat(data.price),
     country:
       data.type === "wordpress" || data.country === "any"
         ? null
         : data.country,
     type: data.type,
+    category: data.category === "none" ? null : data.category,
     // WordPress collects its own hosting access, so RDP only applies elsewhere.
     requiresRdp: data.type === "wordpress" ? false : data.requiresRdp,
   }
@@ -84,6 +94,11 @@ export function ServiceForm({
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "features",
+  })
+
+  const reqArray = useFieldArray({
+    control: form.control,
+    name: "requirements",
   })
 
   const serviceType = form.watch("type")
@@ -151,6 +166,29 @@ export function ServiceForm({
                 WordPress services will ask the customer for cPanel / WP-admin
                 access and a theme (demo or custom).
               </p>
+              <FieldError errors={[fieldState.error]} />
+            </FieldContent>
+          </Field>
+        )}
+      />
+      <Controller
+        control={form.control}
+        name="category"
+        render={({ field, fieldState }) => (
+          <Field>
+            <FieldLabel>Category</FieldLabel>
+            <FieldContent>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No category</SelectItem>
+                  <SelectItem value="stripe">Stripe</SelectItem>
+                  <SelectItem value="paypal">PayPal</SelectItem>
+                  <SelectItem value="wise">Wise</SelectItem>
+                </SelectContent>
+              </Select>
               <FieldError errors={[fieldState.error]} />
             </FieldContent>
           </Field>
@@ -269,6 +307,56 @@ export function ServiceForm({
             ))}
           </div>
           <FieldError errors={[form.formState.errors.features]} />
+        </FieldContent>
+      </Field>
+
+      <Field>
+        <div className="flex items-center justify-between">
+          <FieldLabel>Requirements</FieldLabel>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => reqArray.append({ value: "" })}
+          >
+            <PlusIcon className="mr-1 size-3" />
+            Add requirement
+          </Button>
+        </div>
+        <FieldContent>
+          <p className="text-xs text-muted-foreground">
+            Extra info the customer must provide when ordering this service
+            (e.g. Domain name, Business address). Leave empty if none.
+          </p>
+          {reqArray.fields.length > 0 && (
+            <div className="space-y-2">
+              {reqArray.fields.map((field, index) => (
+                <Controller
+                  key={field.id}
+                  control={form.control}
+                  name={`requirements.${index}.value`}
+                  render={({ field }) => (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder={`Requirement ${index + 1}`}
+                        {...field}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="size-8 shrink-0 text-red-500"
+                        onClick={() => reqArray.remove(index)}
+                      >
+                        <XIcon className="size-4" />
+                      </Button>
+                    </div>
+                  )}
+                />
+              ))}
+            </div>
+          )}
+          <FieldError errors={[form.formState.errors.requirements?.root]} />
         </FieldContent>
       </Field>
 

@@ -12,7 +12,42 @@ import {
   ShoppingCartIcon,
   ReceiptIcon,
   ExternalLinkIcon,
+  Building2Icon,
+  UserIcon,
+  FileTextIcon,
+  DownloadIcon,
 } from "lucide-react"
+
+const DOC_STATUS: Record<string, string> = {
+  approved:
+    "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
+  submitted: "bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20",
+  requested:
+    "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
+  rejected: "bg-red-500/10 text-red-600 dark:text-red-400 ring-red-500/20",
+}
+
+function KV({
+  label,
+  value,
+}: {
+  label: string
+  value: string | null | undefined
+}) {
+  return (
+    <div>
+      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-0.5 text-sm font-medium text-foreground">
+        {value || "—"}
+      </p>
+    </div>
+  )
+}
+
+const countryLabel = (c: string | null) =>
+  c === "uk" ? "United Kingdom" : c === "us" ? "United States" : "—"
 
 const statusBadge: Record<
   string,
@@ -33,6 +68,11 @@ export default function AdminOrderDetailPage({
   const { data: order, isLoading } = trpc.serviceOrders.adminGetById.useQuery({
     id,
   })
+  // Full company details (+ directors) for the attached company, if any.
+  const { data: company } = trpc.companies.getById.useQuery(
+    { id: order?.organizationId ?? "" },
+    { enabled: !!order?.organizationId },
+  )
 
   if (isLoading) {
     return (
@@ -102,6 +142,131 @@ export default function AdminOrderDetailPage({
 
       {/* Full details */}
       <AdminOrderDetails order={order} />
+
+      {/* Attached company — full details + directors */}
+      {company && company.type !== "personal" && (
+        <>
+          <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              <Building2Icon className="size-4 text-sky-500" />
+              Company details
+            </p>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <KV label="Company" value={company.name} />
+              <KV label="Country" value={countryLabel(company.country)} />
+              <KV label="Company number" value={company.companyId} />
+              <KV
+                label="Status"
+                value={
+                  company.status.charAt(0).toUpperCase() +
+                  company.status.slice(1)
+                }
+              />
+              {company.state && <KV label="State" value={company.state} />}
+              {company.ein && <KV label="EIN" value={company.ein} />}
+              {company.sicCode && (
+                <KV label="SIC code" value={company.sicCode} />
+              )}
+            </div>
+            {company.registeredAddress && (
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Registered address
+                </p>
+                <p className="mt-0.5 whitespace-pre-line text-sm font-medium">
+                  {company.registeredAddress}
+                </p>
+              </div>
+            )}
+            {company.website && (
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Website
+                </p>
+                <a
+                  href={company.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-0.5 block break-all text-sm font-medium text-sky-600 hover:underline dark:text-sky-400"
+                >
+                  {company.website}
+                </a>
+              </div>
+            )}
+          </div>
+
+          {company.directors.length > 0 && (
+            <div className="space-y-3 rounded-2xl border border-border bg-card p-5">
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                <UserIcon className="size-4 text-sky-500" />
+                Directors
+              </p>
+              {company.directors.map((d) => (
+                <div
+                  key={d.id}
+                  className="grid gap-3 border-t border-border pt-3 first:border-0 first:pt-0 sm:grid-cols-2"
+                >
+                  <KV label="Name" value={`${d.firstName} ${d.lastName}`} />
+                  <KV label="Email" value={d.email} />
+                  <KV label="Phone" value={d.phone} />
+                  <KV label="Date of birth" value={d.dateOfBirth} />
+                  <div className="sm:col-span-2">
+                    <KV label="Address" value={d.address} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {company.documents.length > 0 && (
+            <div className="space-y-3 rounded-2xl border border-border bg-card p-5">
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                <FileTextIcon className="size-4 text-sky-500" />
+                Documents
+              </p>
+              <div className="divide-y divide-border">
+                {company.documents.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
+                  >
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate text-sm font-medium">
+                        {doc.name}
+                      </span>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ring-1 ring-inset ${
+                          DOC_STATUS[doc.status] ??
+                          "bg-muted text-muted-foreground ring-border"
+                        }`}
+                      >
+                        {doc.status}
+                      </span>
+                    </div>
+                    {doc.value ? (
+                      <Button size="sm" variant="outline" asChild>
+                        <a
+                          href={doc.value}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <DownloadIcon className="size-3.5" />
+                          View
+                        </a>
+                      </Button>
+                    ) : (
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        Not submitted
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Invoice link */}
       {order.invoice && (

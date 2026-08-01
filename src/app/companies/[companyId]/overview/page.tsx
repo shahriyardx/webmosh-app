@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CompaniesHouseCard, OfficersCard, FilingHistoryCard } from "@/components/companies-house-card"
+import { CompanyServicesWidget } from "@/components/company-services-widget"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { useRouter, useParams } from "next/navigation"
 import { useState } from "react"
@@ -277,6 +278,8 @@ export default function OverviewPage() {
         </CardContent>
       </Card>
       )}
+
+      {companyId && <CompanyServicesWidget orgId={companyId} />}
 
       {!isPersonal && companyId && <CompaniesHouseCard orgId={companyId} />}
       {!isPersonal && companyId && <OfficersCard orgId={companyId} />}

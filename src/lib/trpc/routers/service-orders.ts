@@ -81,16 +81,24 @@ export const rdpInputSchema = z
 
 export type RdpInput = z.infer<typeof rdpInputSchema>
 
+export const requirementsInputSchema = z
+  .array(z.object({ label: z.string(), value: z.string() }))
+  .optional()
+
+export type RequirementsInput = z.infer<typeof requirementsInputSchema>
+
 export async function purchaseServiceCore({
   organizationId,
   serviceId,
   wordpress,
   rdp,
+  requirements,
 }: {
   organizationId: string
   serviceId: string
   wordpress: WordpressInput
   rdp?: RdpInput
+  requirements?: RequirementsInput
 }) {
   const svc = await prisma.service.findUnique({ where: { id: serviceId } })
   if (!svc) throw new Error("Service not found")
@@ -101,6 +109,16 @@ export async function purchaseServiceCore({
   }
   if (svc.requiresRdp && !rdp) {
     throw new Error("RDP access details are required for this service")
+  }
+  // Every requirement defined on the service must have a non-empty answer.
+  if (svc.requirements.length > 0) {
+    const answered = new Map(
+      (requirements ?? []).map((r) => [r.label, r.value.trim()]),
+    )
+    const missing = svc.requirements.filter((label) => !answered.get(label))
+    if (missing.length > 0) {
+      throw new Error(`Please provide: ${missing.join(", ")}`)
+    }
   }
   if (wordpress?.mode === "demo" && !wordpress.themeId) {
     throw new Error("Please select a demo theme")
@@ -168,6 +186,12 @@ export async function purchaseServiceCore({
       rdpUsername: rdp?.username ?? null,
       rdpPassword: rdp?.password ?? null,
       rdpPort: rdp?.port ?? null,
+      requirementValues:
+        svc.requirements.length > 0 && requirements
+          ? requirements
+              .filter((r) => svc.requirements.includes(r.label))
+              .map((r) => ({ label: r.label, value: r.value.trim() }))
+          : undefined,
     },
   })
 
@@ -241,6 +265,20 @@ export const serviceOrdersRouter = router({
     .input(z.object({ organizationId: z.string() }))
     .query(async ({ input, ctx }) => {
       await assertOrgMember(ctx.user.id, input.organizationId)
+      const orders = await prisma.serviceOrder.findMany({
+        where: { organizationId: input.organizationId },
+        orderBy: { createdAt: "desc" },
+      })
+      return attachInvoiceAndService(orders)
+    }),
+
+  /** A company's orders — viewable by its members and by any admin. */
+  listForCompany: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      if (ctx.user.role !== "admin") {
+        await assertOrgMember(ctx.user.id, input.organizationId)
+      }
       const orders = await prisma.serviceOrder.findMany({
         where: { organizationId: input.organizationId },
         orderBy: { createdAt: "desc" },
@@ -543,6 +581,61 @@ export const serviceOrdersRouter = router({
       return { ok: true }
     }),
 
+  /**
+   * The most recent RDP details saved on any order for this organization.
+   * Used to pre-fill the RDP form when ordering another RDP-required service
+   * for a company that already has RDP access on file. Member-only.
+   */
+  latestRdp: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const member = await prisma.member.findFirst({
+        where: { organizationId: input.organizationId, userId: ctx.user.id },
+        select: { id: true },
+      })
+      if (!member) return null
+      const order = await prisma.serviceOrder.findFirst({
+        where: { organizationId: input.organizationId, rdpHost: { not: null } },
+        orderBy: { createdAt: "desc" },
+        select: { rdpHost: true, rdpUsername: true, rdpPassword: true },
+      })
+      if (!order?.rdpHost) return null
+      return {
+        host: order.rdpHost ?? "",
+        username: order.rdpUsername ?? "",
+        password: order.rdpPassword ?? "",
+      }
+    }),
+
+  /**
+   * For each of the user's companies that has ordered a WordPress site, the
+   * status of its most recent one. Used to annotate the company picker.
+   */
+  wordpressStatusByOrg: protectedProcedure.query(async ({ ctx }) => {
+    const memberships = await prisma.member.findMany({
+      where: { userId: ctx.user.id },
+      select: { organizationId: true },
+    })
+    const orgIds = memberships.map((m) => m.organizationId)
+    if (orgIds.length === 0) return []
+    const orders = await prisma.serviceOrder.findMany({
+      where: {
+        organizationId: { in: orgIds },
+        service: { type: "wordpress" },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { organizationId: true, status: true },
+    })
+    const seen = new Set<string>()
+    const out: { organizationId: string; status: string }[] = []
+    for (const o of orders) {
+      if (seen.has(o.organizationId)) continue
+      seen.add(o.organizationId)
+      out.push({ organizationId: o.organizationId, status: o.status })
+    }
+    return out
+  }),
+
   purchase: protectedProcedure
     .input(
       z.object({
@@ -550,6 +643,7 @@ export const serviceOrdersRouter = router({
         serviceId: z.string(),
         wordpress: wordpressInputSchema,
         rdp: rdpInputSchema,
+        requirements: requirementsInputSchema,
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -559,6 +653,7 @@ export const serviceOrdersRouter = router({
         serviceId: input.serviceId,
         wordpress: input.wordpress,
         rdp: input.rdp,
+        requirements: input.requirements,
       })
     }),
 
@@ -572,6 +667,7 @@ export const serviceOrdersRouter = router({
         serviceId: z.string(),
         wordpress: wordpressInputSchema,
         rdp: rdpInputSchema,
+        requirements: requirementsInputSchema,
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -581,6 +677,7 @@ export const serviceOrdersRouter = router({
         serviceId: input.serviceId,
         wordpress: input.wordpress,
         rdp: input.rdp,
+        requirements: input.requirements,
       })
     }),
 

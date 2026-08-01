@@ -34,7 +34,12 @@ import {
 } from "@/components/wordpress-checkout-dialog"
 
 type WordpressTarget = { id: string; title: string; price: number }
-type RdpTarget = { id: string; title: string }
+type RdpTarget = {
+  id: string
+  title: string
+  requiresRdp: boolean
+  requirements: string[]
+}
 const EMPTY_RDP = { host: "", username: "", password: "" }
 
 export default function DashboardServicesPage() {
@@ -49,9 +54,17 @@ export default function DashboardServicesPage() {
 
   const { data: allServices, isLoading: svcLoading } = trpc.services.list.useQuery()
 
+  // RDP details already on file for this company (from a previous order), used
+  // to pre-fill the RDP form so it doesn't have to be re-entered.
+  const { data: savedRdp } = trpc.serviceOrders.latestRdp.useQuery(
+    { organizationId: companyId },
+    { enabled: !!companyId },
+  )
+
   const [wpTarget, setWpTarget] = useState<WordpressTarget | null>(null)
   const [rdpTarget, setRdpTarget] = useState<RdpTarget | null>(null)
   const [rdp, setRdp] = useState(EMPTY_RDP)
+  const [reqValues, setReqValues] = useState<Record<string, string>>({})
 
   const purchase = trpc.serviceOrders.purchase.useMutation({
     onSuccess: (order) => {
@@ -73,14 +86,31 @@ export default function DashboardServicesPage() {
     price: number
     type: string
     requiresRdp: boolean
+    requirements: string[]
   }) => {
     if (svc.type === "wordpress") {
       setWpTarget({ id: svc.id, title: svc.title, price: svc.price })
       return
     }
-    if (svc.requiresRdp) {
-      setRdp(EMPTY_RDP)
-      setRdpTarget({ id: svc.id, title: svc.title })
+    const reqs = svc.requirements ?? []
+    if (svc.requiresRdp || reqs.length > 0) {
+      // Pre-fill RDP from the company's existing RDP if we have it on file.
+      setRdp(
+        svc.requiresRdp && savedRdp
+          ? {
+              host: savedRdp.host,
+              username: savedRdp.username,
+              password: savedRdp.password,
+            }
+          : EMPTY_RDP,
+      )
+      setReqValues(Object.fromEntries(reqs.map((l) => [l, ""])))
+      setRdpTarget({
+        id: svc.id,
+        title: svc.title,
+        requiresRdp: svc.requiresRdp,
+        requirements: reqs,
+      })
       return
     }
     purchase.mutate({ organizationId: companyId, serviceId: svc.id })
@@ -88,18 +118,38 @@ export default function DashboardServicesPage() {
 
   const submitRdp = () => {
     if (!rdpTarget) return
-    if (!rdp.host.trim() || !rdp.username.trim() || !rdp.password.trim()) {
+    if (
+      rdpTarget.requiresRdp &&
+      (!rdp.host.trim() || !rdp.username.trim() || !rdp.password.trim())
+    ) {
       toast.error("Please provide the RDP host, username and password")
+      return
+    }
+    const missing = rdpTarget.requirements.filter((l) => !reqValues[l]?.trim())
+    if (missing.length > 0) {
+      toast.error(`Please provide: ${missing.join(", ")}`)
       return
     }
     purchase.mutate({
       organizationId: companyId,
       serviceId: rdpTarget.id,
-      rdp: {
-        host: rdp.host.trim(),
-        username: rdp.username.trim(),
-        password: rdp.password.trim(),
-      },
+      ...(rdpTarget.requiresRdp
+        ? {
+            rdp: {
+              host: rdp.host.trim(),
+              username: rdp.username.trim(),
+              password: rdp.password.trim(),
+            },
+          }
+        : {}),
+      ...(rdpTarget.requirements.length > 0
+        ? {
+            requirements: rdpTarget.requirements.map((l) => ({
+              label: l,
+              value: reqValues[l].trim(),
+            })),
+          }
+        : {}),
     })
   }
 
@@ -222,36 +272,72 @@ export default function DashboardServicesPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>RDP access</DialogTitle>
+            <DialogTitle>Order details</DialogTitle>
             <DialogDescription>
-              {rdpTarget?.title} needs remote access to your machine. Provide
-              the RDP details so our team can get to work.
+              {rdpTarget?.title} needs a few details before we can start.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Host / IP address</Label>
-              <Input
-                placeholder="e.g. 203.0.113.10"
-                value={rdp.host}
-                onChange={(e) => setRdp({ ...rdp, host: e.target.value })}
-              />
+
+          {rdpTarget && rdpTarget.requirements.length > 0 && (
+            <div className="space-y-3">
+              {rdpTarget.requirements.map((label) => (
+                <div key={label} className="space-y-1.5">
+                  <Label>{label}</Label>
+                  <Input
+                    value={reqValues[label] ?? ""}
+                    onChange={(e) =>
+                      setReqValues((p) => ({ ...p, [label]: e.target.value }))
+                    }
+                  />
+                </div>
+              ))}
             </div>
-            <div className="space-y-1.5">
-              <Label>Username</Label>
-              <Input
-                value={rdp.username}
-                onChange={(e) => setRdp({ ...rdp, username: e.target.value })}
-              />
+          )}
+
+          {rdpTarget?.requiresRdp && (
+            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+              <div>
+                <p className="text-sm font-semibold">RDP access</p>
+                <p className="text-xs text-muted-foreground">
+                  This service needs remote access to your machine.
+                </p>
+              </div>
+              {savedRdp && (
+                <p className="rounded-md border border-sky-500/30 bg-sky-500/5 px-2.5 py-1.5 text-xs text-muted-foreground">
+                  Pre-filled from this company&apos;s existing RDP — edit it if
+                  it has changed.
+                </p>
+              )}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Host / IP address</Label>
+                  <Input
+                    placeholder="e.g. 203.0.113.10"
+                    value={rdp.host}
+                    onChange={(e) => setRdp({ ...rdp, host: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Username</Label>
+                  <Input
+                    value={rdp.username}
+                    onChange={(e) =>
+                      setRdp({ ...rdp, username: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Password</Label>
+                  <Input
+                    value={rdp.password}
+                    onChange={(e) =>
+                      setRdp({ ...rdp, password: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Password</Label>
-              <Input
-                value={rdp.password}
-                onChange={(e) => setRdp({ ...rdp, password: e.target.value })}
-              />
-            </div>
-          </div>
+          )}
           <DialogFooter>
             <Button
               variant="outline"

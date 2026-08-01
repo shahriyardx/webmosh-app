@@ -21,6 +21,21 @@ import {
   ConciergeBellIcon,
 } from "lucide-react"
 
+const CATEGORY: Record<string, { label: string; cls: string }> = {
+  stripe: {
+    label: "Stripe",
+    cls: "bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-violet-500/20",
+  },
+  paypal: {
+    label: "PayPal",
+    cls: "bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20",
+  },
+  wise: {
+    label: "Wise",
+    cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
+  },
+}
+
 export default function AdminServicesPage() {
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string
@@ -74,6 +89,7 @@ export default function AdminServicesPage() {
               <TableRow>
                 <TableHead>Title</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Category</TableHead>
                 <TableHead>Country</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead className="w-24">Actions</TableHead>
@@ -90,6 +106,17 @@ export default function AdminServicesPage() {
                       </span>
                     ) : (
                       <span className="text-xs text-muted-foreground">General</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {svc.category && CATEGORY[svc.category] ? (
+                      <span
+                        className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${CATEGORY[svc.category].cls}`}
+                      >
+                        {CATEGORY[svc.category].label}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell>

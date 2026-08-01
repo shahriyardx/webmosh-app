@@ -105,14 +105,47 @@ async function enrichCompanies<
     }
   }
 
+  // Latest order status per company for the Stripe / PayPal / Wise categories.
+  const catOrders = orgIds.length
+    ? await prisma.serviceOrder.findMany({
+        where: {
+          organizationId: { in: orgIds },
+          service: { category: { in: ["stripe", "paypal", "wise"] } },
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          organizationId: true,
+          status: true,
+          service: { select: { category: true } },
+        },
+      })
+    : []
+  const catByOrg = new Map<
+    string,
+    { stripe?: string; paypal?: string; wise?: string }
+  >()
+  for (const o of catOrders) {
+    const cat = o.service?.category
+    if (cat !== "stripe" && cat !== "paypal" && cat !== "wise") continue
+    const entry = catByOrg.get(o.organizationId) ?? {}
+    if (!entry[cat]) {
+      entry[cat] = o.status
+      catByOrg.set(o.organizationId, entry)
+    }
+  }
+
   return Promise.all(
     orgs.map(async (o) => {
+      const cats = catByOrg.get(o.id) ?? {}
       const base = {
         ...o,
         incorporationDate: null as Date | null,
         chStatus: null as string | null,
         websiteStatus: websiteByOrg.get(o.id) ?? null,
         rdpHost: rdpByOrg.get(o.id) ?? null,
+        stripeOrderStatus: cats.stripe ?? null,
+        paypalOrderStatus: cats.paypal ?? null,
+        wiseOrderStatus: cats.wise ?? null,
       }
       if (o.country !== "uk" || !o.companyId) return base
       const dates = await getCompaniesHouseDates(o.companyId).catch(() => null)

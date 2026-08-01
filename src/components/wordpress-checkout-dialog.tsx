@@ -16,18 +16,56 @@ import {
 import { Field, FieldContent, FieldLabel } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 import {
   CheckIcon,
+  ChevronsUpDownIcon,
   ExternalLinkIcon,
   PaletteIcon,
   SparklesIcon,
 } from "lucide-react"
+
+const WP_STATUS: Record<string, { label: string; cls: string }> = {
+  pending: {
+    label: "Pending",
+    cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
+  },
+  processing: {
+    label: "In progress",
+    cls: "bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20",
+  },
+  completed: {
+    label: "Completed",
+    cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
+  },
+  awaiting_quote: {
+    label: "Awaiting quote",
+    cls: "bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-violet-500/20",
+  },
+}
+
+function WpStatusPill({ status }: { status: string }) {
+  const s = WP_STATUS[status]
+  if (!s) return null
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${s.cls}`}
+    >
+      {s.label}
+    </span>
+  )
+}
 
 type Credentials = {
   cpanel: { url: string; username: string; password: string }
@@ -94,11 +132,22 @@ export function WordpressCheckoutDialog({
   const [customDesignUrl, setCustomDesignUrl] = useState("")
   const [creds, setCreds] = useState<Credentials>(EMPTY_CREDS)
   const [organizationId, setOrganizationId] = useState<string>("")
+  const [companyOpen, setCompanyOpen] = useState(false)
   const [contact, setContact] = useState<Contact>(EMPTY_CONTACT)
   const [contactTouched, setContactTouched] = useState<
     Partial<Record<keyof Contact, boolean>>
   >({})
   const [showAllThemes, setShowAllThemes] = useState(false)
+
+  // Latest WordPress-order status per company, to annotate the picker.
+  const { data: wpStatuses } = trpc.serviceOrders.wordpressStatusByOrg.useQuery(
+    undefined,
+    { enabled: open && !!companies?.length },
+  )
+  const statusByOrg = useMemo(
+    () => new Map((wpStatuses ?? []).map((s) => [s.organizationId, s.status])),
+    [wpStatuses],
+  )
 
   const { data: profile } = trpc.companies.myProfile.useQuery(undefined, {
     enabled: open,
@@ -259,26 +308,76 @@ export function WordpressCheckoutDialog({
             <Field>
               <FieldLabel>Attach to a company (optional)</FieldLabel>
               <FieldContent>
-                <Select
-                  value={organizationId || "none"}
-                  onValueChange={(v) =>
-                    setOrganizationId(v === "none" ? "" : v)
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">
-                      No company — personal order
-                    </SelectItem>
-                    {companies.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={companyOpen} onOpenChange={setCompanyOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between font-normal"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate">
+                          {organizationId
+                            ? (companies.find((c) => c.id === organizationId)
+                                ?.name ?? "Select a company")
+                            : "No company — personal order"}
+                        </span>
+                        {organizationId && statusByOrg.get(organizationId) && (
+                          <WpStatusPill
+                            status={statusByOrg.get(organizationId)!}
+                          />
+                        )}
+                      </span>
+                      <ChevronsUpDownIcon className="size-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="start"
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                  >
+                    <Command>
+                      <CommandInput placeholder="Search companies…" />
+                      <CommandList>
+                        <CommandEmpty>No company found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="No company — personal order"
+                            onSelect={() => {
+                              setOrganizationId("")
+                              setCompanyOpen(false)
+                            }}
+                          >
+                            <CheckIcon
+                              className={`mr-2 size-4 ${organizationId === "" ? "opacity-100" : "opacity-0"}`}
+                            />
+                            No company — personal order
+                          </CommandItem>
+                          {companies.map((c) => {
+                            const st = statusByOrg.get(c.id)
+                            return (
+                              <CommandItem
+                                key={c.id}
+                                value={c.name}
+                                onSelect={() => {
+                                  setOrganizationId(c.id)
+                                  setCompanyOpen(false)
+                                }}
+                              >
+                                <CheckIcon
+                                  className={`mr-2 size-4 shrink-0 ${organizationId === c.id ? "opacity-100" : "opacity-0"}`}
+                                />
+                                <span className="flex-1 truncate">
+                                  {c.name}
+                                </span>
+                                {st && <WpStatusPill status={st} />}
+                              </CommandItem>
+                            )
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
                 <p className="text-xs text-muted-foreground">
                   WordPress is a universal service — pick a company only if you
                   want the order linked to one.

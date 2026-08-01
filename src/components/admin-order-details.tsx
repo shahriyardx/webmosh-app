@@ -10,6 +10,7 @@ import {
   GlobeIcon,
   KeyRoundIcon,
   MonitorIcon,
+  ClipboardListIcon,
 } from "lucide-react"
 
 export type AdminOrder =
@@ -271,6 +272,22 @@ export function AdminOrderDetails({ order }: { order: AdminOrder }) {
           )}
         </Section>
       )}
+
+      {Array.isArray(order.requirementValues) &&
+        order.requirementValues.length > 0 && (
+          <Section icon={ClipboardListIcon} title="Requirements">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {(
+                order.requirementValues as unknown as {
+                  label: string
+                  value: string
+                }[]
+              ).map((r, i) => (
+                <KV key={i} label={r.label} value={r.value} />
+              ))}
+            </div>
+          </Section>
+        )}
     </div>
   )
 }

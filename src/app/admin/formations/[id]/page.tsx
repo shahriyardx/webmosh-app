@@ -54,6 +54,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { CompaniesHouseCard, OfficersCard, FilingHistoryCard } from "@/components/companies-house-card"
+import { CompanyServicesWidget } from "@/components/company-services-widget"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 
 function toDateInput(d: Date | string | null | undefined): string {
@@ -635,6 +636,9 @@ export default function FormationDetailPage({
       )}
       </div>
       </div>
+
+      {/* Active services */}
+      <CompanyServicesWidget orgId={id} />
 
       {/* Directors */}
       {org.directors.length > 0 && (

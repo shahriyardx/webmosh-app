@@ -11,8 +11,6 @@ import {
   ChevronsUpDownIcon,
   ChevronUpIcon,
   ChevronDownIcon,
-  CheckCircle2Icon,
-  AlertTriangleIcon,
 } from "lucide-react"
 
 export type CompanyRow =
@@ -35,9 +33,9 @@ type SortKey =
   | "status"
   | "accountsDue"
   | "statementDue"
-  | "services"
   | "website"
   | "stripe"
+  | "paypal"
   | "wise"
 
 const PAGE_SIZE = 10
@@ -69,13 +67,6 @@ function statusLabel(c: CompanyRow) {
 function isActive(c: CompanyRow) {
   if (c.chStatus) return c.chStatus === "active"
   return c.status === "completed"
-}
-
-function actionNeeded(c: CompanyRow) {
-  const now = Date.now()
-  const overdue = (d: Date | null | undefined) =>
-    !!d && new Date(d).getTime() < now
-  return overdue(c.accountsFilingDue) || overdue(c.confirmationStatementDue)
 }
 
 const PILL_STYLES: Record<string, string> = {
@@ -110,6 +101,29 @@ function websiteMeta(s: string | null): { tone: keyof typeof PILL_STYLES; label:
     default:
       return { tone: "muted", label: "Not ordered" }
   }
+}
+
+/** Service-order status → pill, for the Stripe / PayPal / Wise category columns. */
+function orderStatusMeta(
+  s: string | null,
+): { tone: keyof typeof PILL_STYLES; label: string } {
+  switch (s) {
+    case "completed":
+      return { tone: "emerald", label: "Completed" }
+    case "processing":
+      return { tone: "sky", label: "In progress" }
+    case "pending":
+      return { tone: "amber", label: "Pending" }
+    case "awaiting_quote":
+      return { tone: "amber", label: "Awaiting quote" }
+    default:
+      return { tone: "muted", label: "Not ordered" }
+  }
+}
+
+function OrderStatusPill({ status }: { status: string | null }) {
+  const m = orderStatusMeta(status)
+  return <Pill tone={m.tone} label={m.label} />
 }
 
 function accountMeta(s: string): { tone: keyof typeof PILL_STYLES; label: string } {
@@ -184,10 +198,20 @@ export function CompaniesTable({
     const mk = () => ({ active: 0, closed: 0 })
     const website = mk()
     const stripe = mk()
+    const paypal = mk()
     const wise = mk()
-    const tally = (bucket: { active: number; closed: number }, s: string) => {
+    const tallyWeb = (bucket: { active: number; closed: number }, s: string) => {
       if (s === "active") bucket.active++
       else if (s === "closed") bucket.closed++
+    }
+    // For category orders: active = completed, closed slot = in progress.
+    const tallyCat = (
+      bucket: { active: number; closed: number },
+      s: string | null,
+    ) => {
+      if (s === "completed") bucket.active++
+      else if (s === "pending" || s === "processing" || s === "awaiting_quote")
+        bucket.closed++
     }
     for (const c of companies) {
       const web = c.websiteStatusOverride
@@ -195,11 +219,12 @@ export function CompaniesTable({
         : c.websiteStatus === "completed"
           ? "active"
           : ""
-      tally(website, web)
-      tally(stripe, c.stripeStatus)
-      tally(wise, c.wiseStatus)
+      tallyWeb(website, web)
+      tallyCat(stripe, c.stripeOrderStatus)
+      tallyCat(paypal, c.paypalOrderStatus)
+      tallyCat(wise, c.wiseOrderStatus)
     }
-    return { website, stripe, wise }
+    return { website, stripe, paypal, wise }
   }, [companies])
 
   const sorted = useMemo(() => {
@@ -224,8 +249,6 @@ export function CompaniesTable({
               time(b.confirmationStatementDue)) *
             dir
           )
-        case "services":
-          return (Number(actionNeeded(a)) - Number(actionNeeded(b))) * dir
         case "website":
           return (
             ((rank[a.websiteStatusOverride ?? a.websiteStatus ?? ""] ?? -1) -
@@ -233,9 +256,23 @@ export function CompaniesTable({
             dir
           )
         case "stripe":
-          return ((rank[a.stripeStatus] ?? -1) - (rank[b.stripeStatus] ?? -1)) * dir
+          return (
+            ((rank[a.stripeOrderStatus ?? ""] ?? -1) -
+              (rank[b.stripeOrderStatus ?? ""] ?? -1)) *
+            dir
+          )
+        case "paypal":
+          return (
+            ((rank[a.paypalOrderStatus ?? ""] ?? -1) -
+              (rank[b.paypalOrderStatus ?? ""] ?? -1)) *
+            dir
+          )
         case "wise":
-          return ((rank[a.wiseStatus] ?? -1) - (rank[b.wiseStatus] ?? -1)) * dir
+          return (
+            ((rank[a.wiseOrderStatus ?? ""] ?? -1) -
+              (rank[b.wiseOrderStatus ?? ""] ?? -1)) *
+            dir
+          )
         default:
           return 0
       }
@@ -271,10 +308,26 @@ export function CompaniesTable({
   return (
     <div className="space-y-4">
       {/* Summary counters */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard label="Website" counts={summary.website} />
-        <SummaryCard label="Stripe" counts={summary.stripe} />
-        <SummaryCard label="Wise" counts={summary.wise} />
+        <SummaryCard
+          label="Stripe"
+          counts={summary.stripe}
+          primaryLabel="Completed"
+          secondaryLabel="In progress"
+        />
+        <SummaryCard
+          label="PayPal"
+          counts={summary.paypal}
+          primaryLabel="Completed"
+          secondaryLabel="In progress"
+        />
+        <SummaryCard
+          label="Wise"
+          counts={summary.wise}
+          primaryLabel="Completed"
+          secondaryLabel="In progress"
+        />
       </div>
 
       {/* Search */}
@@ -293,7 +346,7 @@ export function CompaniesTable({
 
       {/* Table */}
       <div className="overflow-x-auto rounded-2xl border border-border">
-        <table className="w-full min-w-[1180px] text-sm">
+        <table className="w-full min-w-[1300px] text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-left">
               <SortHeader label="Company Name" active={sortKey === "name"} dir={sortDir} onClick={() => toggleSort("name")} />
@@ -304,18 +357,17 @@ export function CompaniesTable({
               <SortHeader label="Statement Due" active={sortKey === "statementDue"} dir={sortDir} onClick={() => toggleSort("statementDue")} />
               <SortHeader label="Website" active={sortKey === "website"} dir={sortDir} onClick={() => toggleSort("website")} />
               <SortHeader label="Stripe" active={sortKey === "stripe"} dir={sortDir} onClick={() => toggleSort("stripe")} />
+              <SortHeader label="PayPal" active={sortKey === "paypal"} dir={sortDir} onClick={() => toggleSort("paypal")} />
               <SortHeader label="Wise" active={sortKey === "wise"} dir={sortDir} onClick={() => toggleSort("wise")} />
               {showRdp && (
                 <th className="px-4 py-3 font-semibold text-muted-foreground">
                   <span className="whitespace-nowrap">RDP IP</span>
                 </th>
               )}
-              <SortHeader label="My Services" active={sortKey === "services"} dir={sortDir} onClick={() => toggleSort("services")} />
             </tr>
           </thead>
           <tbody>
             {pageItems.map((c) => {
-              const needsAction = actionNeeded(c)
               return (
                 <tr
                   key={c.id}
@@ -366,43 +418,19 @@ export function CompaniesTable({
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <AccountCell
-                      c={c}
-                      field="stripe"
-                      value={c.stripeStatus}
-                      mode={mode}
-                      onSetStatus={onSetStatus}
-                      pendingKey={pendingKey}
-                    />
+                    <OrderStatusPill status={c.stripeOrderStatus} />
                   </td>
                   <td className="px-4 py-3">
-                    <AccountCell
-                      c={c}
-                      field="wise"
-                      value={c.wiseStatus}
-                      mode={mode}
-                      onSetStatus={onSetStatus}
-                      pendingKey={pendingKey}
-                    />
+                    <OrderStatusPill status={c.paypalOrderStatus} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <OrderStatusPill status={c.wiseOrderStatus} />
                   </td>
                   {showRdp && (
                     <td className="px-4 py-3 font-mono text-xs">
                       {c.rdpHost ?? "—"}
                     </td>
                   )}
-                  <td className="px-4 py-3">
-                    {needsAction ? (
-                      <span className="inline-flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-400">
-                        <AlertTriangleIcon className="size-4" />
-                        Action needed
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                        <CheckCircle2Icon className="size-4" />
-                        No action needed
-                      </span>
-                    )}
-                  </td>
                 </tr>
               )
             })}
@@ -465,9 +493,13 @@ export function CompaniesTable({
 function SummaryCard({
   label,
   counts,
+  primaryLabel = "Active",
+  secondaryLabel = "Closed",
 }: {
   label: string
   counts: { active: number; closed: number }
+  primaryLabel?: string
+  secondaryLabel?: string
 }) {
   return (
     <div className="rounded-xl border border-border p-4">
@@ -481,7 +513,7 @@ function SummaryCard({
           </p>
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className="size-1.5 rounded-full bg-emerald-500" />
-            Active
+            {primaryLabel}
           </p>
         </div>
         <div className="h-9 w-px bg-border" />
@@ -491,7 +523,7 @@ function SummaryCard({
           </p>
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className="size-1.5 rounded-full bg-muted-foreground/40" />
-            Closed
+            {secondaryLabel}
           </p>
         </div>
       </div>
@@ -507,48 +539,6 @@ type SetStatusFn = (
 
 const STATUS_SELECT_CLS =
   "rounded-md border border-border bg-background px-2 py-1 text-xs font-medium outline-none focus:ring-2 focus:ring-sky-500/40 disabled:opacity-50"
-
-function AccountCell({
-  c,
-  field,
-  value,
-  mode,
-  onSetStatus,
-  pendingKey,
-}: {
-  c: CompanyRow
-  field: "stripe" | "wise"
-  value: string
-  mode: "user" | "admin"
-  onSetStatus?: SetStatusFn
-  pendingKey?: string | null
-}) {
-  const meta = accountMeta(value)
-  if (mode !== "admin" || !onSetStatus) {
-    return <Pill tone={meta.tone} label={meta.label} />
-  }
-  const saving = pendingKey === `${c.id}:${field}`
-  return (
-    <select
-      value={value}
-      disabled={saving}
-      onChange={(e) =>
-        onSetStatus(c.id, field, e.target.value as AccountStatusValue)
-      }
-      className={`${STATUS_SELECT_CLS} ${PILL_STYLES[meta.tone]}`}
-    >
-      {ACCOUNT_OPTIONS.map((o) => (
-        <option
-          key={o.value}
-          value={o.value}
-          className="bg-background text-foreground"
-        >
-          {o.label}
-        </option>
-      ))}
-    </select>
-  )
-}
 
 function WebsiteCell({
   c,

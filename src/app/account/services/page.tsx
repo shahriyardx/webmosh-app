@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { trpc } from "@/lib/trpc/client"
 import { toast } from "sonner"
@@ -44,6 +44,7 @@ type Service = {
   country: string | null
   type: "general" | "wordpress"
   requiresRdp: boolean
+  requirements: string[]
 }
 
 const EMPTY_RDP = { host: "", username: "", password: "" }
@@ -57,6 +58,28 @@ export default function AccountServicesPage() {
   const [orgId, setOrgId] = useState<string>("")
   const [wpFor, setWpFor] = useState<Service | null>(null)
   const [rdp, setRdp] = useState(EMPTY_RDP)
+  const [reqValues, setReqValues] = useState<Record<string, string>>({})
+
+  // RDP already on file for the selected company (from a previous order).
+  const { data: savedRdp } = trpc.serviceOrders.latestRdp.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId && !!picking?.requiresRdp },
+  )
+
+  // When the chosen company changes, pre-fill its saved RDP (still editable).
+  useEffect(() => {
+    if (!picking?.requiresRdp) return
+    setRdp(
+      savedRdp
+        ? {
+            host: savedRdp.host,
+            username: savedRdp.username,
+            password: savedRdp.password,
+          }
+        : EMPTY_RDP,
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId, savedRdp, picking?.id])
 
   const purchase = trpc.serviceOrders.purchase.useMutation({
     onSuccess: (order) => {
@@ -125,6 +148,7 @@ export default function AccountServicesPage() {
     }
     setOrgId("")
     setRdp(EMPTY_RDP)
+    setReqValues(Object.fromEntries((svc.requirements ?? []).map((l) => [l, ""])))
     setPicking(svc)
   }
 
@@ -138,6 +162,13 @@ export default function AccountServicesPage() {
       toast.error("Please provide the RDP host, username and password")
       return
     }
+    const missing = (picking.requirements ?? []).filter(
+      (l) => !reqValues[l]?.trim(),
+    )
+    if (missing.length > 0) {
+      toast.error(`Please provide: ${missing.join(", ")}`)
+      return
+    }
     purchase.mutate({
       organizationId: orgId,
       serviceId: picking.id,
@@ -148,6 +179,14 @@ export default function AccountServicesPage() {
               username: rdp.username.trim(),
               password: rdp.password.trim(),
             },
+          }
+        : {}),
+      ...((picking.requirements ?? []).length > 0
+        ? {
+            requirements: picking.requirements.map((l) => ({
+              label: l,
+              value: reqValues[l].trim(),
+            })),
           }
         : {}),
     })
@@ -288,6 +327,22 @@ export default function AccountServicesPage() {
             )}
           </div>
 
+          {picking && picking.requirements.length > 0 && (
+            <div className="space-y-3">
+              {picking.requirements.map((label) => (
+                <div key={label} className="space-y-1.5">
+                  <Label>{label}</Label>
+                  <Input
+                    value={reqValues[label] ?? ""}
+                    onChange={(e) =>
+                      setReqValues((p) => ({ ...p, [label]: e.target.value }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
           {picking?.requiresRdp && (
             <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
               <div>
@@ -297,6 +352,12 @@ export default function AccountServicesPage() {
                   RDP details so our team can get to work.
                 </p>
               </div>
+              {savedRdp && (
+                <p className="rounded-md border border-sky-500/30 bg-sky-500/5 px-2.5 py-1.5 text-xs text-muted-foreground">
+                  Pre-filled from this company&apos;s existing RDP — edit it if
+                  it has changed.
+                </p>
+              )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label>Host / IP address</Label>

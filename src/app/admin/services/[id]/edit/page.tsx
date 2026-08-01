@@ -63,9 +63,12 @@ export default function EditServicePage({
           title: svc.title,
           description: svc.description,
           features: svc.features.map((f) => ({ value: f })),
+          requirements: (svc.requirements ?? []).map((r) => ({ value: r })),
           price: String(svc.price),
           country: (svc.country as "us" | "uk" | null) ?? "any",
           type: (svc.type as "general" | "wordpress") ?? "general",
+          category:
+            (svc.category as "stripe" | "paypal" | "wise" | null) ?? "none",
           requiresRdp: svc.requiresRdp ?? false,
         }}
         loading={updateSvc.isPending}
