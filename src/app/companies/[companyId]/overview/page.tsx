@@ -9,6 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CompaniesHouseCard, OfficersCard, FilingHistoryCard } from "@/components/companies-house-card"
 import { CompanyServicesWidget } from "@/components/company-services-widget"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import {
+  DirectorEditDialog,
+  type EditableDirector,
+} from "@/components/director-edit-dialog"
 import { useRouter, useParams } from "next/navigation"
 import { useState } from "react"
 import {
@@ -25,6 +29,7 @@ import {
   UserIcon,
   ExternalLinkIcon,
   MonitorIcon,
+  PencilIcon,
 } from "lucide-react"
 
 const docStatusBadge: Record<
@@ -62,6 +67,54 @@ const toneText: Record<string, string> = {
   ok: "text-muted-foreground",
 }
 
+function initials(name: string) {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  )
+}
+
+/** Compact stat tile used inside the seamless details grid. */
+function StatTile({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="bg-card px-4 py-3">
+      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <div className="mt-1 truncate text-sm font-semibold text-foreground">
+        {value}
+      </div>
+    </div>
+  )
+}
+
+/** Full-width labelled block for longer values (address, website, …). */
+function InfoBlock({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-xl border border-border p-3">
+      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <div className="mt-0.5 text-sm font-medium text-foreground">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+const orgStatusVariant = (s: string): "outline" | "secondary" | "default" | "destructive" =>
+  s === "rejected" ? "destructive" : s === "processing" ? "default" : "secondary"
+
 export default function OverviewPage() {
   const { data: session } = authClient.useSession()
   const params = useParams()
@@ -75,6 +128,9 @@ export default function OverviewPage() {
   const router = useRouter()
   const utils = trpc.useUtils()
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [editDirector, setEditDirector] = useState<EditableDirector | null>(
+    null,
+  )
 
   const { data: invoices } = trpc.invoices.list.useQuery(
     { organizationId: companyId },
@@ -136,15 +192,38 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground uppercase">
-          {isPersonal ? (session?.user?.name ?? org.name) : org.name}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {isPersonal
-            ? "Personal Account"
-            : `${org.country === "uk" ? "United Kingdom" : "United States"} Company`}
-        </p>
+      <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-gradient-to-br from-sky-500/[0.07] via-transparent to-transparent p-5">
+        <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-sky-500/10 text-lg font-bold text-sky-600 ring-1 ring-inset ring-sky-500/20 dark:text-sky-400">
+          {initials(isPersonal ? (session?.user?.name ?? org.name) : org.name)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="truncate text-2xl font-bold uppercase tracking-tight text-foreground">
+              {isPersonal ? (session?.user?.name ?? org.name) : org.name}
+            </h1>
+            {!isPersonal && (
+              <Badge variant={orgStatusVariant(org.status)} className="capitalize">
+                {org.status}
+              </Badge>
+            )}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <GlobeIcon className="size-3.5" />
+              {isPersonal
+                ? "Personal Account"
+                : org.country === "uk"
+                  ? "United Kingdom Company"
+                  : "United States Company"}
+            </span>
+            {!isPersonal && org.companyId && (
+              <span className="inline-flex items-center gap-1.5 font-mono text-xs">
+                <HashIcon className="size-3.5" />
+                {org.companyId}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       {isPersonal && (
@@ -187,94 +266,62 @@ export default function OverviewPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-3">
-            <GlobeIcon className="size-4 shrink-0 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Country</p>
-              <p className="text-sm font-medium">
-                {org.country === "uk" ? "United Kingdom" : "United States"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Status</p>
-              <Badge
-                variant={
-                  org.status === "rejected"
-                    ? "destructive"
-                    : org.status === "processing"
-                      ? "default"
-                      : "secondary"
-                }
-                className="mt-0.5"
-              >
-                {org.status}
-              </Badge>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <HashIcon className="size-4 shrink-0 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">SIC Code</p>
-              <p className="text-sm font-medium">{org.sicCode ?? "—"}</p>
-            </div>
-          </div>
-          {org.website && (
-            <div className="flex items-center gap-3">
-              <GlobeIcon className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Website</p>
-                <a
-                  href={org.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-medium text-sky-600 hover:underline"
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
+            <StatTile
+              label="Country"
+              value={org.country === "uk" ? "United Kingdom" : "United States"}
+            />
+            <StatTile
+              label="Status"
+              value={
+                <Badge
+                  variant={orgStatusVariant(org.status)}
+                  className="capitalize"
                 >
-                  {org.website}
-                </a>
-              </div>
-            </div>
-          )}
-          {org.country === "uk" && org.companyId && (
-            <div className="flex items-center gap-3">
-              <HashIcon className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Company ID</p>
-                <p className="text-sm font-medium">{org.companyId}</p>
-              </div>
-            </div>
-          )}
-          {org.country === "uk" && org.authCode && (
-            <div className="flex items-center gap-3">
-              <HashIcon className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Auth Code</p>
-                <p className="text-sm font-mono">{org.authCode}</p>
-              </div>
-            </div>
+                  {org.status}
+                </Badge>
+              }
+            />
+            {org.state && <StatTile label="State" value={org.state} />}
+            {org.ein && <StatTile label="EIN" value={org.ein} />}
+            {org.sicCode && <StatTile label="SIC Code" value={org.sicCode} />}
+            {org.country === "uk" && org.companyId && (
+              <StatTile label="Company ID" value={org.companyId} />
+            )}
+            {org.country === "uk" && org.authCode && (
+              <StatTile
+                label="Auth Code"
+                value={<span className="font-mono">{org.authCode}</span>}
+              />
+            )}
+            <StatTile
+              label="Created"
+              value={new Date(org.createdAt).toLocaleDateString()}
+            />
+          </div>
+
+          {org.registeredAddress && (
+            <InfoBlock label="Registered Address">
+              <span className="whitespace-pre-line">
+                {org.registeredAddress}
+              </span>
+            </InfoBlock>
           )}
           {org.sicDescription && (
-            <div className="flex items-center gap-3">
-              <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Business Activity
-                </p>
-                <p className="text-sm font-medium">{org.sicDescription}</p>
-              </div>
-            </div>
+            <InfoBlock label="Business Activity">{org.sicDescription}</InfoBlock>
           )}
-          <div className="flex items-center gap-3">
-            <CalendarIcon className="size-4 shrink-0 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Created</p>
-              <p className="text-sm font-medium">
-                {new Date(org.createdAt).toLocaleDateString()}
-              </p>
-            </div>
-          </div>
+          {org.website && (
+            <InfoBlock label="Website">
+              <a
+                href={org.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block break-all text-sky-600 hover:underline dark:text-sky-400"
+              >
+                {org.website}
+              </a>
+            </InfoBlock>
+          )}
         </CardContent>
       </Card>
       )}
@@ -338,9 +385,29 @@ export default function OverviewPage() {
           <CardContent className="space-y-4">
             {org.directors.map((d) => (
               <div key={d.id} className="rounded-lg border border-border p-4">
-                <p className="text-sm font-semibold">
-                  {d.firstName} {d.lastName}
-                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold">
+                    {d.firstName} {d.lastName}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setEditDirector({
+                        id: d.id,
+                        firstName: d.firstName,
+                        lastName: d.lastName,
+                        email: d.email,
+                        phone: d.phone,
+                        dateOfBirth: d.dateOfBirth,
+                        address: d.address,
+                      })
+                    }
+                  >
+                    <PencilIcon className="size-3.5" />
+                    Edit
+                  </Button>
+                </div>
                 <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <dt className="text-xs text-muted-foreground">Email</dt>
@@ -564,6 +631,18 @@ export default function OverviewPage() {
           Delete
         </Button>
       </div>
+
+      {editDirector && companyId && (
+        <DirectorEditDialog
+          open={!!editDirector}
+          onOpenChange={(o) => !o && setEditDirector(null)}
+          organizationId={companyId}
+          director={editDirector}
+          onSaved={() =>
+            utils.companies.getOverview.invalidate({ orgId: companyId })
+          }
+        />
+      )}
 
       <DeleteConfirmDialog
         open={deleteOpen}

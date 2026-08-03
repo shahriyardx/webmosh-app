@@ -73,6 +73,41 @@ async function accountsFor(userId: string) {
   return { from, to, rates, remarks }
 }
 
+/**
+ * Fee accrual for a client: total fee charged across approved normal
+ * transactions, minus what the admin has already withdrawn (isFee rows).
+ */
+async function feeSummaryFor(userId: string) {
+  const [user, txs] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { exchangeFeePercent: true, exchangeFeeStartDate: true },
+    }),
+    prisma.exchangeTransaction.findMany({
+      where: { userId, status: ExchangeTxStatus.approved },
+      select: { amount: true, isFee: true, date: true },
+    }),
+  ])
+  const feePercent = user?.exchangeFeePercent ?? 0
+  const feeStartDate = user?.exchangeFeeStartDate ?? null
+  let accruedFee = 0
+  let withdrawnFee = 0
+  for (const t of txs) {
+    // The start date resets the fee window: nothing before it counts — not
+    // the charged fees, and not any fee already withdrawn earlier.
+    if (feeStartDate && t.date < feeStartDate) continue
+    if (t.isFee) withdrawnFee += t.amount
+    else accruedFee += (t.amount * feePercent) / 100
+  }
+  return {
+    feePercent,
+    feeStartDate,
+    accruedFee,
+    withdrawnFee,
+    outstandingFee: Math.max(0, accruedFee - withdrawnFee),
+  }
+}
+
 async function assertEnabled(userId: string) {
   const u = await prisma.user.findUnique({
     where: { id: userId },
@@ -173,11 +208,68 @@ export const exchangeRouter = router({
 
   create: adminProcedure
     .input(z.object({ userId: z.string(), ...txShape }))
+    .mutation(async ({ input }) => {
+      const u = await prisma.user.findUnique({
+        where: { id: input.userId },
+        select: { exchangeFeePercent: true },
+      })
+      return prisma.exchangeTransaction.create({
+        data: {
+          userId: input.userId,
+          status: ExchangeTxStatus.approved,
+          feePercent: u?.exchangeFeePercent ?? 0,
+          ...cleanTx(input),
+        },
+      })
+    }),
+
+  /** Current fee % + accrual summary for a client. */
+  feeSummary: adminProcedure
+    .input(z.object({ userId: z.string() }))
+    .query(({ input }) => feeSummaryFor(input.userId)),
+
+  /**
+   * Set the per-transaction fee percentage charged to a client, and the date
+   * from which it applies (null = every transaction).
+   */
+  setFeePercent: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        percent: z.number().min(0).max(100),
+        startDate: z.date().nullable().optional(),
+      }),
+    )
+    .mutation(({ input }) =>
+      prisma.user.update({
+        where: { id: input.userId },
+        data: {
+          exchangeFeePercent: input.percent,
+          ...(input.startDate !== undefined && {
+            exchangeFeeStartDate: input.startDate,
+          }),
+        },
+        select: {
+          id: true,
+          exchangeFeePercent: true,
+          exchangeFeeStartDate: true,
+        },
+      }),
+    ),
+
+  /**
+   * Withdraw the accrued fee as a normal (approved) exchange transaction,
+   * flagged so the ledger renders it in red. Does not itself accrue a fee.
+   */
+  withdrawFee: adminProcedure
+    .input(z.object({ userId: z.string(), ...txShape }))
     .mutation(({ input }) =>
       prisma.exchangeTransaction.create({
         data: {
           userId: input.userId,
           status: ExchangeTxStatus.approved,
+          isFee: true,
+          feePercent: 0,
           ...cleanTx(input),
         },
       }),
@@ -230,15 +322,25 @@ export const exchangeRouter = router({
     return accountsFor(ctx.user.id)
   }),
 
+  myFeeSummary: protectedProcedure.query(async ({ ctx }) => {
+    await assertEnabled(ctx.user.id)
+    return feeSummaryFor(ctx.user.id)
+  }),
+
   /** Client submits a transaction — created as pending until an admin approves. */
   myCreate: protectedProcedure
     .input(z.object(txShape))
     .mutation(async ({ input, ctx }) => {
       await assertEnabled(ctx.user.id)
+      const u = await prisma.user.findUnique({
+        where: { id: ctx.user.id },
+        select: { exchangeFeePercent: true },
+      })
       const tx = await prisma.exchangeTransaction.create({
         data: {
           userId: ctx.user.id,
           status: ExchangeTxStatus.pending,
+          feePercent: u?.exchangeFeePercent ?? 0,
           ...cleanTx(input),
         },
       })

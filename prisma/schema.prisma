@@ -43,6 +43,10 @@ model User {
   bankAccounts  BankAccount[]
   freelancerAdjustments FreelancerAdjustment[]
   exchangeEnabled Boolean @default(false) @map("exchange_enabled")
+  // Per-transaction fee charged to this client, as a percentage of the amount.
+  exchangeFeePercent Float @default(0) @map("exchange_fee_percent")
+  // The fee only applies to transactions dated on/after this day (null = all).
+  exchangeFeeStartDate DateTime? @map("exchange_fee_start_date")
   exchangeTransactions ExchangeTransaction[]
 
   @@unique([email])
@@ -162,8 +166,11 @@ model Organization {
   stateFilingDue           DateTime? @map("state_filing_due")
   federalFilingDue         DateTime? @map("federal_filing_due")
   stateTaxDue              DateTime? @map("state_tax_due")
-  stripeStatus   AccountStatus @default(not_started) @map("stripe_status")
-  wiseStatus     AccountStatus @default(not_started) @map("wise_status")
+  // Manual admin status overrides. NULL = follow the live order status ("Auto");
+  // a set value wins over the order-derived status on the company list.
+  stripeStatusOverride  AccountStatus? @map("stripe_status_override")
+  paypalStatusOverride  AccountStatus? @map("paypal_status_override")
+  wiseStatusOverride    AccountStatus? @map("wise_status_override")
   websiteStatusOverride AccountStatus? @map("website_status_override")
   directors      Director[]
   documents      Document[]
@@ -602,6 +609,10 @@ model ExchangeTransaction {
   fromAccount String           @map("from_account")
   toAccount   String           @map("to_account")
   remark      String?
+  // Fee percentage applied to this transaction (snapshot at creation).
+  feePercent  Float            @default(0) @map("fee_percent")
+  // A monthly fee withdrawal by the admin — a normal transaction shown in red.
+  isFee       Boolean          @default(false) @map("is_fee")
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 

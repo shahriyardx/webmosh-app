@@ -121,11 +121,6 @@ function orderStatusMeta(
   }
 }
 
-function OrderStatusPill({ status }: { status: string | null }) {
-  const m = orderStatusMeta(status)
-  return <Pill tone={m.tone} label={m.label} />
-}
-
 function accountMeta(s: string): { tone: keyof typeof PILL_STYLES; label: string } {
   switch (s) {
     case "active":
@@ -149,6 +144,33 @@ function websiteEffectiveMeta(
   return websiteMeta(c.websiteStatus)
 }
 
+/**
+ * Effective Stripe/PayPal/Wise pill: a manual admin override wins over the
+ * live order status. NULL override → follow the order ("Auto").
+ */
+function categoryEffectiveMeta(
+  override: string | null,
+  orderStatus: string | null,
+): { tone: keyof typeof PILL_STYLES; label: string } {
+  if (override) return accountMeta(override)
+  return orderStatusMeta(orderStatus)
+}
+
+const CATEGORY_FIELDS = {
+  stripe: (c: CompanyRow) => ({
+    override: c.stripeStatusOverride,
+    order: c.stripeOrderStatus,
+  }),
+  paypal: (c: CompanyRow) => ({
+    override: c.paypalStatusOverride,
+    order: c.paypalOrderStatus,
+  }),
+  wise: (c: CompanyRow) => ({
+    override: c.wiseStatusOverride,
+    order: c.wiseOrderStatus,
+  }),
+} as const
+
 const rank = {
   active: 4,
   completed: 4,
@@ -167,10 +189,10 @@ export function CompaniesTable({
 }: {
   companies: CompanyRow[]
   mode?: "user" | "admin"
-  /** Admin only: change a company's Website/Stripe/Wise status. */
+  /** Admin only: change a company's Website/Stripe/PayPal/Wise status. */
   onSetStatus?: (
     organizationId: string,
-    field: "stripe" | "wise" | "website",
+    field: "stripe" | "paypal" | "wise" | "website",
     status: SetStatusValue,
   ) => void
   /** Admin only: `${orgId}:${field}` currently saving. */
@@ -204,13 +226,24 @@ export function CompaniesTable({
       if (s === "active") bucket.active++
       else if (s === "closed") bucket.closed++
     }
-    // For category orders: active = completed, closed slot = in progress.
+    // Category columns: a manual override wins over the live order status.
+    // active = completed/active, "closed" slot = in progress / pending.
     const tallyCat = (
       bucket: { active: number; closed: number },
-      s: string | null,
+      override: string | null,
+      order: string | null,
     ) => {
-      if (s === "completed") bucket.active++
-      else if (s === "pending" || s === "processing" || s === "awaiting_quote")
+      if (override) {
+        if (override === "active") bucket.active++
+        else if (override === "pending") bucket.closed++
+        return
+      }
+      if (order === "completed") bucket.active++
+      else if (
+        order === "pending" ||
+        order === "processing" ||
+        order === "awaiting_quote"
+      )
         bucket.closed++
     }
     for (const c of companies) {
@@ -220,9 +253,9 @@ export function CompaniesTable({
           ? "active"
           : ""
       tallyWeb(website, web)
-      tallyCat(stripe, c.stripeOrderStatus)
-      tallyCat(paypal, c.paypalOrderStatus)
-      tallyCat(wise, c.wiseOrderStatus)
+      tallyCat(stripe, c.stripeStatusOverride, c.stripeOrderStatus)
+      tallyCat(paypal, c.paypalStatusOverride, c.paypalOrderStatus)
+      tallyCat(wise, c.wiseStatusOverride, c.wiseOrderStatus)
     }
     return { website, stripe, paypal, wise }
   }, [companies])
@@ -257,20 +290,22 @@ export function CompaniesTable({
           )
         case "stripe":
           return (
-            ((rank[a.stripeOrderStatus ?? ""] ?? -1) -
-              (rank[b.stripeOrderStatus ?? ""] ?? -1)) *
+            ((rank[a.stripeStatusOverride ?? a.stripeOrderStatus ?? ""] ?? -1) -
+              (rank[b.stripeStatusOverride ?? b.stripeOrderStatus ?? ""] ??
+                -1)) *
             dir
           )
         case "paypal":
           return (
-            ((rank[a.paypalOrderStatus ?? ""] ?? -1) -
-              (rank[b.paypalOrderStatus ?? ""] ?? -1)) *
+            ((rank[a.paypalStatusOverride ?? a.paypalOrderStatus ?? ""] ?? -1) -
+              (rank[b.paypalStatusOverride ?? b.paypalOrderStatus ?? ""] ??
+                -1)) *
             dir
           )
         case "wise":
           return (
-            ((rank[a.wiseOrderStatus ?? ""] ?? -1) -
-              (rank[b.wiseOrderStatus ?? ""] ?? -1)) *
+            ((rank[a.wiseStatusOverride ?? a.wiseOrderStatus ?? ""] ?? -1) -
+              (rank[b.wiseStatusOverride ?? b.wiseOrderStatus ?? ""] ?? -1)) *
             dir
           )
         default:
@@ -418,13 +453,31 @@ export function CompaniesTable({
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <OrderStatusPill status={c.stripeOrderStatus} />
+                    <CategoryCell
+                      c={c}
+                      field="stripe"
+                      mode={mode}
+                      onSetStatus={onSetStatus}
+                      pendingKey={pendingKey}
+                    />
                   </td>
                   <td className="px-4 py-3">
-                    <OrderStatusPill status={c.paypalOrderStatus} />
+                    <CategoryCell
+                      c={c}
+                      field="paypal"
+                      mode={mode}
+                      onSetStatus={onSetStatus}
+                      pendingKey={pendingKey}
+                    />
                   </td>
                   <td className="px-4 py-3">
-                    <OrderStatusPill status={c.wiseOrderStatus} />
+                    <CategoryCell
+                      c={c}
+                      field="wise"
+                      mode={mode}
+                      onSetStatus={onSetStatus}
+                      pendingKey={pendingKey}
+                    />
                   </td>
                   {showRdp && (
                     <td className="px-4 py-3 font-mono text-xs">
@@ -533,7 +586,7 @@ function SummaryCard({
 
 type SetStatusFn = (
   organizationId: string,
-  field: "stripe" | "wise" | "website",
+  field: "stripe" | "paypal" | "wise" | "website",
   status: SetStatusValue,
 ) => void
 
@@ -565,6 +618,53 @@ function WebsiteCell({
       disabled={saving}
       onChange={(e) =>
         onSetStatus(c.id, "website", e.target.value as SetStatusValue)
+      }
+      className={`${STATUS_SELECT_CLS} ${PILL_STYLES[meta.tone]}`}
+    >
+      <option value="auto" className="bg-background text-foreground">
+        {autoLabel}
+      </option>
+      {ACCOUNT_OPTIONS.map((o) => (
+        <option
+          key={o.value}
+          value={o.value}
+          className="bg-background text-foreground"
+        >
+          {o.label}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+function CategoryCell({
+  c,
+  field,
+  mode,
+  onSetStatus,
+  pendingKey,
+}: {
+  c: CompanyRow
+  field: "stripe" | "paypal" | "wise"
+  mode: "user" | "admin"
+  onSetStatus?: SetStatusFn
+  pendingKey?: string | null
+}) {
+  const { override, order } = CATEGORY_FIELDS[field](c)
+  const meta = categoryEffectiveMeta(override, order)
+  if (mode !== "admin" || !onSetStatus) {
+    return <Pill tone={meta.tone} label={meta.label} />
+  }
+  const saving = pendingKey === `${c.id}:${field}`
+  // Selected value is the override, or "auto" when following the live order.
+  const value = override ?? "auto"
+  const autoLabel = `Auto — ${orderStatusMeta(order).label}`
+  return (
+    <select
+      value={value}
+      disabled={saving}
+      onChange={(e) =>
+        onSetStatus(c.id, field, e.target.value as SetStatusValue)
       }
       className={`${STATUS_SELECT_CLS} ${PILL_STYLES[meta.tone]}`}
     >

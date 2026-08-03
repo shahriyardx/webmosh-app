@@ -187,8 +187,9 @@ async function listCompaniesForUser(userId: string) {
           createdAt: true,
           confirmationStatementDue: true,
           accountsFilingDue: true,
-          stripeStatus: true,
-          wiseStatus: true,
+          stripeStatusOverride: true,
+          paypalStatusOverride: true,
+          wiseStatusOverride: true,
           websiteStatusOverride: true,
         },
       },
@@ -511,11 +512,16 @@ export const companiesRouter = router({
         director: z.object({
           name: z.string().min(1),
           dateOfBirth: z.string().min(1),
+          email: z.string().email().optional(),
+          phone: z.string().optional(),
         }),
-        certificateUrl: z.string().min(1),
-        articlesUrl: z.string().min(1),
-        einLetterUrl: z.string().min(1),
-        passportUrl: z.string().min(1),
+        // Documents are optional — a client can upload them later. A missing
+        // URL creates a "requested" placeholder they can fulfil from their
+        // dashboard.
+        certificateUrl: z.string().optional(),
+        articlesUrl: z.string().optional(),
+        einLetterUrl: z.string().optional(),
+        passportUrl: z.string().optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -561,40 +567,28 @@ export const companiesRouter = router({
           organizationId: org.id,
           firstName,
           lastName,
-          email: "",
-          phone: "",
+          email: input.director.email?.trim() || "",
+          phone: input.director.phone?.trim() || "",
           dateOfBirth: input.director.dateOfBirth.trim(),
           address: input.registeredAddress.trim(),
         },
       })
 
+      // Any document without a URL is created as "requested" so the client can
+      // upload it later from their dashboard.
+      const docDefs: { name: string; url?: string }[] = [
+        { name: "Certificate of Incorporation", url: input.certificateUrl },
+        { name: "Articles of Organization", url: input.articlesUrl },
+        { name: "EIN Letter", url: input.einLetterUrl },
+        { name: "Director Passport", url: input.passportUrl },
+      ]
       await prisma.document.createMany({
-        data: [
-          {
-            name: "Certificate of Incorporation",
-            value: input.certificateUrl,
-            status: DocumentStatus.submitted,
-            organizationId: org.id,
-          },
-          {
-            name: "Articles of Organization",
-            value: input.articlesUrl,
-            status: DocumentStatus.submitted,
-            organizationId: org.id,
-          },
-          {
-            name: "EIN Letter",
-            value: input.einLetterUrl,
-            status: DocumentStatus.submitted,
-            organizationId: org.id,
-          },
-          {
-            name: "Director Passport",
-            value: input.passportUrl,
-            status: DocumentStatus.submitted,
-            organizationId: org.id,
-          },
-        ],
+        data: docDefs.map((d) => ({
+          name: d.name,
+          value: d.url || null,
+          status: d.url ? DocumentStatus.submitted : DocumentStatus.requested,
+          organizationId: org.id,
+        })),
       })
 
       await createAdminNotification({
@@ -751,6 +745,9 @@ export const companiesRouter = router({
           type: true,
           companyId: true,
           authCode: true,
+          state: true,
+          ein: true,
+          registeredAddress: true,
           confirmationStatementDue: true,
           accountsFilingDue: true,
           stateFilingDue: true,
@@ -1010,6 +1007,50 @@ export const companiesRouter = router({
       })
     }),
 
+  /**
+   * Edit a director's details. Available to an admin or a member of the
+   * company (US and UK alike). Directors are the single source of truth, so
+   * the change reflects everywhere the director is shown (client, admin, and
+   * the assigned freelancer's task).
+   */
+  updateDirector: protectedProcedure
+    .input(
+      z.object({
+        directorId: z.string(),
+        organizationId: z.string(),
+        firstName: z.string().min(1, "Name is required"),
+        lastName: z.string().optional(),
+        email: z.string().email("Enter a valid email").or(z.literal("")).optional(),
+        phone: z.string().optional(),
+        dateOfBirth: z.string().optional(),
+        address: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Admins can edit any company; otherwise the caller must be a member.
+      if (ctx.user.role !== "admin") {
+        await assertOrgMember(ctx.user.id, input.organizationId)
+      }
+      // Make sure the director actually belongs to this organization.
+      const director = await prisma.director.findFirst({
+        where: { id: input.directorId, organizationId: input.organizationId },
+        select: { id: true },
+      })
+      if (!director) throw new Error("Director not found")
+
+      return prisma.director.update({
+        where: { id: input.directorId },
+        data: {
+          firstName: input.firstName.trim(),
+          lastName: input.lastName?.trim() ?? "",
+          email: input.email?.trim() ?? "",
+          phone: input.phone?.trim() ?? "",
+          dateOfBirth: input.dateOfBirth?.trim() ?? "",
+          address: input.address?.trim() ?? "",
+        },
+      })
+    }),
+
   updateStatus: adminProcedure
     .input(z.object({ id: z.string(), status: z.nativeEnum(CompanyStatus) }))
     .mutation(async ({ input }) => {
@@ -1049,35 +1090,39 @@ export const companiesRouter = router({
     .input(z.object({ userId: z.string() }))
     .query(({ input }) => listCompaniesForUser(input.userId)),
 
-  /** Admin: set a company's Stripe, Wise, or Website account status. */
+  /**
+   * Admin: manually set a company's Stripe / PayPal / Wise / Website status.
+   * "auto" clears the override so the column follows the live order status.
+   */
   setAccountStatus: adminProcedure
     .input(
       z.object({
         organizationId: z.string(),
-        field: z.enum(["stripe", "wise", "website"]),
-        // "auto" clears a Website override so it follows the order again.
+        field: z.enum(["stripe", "paypal", "wise", "website"]),
         status: z.union([z.nativeEnum(AccountStatus), z.literal("auto")]),
       }),
     )
     .mutation(async ({ input }) => {
       const { organizationId, field, status } = input
-      if (field === "website") {
-        return prisma.organization.update({
-          where: { id: organizationId },
-          data: {
-            websiteStatusOverride: status === "auto" ? null : status,
-          },
-          select: { id: true, websiteStatusOverride: true },
-        })
-      }
-      if (status === "auto") throw new Error("Invalid status")
+      const value = status === "auto" ? null : status
+      const data =
+        field === "stripe"
+          ? { stripeStatusOverride: value }
+          : field === "paypal"
+            ? { paypalStatusOverride: value }
+            : field === "wise"
+              ? { wiseStatusOverride: value }
+              : { websiteStatusOverride: value }
       return prisma.organization.update({
         where: { id: organizationId },
-        data:
-          field === "stripe"
-            ? { stripeStatus: status }
-            : { wiseStatus: status },
-        select: { id: true, stripeStatus: true, wiseStatus: true },
+        data,
+        select: {
+          id: true,
+          stripeStatusOverride: true,
+          paypalStatusOverride: true,
+          wiseStatusOverride: true,
+          websiteStatusOverride: true,
+        },
       })
     }),
 

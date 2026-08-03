@@ -101,7 +101,7 @@ export default function AdminClientProfilePage({
 
   const handleSetStatus = (
     organizationId: string,
-    field: "stripe" | "wise" | "website",
+    field: "stripe" | "paypal" | "wise" | "website",
     status: SetStatusValue,
   ) => {
     setStatusPending(`${organizationId}:${field}`)

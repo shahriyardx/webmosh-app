@@ -79,6 +79,33 @@ function FileField({
   )
 }
 
+function ModeButton({
+  active,
+  title,
+  subtitle,
+  onClick,
+}: {
+  active: boolean
+  title: string
+  subtitle: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+        active
+          ? "border-sky-500 bg-sky-500/10 ring-1 ring-sky-500/40"
+          : "border-border hover:border-sky-500/40"
+      }`}
+    >
+      <p className="text-sm font-semibold text-foreground">{title}</p>
+      <p className="text-xs text-muted-foreground">{subtitle}</p>
+    </button>
+  )
+}
+
 export function UsCompanyImport({
   onDone,
 }: {
@@ -91,6 +118,9 @@ export function UsCompanyImport({
   const [ein, setEin] = useState("")
   const [directorName, setDirectorName] = useState("")
   const [directorDob, setDirectorDob] = useState("")
+  const [directorEmail, setDirectorEmail] = useState("")
+  const [directorPhone, setDirectorPhone] = useState("")
+  const [docMode, setDocMode] = useState<"now" | "later">("now")
   const [files, setFiles] = useState<DocFiles>({})
   const [uploading, setUploading] = useState(false)
 
@@ -117,9 +147,33 @@ export function UsCompanyImport({
       toast.error("Please fill in all required fields.")
       return
     }
+
+    const baseInput = {
+      companyName: companyName.trim(),
+      companyNumber: companyNumber.trim() || undefined,
+      state,
+      registeredAddress: registeredAddress.trim(),
+      ein: ein.trim() || undefined,
+      director: {
+        name: directorName.trim(),
+        dateOfBirth: directorDob,
+        email: directorEmail.trim() || undefined,
+        phone: directorPhone.trim() || undefined,
+      },
+    }
+
+    // Upload later: skip the files entirely — the backend creates document
+    // placeholders the client can fulfil from their dashboard.
+    if (docMode === "later") {
+      importUs.mutate(baseInput)
+      return
+    }
+
     const { certificate, articles, einLetter, passport } = files
     if (!certificate || !articles || !einLetter || !passport) {
-      toast.error("Please upload all four documents.")
+      toast.error(
+        "Please upload all four documents, or choose “Upload later”.",
+      )
       return
     }
 
@@ -144,12 +198,7 @@ export function UsCompanyImport({
         throw new Error("Document upload failed. Please try again.")
       }
       importUs.mutate({
-        companyName: companyName.trim(),
-        companyNumber: companyNumber.trim() || undefined,
-        state,
-        registeredAddress: registeredAddress.trim(),
-        ein: ein.trim() || undefined,
-        director: { name: directorName.trim(), dateOfBirth: directorDob },
+        ...baseInput,
         certificateUrl,
         articlesUrl,
         einLetterUrl,
@@ -240,32 +289,77 @@ export function UsCompanyImport({
               onChange={(e) => setDirectorDob(e.target.value)}
             />
           </div>
+          <div className="space-y-1.5">
+            <Label>Email</Label>
+            <Input
+              type="email"
+              placeholder="director@example.com"
+              value={directorEmail}
+              onChange={(e) => setDirectorEmail(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Phone</Label>
+            <Input
+              type="tel"
+              placeholder="+1 555 123 4567"
+              value={directorPhone}
+              onChange={(e) => setDirectorPhone(e.target.value)}
+            />
+          </div>
         </div>
-        <FileField
-          label="Director passport *"
-          file={files.passport}
-          onPick={(f) => setFile("passport", f)}
-        />
       </div>
 
       {/* Documents */}
       <div className="space-y-4 border-t border-border pt-6">
         <h3 className="text-sm font-semibold text-foreground">Documents</h3>
-        <FileField
-          label="Certificate of Incorporation *"
-          file={files.certificate}
-          onPick={(f) => setFile("certificate", f)}
-        />
-        <FileField
-          label="Articles of Organization *"
-          file={files.articles}
-          onPick={(f) => setFile("articles", f)}
-        />
-        <FileField
-          label="EIN Letter *"
-          file={files.einLetter}
-          onPick={(f) => setFile("einLetter", f)}
-        />
+
+        {/* Upload now / later choice */}
+        <div className="grid grid-cols-2 gap-2">
+          <ModeButton
+            active={docMode === "now"}
+            title="Upload now"
+            subtitle="Attach documents today"
+            onClick={() => setDocMode("now")}
+          />
+          <ModeButton
+            active={docMode === "later"}
+            title="Upload later"
+            subtitle="Add them from your dashboard"
+            onClick={() => setDocMode("later")}
+          />
+        </div>
+
+        {docMode === "now" ? (
+          <div className="space-y-4">
+            <FileField
+              label="Director passport *"
+              file={files.passport}
+              onPick={(f) => setFile("passport", f)}
+            />
+            <FileField
+              label="Certificate of Incorporation *"
+              file={files.certificate}
+              onPick={(f) => setFile("certificate", f)}
+            />
+            <FileField
+              label="Articles of Organization *"
+              file={files.articles}
+              onPick={(f) => setFile("articles", f)}
+            />
+            <FileField
+              label="EIN Letter *"
+              file={files.einLetter}
+              onPick={(f) => setFile("einLetter", f)}
+            />
+          </div>
+        ) : (
+          <p className="rounded-lg bg-muted/50 px-3 py-2.5 text-sm text-muted-foreground">
+            No problem — we&apos;ll add the passport, certificate, articles and
+            EIN letter as pending items. You can upload each one later from your
+            company&apos;s documents page.
+          </p>
+        )}
       </div>
 
       <Button className="w-full" onClick={submit} disabled={busy}>

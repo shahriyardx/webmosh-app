@@ -37,6 +37,7 @@ import {
   PaperclipIcon,
   Trash2Icon,
   MonitorIcon,
+  PencilIcon,
 } from "lucide-react"
 import {
   MultiSelect,
@@ -56,6 +57,10 @@ import {
 import { CompaniesHouseCard, OfficersCard, FilingHistoryCard } from "@/components/companies-house-card"
 import { CompanyServicesWidget } from "@/components/company-services-widget"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
+import {
+  DirectorEditDialog,
+  type EditableDirector,
+} from "@/components/director-edit-dialog"
 
 function toDateInput(d: Date | string | null | undefined): string {
   if (!d) return ""
@@ -144,6 +149,9 @@ export default function FormationDetailPage({
   const utils = trpc.useUtils()
 
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [editDirector, setEditDirector] = useState<EditableDirector | null>(
+    null,
+  )
   const deleteFormation = trpc.companies.deleteFormation.useMutation({
     onSuccess: () => {
       utils.companies.listAll.invalidate()
@@ -449,13 +457,13 @@ export default function FormationDetailPage({
                   </span>
                 }
               />
-              <Stat label="SIC Code" value={org.sicCode ?? "—"} />
+              {org.state && <Stat label="State" value={org.state} />}
+              {org.ein && <Stat label="EIN" value={org.ein} />}
+              {org.sicCode && <Stat label="SIC Code" value={org.sicCode} />}
               <Stat
                 label="Created"
                 value={new Date(org.createdAt).toLocaleDateString()}
               />
-              {org.state && <Stat label="State" value={org.state} />}
-              {org.ein && <Stat label="EIN" value={org.ein} />}
             </div>
 
             {org.registeredAddress && (
@@ -652,32 +660,65 @@ export default function FormationDetailPage({
           <CardContent>
             <div className="divide-y divide-border">
               {org.directors.map((d) => (
-                <div key={d.id} className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Name</p>
-                    <p className="text-sm font-medium">{d.firstName} {d.lastName}</p>
+                <div key={d.id} className="py-4 first:pt-0 last:pb-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold">
+                      {d.firstName} {d.lastName}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setEditDirector({
+                          id: d.id,
+                          firstName: d.firstName,
+                          lastName: d.lastName,
+                          email: d.email,
+                          phone: d.phone,
+                          dateOfBirth: d.dateOfBirth,
+                          address: d.address,
+                        })
+                      }
+                    >
+                      <PencilIcon className="size-3.5" />
+                      Edit
+                    </Button>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Email</p>
-                    <p className="text-sm">{d.email}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Phone</p>
-                    <p className="text-sm">{d.phone}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Date of Birth</p>
-                    <p className="text-sm">{d.dateOfBirth}</p>
-                  </div>
-                  <div className="space-y-1 sm:col-span-2">
-                    <p className="text-xs text-muted-foreground">Address</p>
-                    <p className="text-sm">{d.address}</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Email</p>
+                      <p className="text-sm">{d.email || "—"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Phone</p>
+                      <p className="text-sm">{d.phone || "—"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">
+                        Date of Birth
+                      </p>
+                      <p className="text-sm">{d.dateOfBirth || "—"}</p>
+                    </div>
+                    <div className="space-y-1 sm:col-span-2">
+                      <p className="text-xs text-muted-foreground">Address</p>
+                      <p className="text-sm">{d.address || "—"}</p>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {editDirector && (
+        <DirectorEditDialog
+          open={!!editDirector}
+          onOpenChange={(o) => !o && setEditDirector(null)}
+          organizationId={id}
+          director={editDirector}
+          onSaved={() => utils.companies.getById.invalidate({ id })}
+        />
       )}
 
       {/* Documents */}

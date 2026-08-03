@@ -35,6 +35,7 @@ import {
   XIcon,
   PencilIcon,
   CheckIcon,
+  BanknoteIcon,
 } from "lucide-react"
 
 export const money = (n: number) =>
@@ -78,6 +79,8 @@ type Tx = {
   fromAccount: string
   toAccount: string
   remark: string | null
+  feePercent: number
+  isFee: boolean
 }
 
 export function ExchangeLedger({
@@ -125,6 +128,29 @@ export function ExchangeLedger({
   })
   const accounts = isAdmin ? adminAccounts.data : clientAccounts.data
 
+  // Fee accrual summary + per-client fee percentage (admin sets it).
+  const adminFee = trpc.exchange.feeSummary.useQuery(
+    { userId: userId ?? "" },
+    { enabled: isAdmin && !!userId },
+  )
+  const clientFee = trpc.exchange.myFeeSummary.useQuery(undefined, {
+    enabled: !isAdmin,
+  })
+  const fee = isAdmin ? adminFee.data : clientFee.data
+
+  const [feeInput, setFeeInput] = useState("")
+  const [feeStartInput, setFeeStartInput] = useState("")
+  useEffect(() => {
+    if (adminFee.data) {
+      setFeeInput(String(adminFee.data.feePercent))
+      setFeeStartInput(
+        adminFee.data.feeStartDate
+          ? new Date(adminFee.data.feeStartDate).toISOString().slice(0, 10)
+          : "",
+      )
+    }
+  }, [adminFee.data])
+
   const [form, setForm] = useState<TxForm>(emptyTx)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
@@ -136,6 +162,8 @@ export function ExchangeLedger({
     utils.exchange.accounts.invalidate()
     utils.exchange.myAccounts.invalidate()
     utils.exchange.enabledClients.invalidate()
+    utils.exchange.feeSummary.invalidate()
+    utils.exchange.myFeeSummary.invalidate()
   }
 
   const adminCreate = trpc.exchange.create.useMutation({
@@ -182,6 +210,24 @@ export function ExchangeLedger({
       invalidate()
       setDeleteId(null)
       toast.success("Entry removed")
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const saveFee = trpc.exchange.setFeePercent.useMutation({
+    onSuccess: () => {
+      utils.exchange.feeSummary.invalidate()
+      toast.success("Fee updated")
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  const [withdrawOpen, setWithdrawOpen] = useState(false)
+  const [withdrawForm, setWithdrawForm] = useState<TxForm>(emptyTx)
+  const withdrawFee = trpc.exchange.withdrawFee.useMutation({
+    onSuccess: () => {
+      invalidate()
+      setWithdrawOpen(false)
+      toast.success("Fee withdrawn")
     },
     onError: (e) => toast.error(e.message),
   })
@@ -238,12 +284,44 @@ export function ExchangeLedger({
     else clientDelete.mutate({ id: deleteId })
   }
 
+  const submitFee = () => {
+    if (!userId) return
+    const p = parseFloat(feeInput)
+    if (isNaN(p) || p < 0 || p > 100) {
+      toast.error("Enter a fee percent between 0 and 100.")
+      return
+    }
+    saveFee.mutate({
+      userId,
+      percent: p,
+      startDate: feeStartInput ? new Date(feeStartInput) : null,
+    })
+  }
+
+  const openWithdraw = () => {
+    setWithdrawForm({
+      ...emptyTx(),
+      amount: fee ? (fee.outstandingFee || 0).toFixed(2) : "",
+      remark: "Monthly fee withdrawal",
+    })
+    setWithdrawOpen(true)
+  }
+  const submitWithdraw = () => {
+    if (!userId) return
+    const parsed = parse(withdrawForm)
+    if (parsed) withdrawFee.mutate({ userId, ...parsed })
+  }
+
   const creating = adminCreate.isPending || clientCreate.isPending
   const setField = (patch: Partial<TxForm>) =>
     setForm((f) => ({ ...f, ...patch }))
   const hasFilters =
     fromDate || toDate || toAccount !== ALL || fromAccount !== ALL
   const items = (data?.items ?? []) as Tx[]
+
+  // Current fee settings used to show the per-row fee (gated by start date).
+  const feePct = fee?.feePercent ?? 0
+  const feeStart = fee?.feeStartDate ? new Date(fee.feeStartDate) : null
 
   return (
     <div className="space-y-6">
@@ -326,6 +404,80 @@ export function ExchangeLedger({
         </CardContent>
       </Card>
 
+      {/* Fee control (admin) */}
+      {isAdmin && (
+        <Card className="border-red-500/20">
+          <CardContent className="flex flex-wrap items-end justify-between gap-4 p-5">
+            <div className="flex flex-wrap items-end gap-3">
+              <Labeled label="Transaction fee (%)">
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  className="w-32"
+                  placeholder="0"
+                  value={feeInput}
+                  onChange={(e) => setFeeInput(e.target.value)}
+                />
+              </Labeled>
+              <Labeled label="Fee from">
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="date"
+                    className="w-40"
+                    value={feeStartInput}
+                    onChange={(e) => setFeeStartInput(e.target.value)}
+                  />
+                  {feeStartInput && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-9 shrink-0 text-muted-foreground"
+                      title="Clear start date"
+                      onClick={() => setFeeStartInput("")}
+                    >
+                      <XIcon className="size-4" />
+                    </Button>
+                  )}
+                </div>
+              </Labeled>
+              <Button
+                variant="outline"
+                disabled={saveFee.isPending}
+                onClick={submitFee}
+              >
+                {saveFee.isPending ? "Saving…" : "Save fee"}
+              </Button>
+              <p className="pb-2 text-xs text-muted-foreground">
+                {feeStartInput
+                  ? "Charged on transactions from this date onward."
+                  : "Charged on every transaction. Set a start date to limit it."}
+              </p>
+            </div>
+            <div className="flex items-end gap-4">
+              <div className="text-right">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Fee to withdraw
+                </p>
+                <p className="text-xl font-bold tabular-nums text-red-600 dark:text-red-400">
+                  ${money(fee?.outstandingFee ?? 0)}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="border-red-500/40 text-red-600 hover:text-red-600 dark:text-red-400 dark:hover:text-red-400"
+                disabled={!fee || fee.outstandingFee <= 0}
+                onClick={openWithdraw}
+              >
+                <BanknoteIcon className="size-4" />
+                Withdraw fee
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filters */}
       <Card>
         <CardContent className="flex flex-wrap items-end gap-3 p-4">
@@ -375,7 +527,7 @@ export function ExchangeLedger({
       </Card>
 
       {/* Totals */}
-      <div className="grid gap-4 sm:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Stat label="Transactions" value={String(data?.count ?? 0)} />
         <Stat
           label="Pending"
@@ -395,6 +547,11 @@ export function ExchangeLedger({
           value={`৳${money(data?.totalBdt ?? 0)}`}
           valueClass="text-emerald-600 dark:text-emerald-400"
         />
+        <Stat
+          label={`Fee charged${fee?.feePercent ? ` (${money(fee.feePercent)}%)` : ""}`}
+          value={`$${money(fee?.accruedFee ?? 0)}`}
+          valueClass="text-red-600 dark:text-red-400"
+        />
       </div>
 
       {/* Table */}
@@ -404,6 +561,7 @@ export function ExchangeLedger({
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead className="text-right">Amount</TableHead>
+              <TableHead className="text-right">Fee</TableHead>
               <TableHead className="text-right">Rate (BDT)</TableHead>
               <TableHead>From</TableHead>
               <TableHead>To</TableHead>
@@ -416,14 +574,14 @@ export function ExchangeLedger({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={9} className="py-10 text-center">
+                <TableCell colSpan={10} className="py-10 text-center">
                   <div className="mx-auto size-5 animate-pulse rounded-full bg-sky-500/50" />
                 </TableCell>
               </TableRow>
             ) : items.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={9}
+                  colSpan={10}
                   className="py-12 text-center text-sm text-muted-foreground"
                 >
                   No transactions{hasFilters ? " match these filters" : " yet"}.
@@ -432,13 +590,34 @@ export function ExchangeLedger({
             ) : (
               items.map((tx) => {
                 const pending = tx.status === "pending"
+                const feeApplies =
+                  !tx.isFee &&
+                  feePct > 0 &&
+                  (!feeStart || new Date(tx.date) >= feeStart)
+                const rowFee = feeApplies ? (tx.amount * feePct) / 100 : 0
                 return (
-                  <TableRow key={tx.id} className={pending ? "bg-amber-500/[0.04]" : ""}>
+                  <TableRow
+                    key={tx.id}
+                    className={
+                      tx.isFee
+                        ? "bg-red-500/[0.05]"
+                        : pending
+                          ? "bg-amber-500/[0.04]"
+                          : ""
+                    }
+                  >
                     <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                       {new Date(tx.date).toLocaleDateString()}
                     </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
+                    <TableCell
+                      className={`text-right font-medium tabular-nums ${
+                        tx.isFee ? "text-red-600 dark:text-red-400" : ""
+                      }`}
+                    >
                       ${money(tx.amount)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {rowFee ? `$${money(rowFee)}` : "—"}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
                       {money(tx.rate)}
@@ -450,18 +629,26 @@ export function ExchangeLedger({
                     <TableCell className="max-w-48 truncate text-sm text-muted-foreground">
                       {tx.remark || "—"}
                     </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                    <TableCell
+                      className={`text-right font-semibold tabular-nums ${
+                        tx.isFee
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-emerald-600 dark:text-emerald-400"
+                      }`}
+                    >
                       ৳{money(tx.amount * tx.rate)}
                     </TableCell>
                     <TableCell>
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          pending
-                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                            : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                          tx.isFee
+                            ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                            : pending
+                              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                              : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
                         }`}
                       >
-                        {pending ? "Pending" : "Approved"}
+                        {tx.isFee ? "Fee" : pending ? "Pending" : "Approved"}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -575,6 +762,90 @@ export function ExchangeLedger({
             </Button>
             <Button onClick={submitEdit} disabled={update.isPending}>
               {update.isPending ? "Saving…" : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw fee dialog (admin) */}
+      <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Withdraw fee</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Records the accrued fee as an exchange transaction. It counts as a
+            normal transaction and is shown in{" "}
+            <span className="font-medium text-red-600 dark:text-red-400">
+              red
+            </span>
+            .
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Labeled label="Date">
+              <Input
+                type="date"
+                value={withdrawForm.date}
+                onChange={(e) =>
+                  setWithdrawForm((f) => ({ ...f, date: e.target.value }))
+                }
+              />
+            </Labeled>
+            <Labeled label="Amount (fee)">
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                value={withdrawForm.amount}
+                onChange={(e) =>
+                  setWithdrawForm((f) => ({ ...f, amount: e.target.value }))
+                }
+              />
+            </Labeled>
+            <Labeled label="Rate (BDT)">
+              <AutoInput
+                type="number"
+                value={withdrawForm.rate}
+                onChange={(v) => setWithdrawForm((f) => ({ ...f, rate: v }))}
+                options={accounts?.rates ?? []}
+              />
+            </Labeled>
+            <Labeled label="From account">
+              <AutoInput
+                value={withdrawForm.fromAccount}
+                onChange={(v) =>
+                  setWithdrawForm((f) => ({ ...f, fromAccount: v }))
+                }
+                options={accounts?.from ?? []}
+              />
+            </Labeled>
+            <Labeled label="To account">
+              <AutoInput
+                value={withdrawForm.toAccount}
+                onChange={(v) =>
+                  setWithdrawForm((f) => ({ ...f, toAccount: v }))
+                }
+                options={accounts?.to ?? []}
+              />
+            </Labeled>
+            <Labeled label="Remark (optional)">
+              <AutoInput
+                value={withdrawForm.remark}
+                onChange={(v) => setWithdrawForm((f) => ({ ...f, remark: v }))}
+                options={accounts?.remarks ?? []}
+              />
+            </Labeled>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWithdrawOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={submitWithdraw}
+              disabled={withdrawFee.isPending}
+            >
+              {withdrawFee.isPending ? "Withdrawing…" : "Withdraw fee"}
             </Button>
           </DialogFooter>
         </DialogContent>

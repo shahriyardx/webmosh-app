@@ -70,7 +70,24 @@ const taskSelect = {
     select: { id: true, name: true, email: true, image: true },
   },
   organization: {
-    select: { id: true, name: true, country: true },
+    select: {
+      id: true,
+      name: true,
+      country: true,
+      // Live director details so the assigned freelancer always sees the
+      // current info (edits by the client/admin reflect here immediately).
+      directors: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          dateOfBirth: true,
+          address: true,
+        },
+      },
+    },
   },
   order: {
     select: {

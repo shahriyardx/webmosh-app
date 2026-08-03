@@ -23,6 +23,7 @@ import {
   ClipboardListIcon,
   CalendarClockIcon,
   BuildingIcon,
+  UserIcon,
   PaletteIcon,
   Globe2Icon,
   MailIcon,
@@ -363,6 +364,62 @@ export default function FreelancerTaskDetailPage({
                       value={task.order.contactAddress}
                       multiline
                     />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+          {/* Director details (live from the company record) */}
+          {task.organization?.directors &&
+            task.organization.directors.length > 0 && (
+              <Card>
+                <CardContent className="space-y-4 p-6">
+                  <div className="flex items-center gap-2">
+                    <UserIcon className="size-4 text-sky-500" />
+                    <h2 className="text-sm font-semibold uppercase tracking-wider">
+                      {task.organization.directors.length > 1
+                        ? "Directors"
+                        : "Director"}
+                    </h2>
+                  </div>
+                  <div className="space-y-5">
+                    {task.organization.directors.map((d) => (
+                      <div
+                        key={d.id}
+                        className="grid gap-4 border-t border-border pt-5 first:border-0 first:pt-0 sm:grid-cols-2"
+                      >
+                        <FieldRow
+                          icon={<UserIcon className="size-4" />}
+                          label="Name"
+                          value={`${d.firstName} ${d.lastName}`.trim()}
+                        />
+                        <FieldRow
+                          icon={<MailIcon className="size-4" />}
+                          label="Email"
+                          value={d.email}
+                          copyable
+                        />
+                        <FieldRow
+                          icon={<PhoneIcon className="size-4" />}
+                          label="Phone"
+                          value={d.phone}
+                          copyable
+                        />
+                        <FieldRow
+                          icon={<CalendarClockIcon className="size-4" />}
+                          label="Date of birth"
+                          value={d.dateOfBirth}
+                        />
+                        <div className="sm:col-span-2">
+                          <FieldRow
+                            icon={<MapPinIcon className="size-4" />}
+                            label="Address"
+                            value={d.address}
+                            multiline
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
